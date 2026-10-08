@@ -150,6 +150,8 @@ create trigger share_grant_assertions_owner before insert or update on public.sh
 -- ---------- table privileges ----------
 -- Supabase grants ALL on public tables to anon/authenticated by default; tighten.
 revoke all on all tables in schema public from anon;
+-- Supabase's default privileges also hand anon every sequence in public (identity columns); anon never inserts.
+revoke all on all sequences in schema public from anon;
 grant select on public.jurisdictions, public.issuers, public.credential_catalog, public.verification_sources to anon;
 revoke update, delete, truncate on public.audit_events, public.share_access_events,
   public.monitoring_events, public.analytics_events from authenticated;
