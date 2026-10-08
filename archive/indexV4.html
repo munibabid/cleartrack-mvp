@@ -16,8 +16,10 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 @media(max-width:950px){.hero{grid-template-columns:1fr;gap:28px;padding:34px 22px}.hero h1{font-size:39px}.stats,.grid,.qrgrid,.onboard-summary{grid-template-columns:1fr 1fr}.cards,.business .cards{grid-template-columns:1fr 1fr}.app{grid-template-columns:1fr}.side{display:none}.main{padding:16px}.panel{overflow:auto}table{min-width:1050px}}
 @media(max-width:620px){.stats,.grid,.cards,.business .cards,.qrgrid,.onboard-summary{grid-template-columns:1fr}}
 </style>
+<meta name="robots" content="noindex">
 </head>
 <body>
+<div style="position:sticky;top:0;z-index:9999;background:#7c2d12;color:#fff;padding:9px 14px;font:600 13px/1.4 Arial,sans-serif;text-align:center">ARCHIVED PROTOTYPE (v4) — not the current app and not maintained. Data is stored under a separate archive key so it cannot overwrite the live demo. <a href="../" style="color:#fde68a">Open the current app →</a></div>
 
 <section id="public" class="public hidden"><div>
 <div class="brand" style="justify-content:center;margin-bottom:20px"><div class="mark">N</div>NurseCredX</div>
@@ -68,7 +70,7 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
-const $=x=>document.getElementById(x),WS='wss://s.devnet.rippletest.net:51233/',EX='https://devnet.xrpl.org',SK='nursecredx_v2',WK='nursecredx_wallets_v2',AF=65536;
+const $=x=>document.getElementById(x),WS='wss://s.devnet.rippletest.net:51233/',EX='https://devnet.xrpl.org',SK='nursecredx_archive_v4',WK='nursecredx_archive_v4_wallets',AF=65536;
 let creds=[],filter='all',verifyId=null;
 const requirements=[
 ['California RN License','RN_CA_ACTIVE','Licenses & Certifications',true,false,'California BRN / Nursys','2028-04-30'],['BLS','CERT_BLS','Licenses & Certifications',true,false,'AHA / certification issuer','2027-11-12'],['ACLS','CERT_ACLS','Licenses & Certifications',true,false,'AHA / certification issuer','2027-02-18'],['NIHSS','CERT_NIHSS','Licenses & Certifications',true,false,'Certification issuer','2027-06-01'],['TB Screening','HEALTH_TB_CURRENT','Health & Immunizations',true,true,'Occupational health / lab','2027-09-01'],['Influenza Vaccine','HEALTH_FLU_CURRENT','Health & Immunizations',true,true,'Occupational health / provider','2027-09-30'],['Physical Exam','HEALTH_PHYSICAL_CURRENT','Health & Immunizations',true,true,'Occupational health provider','2027-08-15'],['N95 Fit Test','HEALTH_FIT_TEST','Health & Immunizations',true,true,'Occupational health / employer','2027-01-05'],['Drug Screen','SCREEN_DRUG_CURRENT','Screening & Employment',true,true,'Background screening vendor','2027-10-01'],['Background Check','SCREEN_BACKGROUND_CURRENT','Screening & Employment',true,true,'Background screening vendor','2027-10-01'],['ICU Experience','EMP_ICU_VERIFIED','Screening & Employment',true,false,'Employer / HR verification',''],['Clinical Hours','CLINICAL_HOURS_VERIFIED','Clinical Requirements',true,false,'School / employer verification',''],['Education Verification','EDU_BSN','Clinical Requirements',false,false,'School / registrar','']
