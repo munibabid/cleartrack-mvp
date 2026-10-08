@@ -28,3 +28,4 @@ function renderV7Views(){
  document.querySelectorAll('.details').forEach(btn=>btn.onclick=()=>showProof(+btn.dataset.id))
 }
 function openOnboard(){const ob=onboarding();$('onboardRows').innerHTML=ob.req.map(c=>`<div class="reqrow"><div><b>${ec(c.name)}</b><div class="source">${ec(c.prov?.source||'Primary source pending')}</div></div><span class="badge ${reqSatisfied(c)?'READY':'PENDING'}">${reqSatisfied(c)?'SATISFIED':'PENDING'}</span></div>`).join('');$('onboard').showModal()}
+function v81SyncAddForm(){const k=$('credentialKindV81').value;$('jurisdictionRowV81').classList.toggle('hidden',k!=='RN_LICENSE');$('otherRowV81').classList.toggle('hidden',k!=='OTHER');$('sec').value=k==='EDU_BSN'?'Clinical Requirements':k==='EMP_ICU_VERIFIED'?'Screening & Employment':k==='OTHER'?$('sec').value:'Licenses & Certifications'}
