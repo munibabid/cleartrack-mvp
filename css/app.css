@@ -87,3 +87,13 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 .entry-demo-note{max-width:1080px;margin:18px auto 0;padding:12px 14px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;line-height:1.5;text-align:center}
 .side nav .side-switch{margin-top:14px;border:1px solid #343a56;color:#fff}
 @media(max-width:900px){.role-cards{grid-template-columns:1fr}.entry-v82{padding:30px 16px}.entry-v82 h1{font-size:34px}}
+
+/* PR 3: sharing & access */
+.grid2-v83{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pb-v83{padding:4px 16px 8px}
+.share-card-v83{padding:12px 0;border-bottom:1px solid var(--b)}.share-card-v83:last-child{border-bottom:0}
+.share-card-v83 .meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 12px;margin:8px 0;font-size:12px;color:var(--m)}
+.share-card-v83 .meta b{color:var(--t);font-weight:700}
+.share-card-v83 .acts{display:flex;gap:6px;flex-wrap:wrap}
+.activity-v83{padding:8px 0;border-bottom:1px solid var(--b);font-size:13px}.activity-v83:last-child{border-bottom:0}
+@media(max-width:620px){.grid2-v83{grid-template-columns:1fr}.share-card-v83 .meta{grid-template-columns:1fr 1fr}}

@@ -53,6 +53,7 @@
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
 <button class="v7nav" data-view="opportunitiesView">◎ Opportunities</button>
+<button class="v7nav" data-view="shareView">⇆ Share &amp; Access</button>
 <button class="v7nav" data-view="menuView">☰ Menu</button>
 <button class="side-switch switchRoleAny">⇄ Switch Role</button>
 </nav><div class="net"><b>Verification Network</b><div id="walletInfo">Advanced proof infrastructure stays in the background.</div></div></aside>
@@ -91,12 +92,22 @@
   <div class="small">Opportunities only demonstrate how verified credentials can power job-readiness matching. Payroll, recruiter chat, contracts, timecards, and assignment management are intentionally out of scope.</div>
 </div>
 
+<div id="shareView" class="view">
+  <div class="v7-head"><div><h1>Share &amp; Access</h1><div class="small">Assignment-scoped access to your live Passport. Source documents are never shared.</div></div><button class="pri" id="shareNewV83">Share Passport</button></div>
+  <div class="notice" style="margin:0 0 14px">Demo: shares and requests are stored in this browser only, so share links open only in this browser.</div>
+  <div class="task-category-v7"><div class="cathead"><b>Active</b></div><div id="shareActiveV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Pending Requests</b></div><div id="sharePendingV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Expired</b></div><div id="shareExpiredV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Revoked</b></div><div id="shareRevokedV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Activity</b><div class="small">Sharing and verification events (this demo session)</div></div><div id="shareActivityV83" class="pb-v83"></div></div>
+</div>
+
 <div id="menuView" class="view">
   <div class="v7-head"><div><h1>Menu</h1><div class="small">Profile, sharing, and verification settings</div></div></div>
   <div class="panel">
     <div class="menu-item-v7"><div><b>Profile</b><div class="small">Specialty and professional information</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Submitted Credentials</b><div class="small">Uploads and verification history</div></div><span>›</span></div>
-    <div class="menu-item-v7"><div><b>Sharing & Privacy</b><div class="small">Manage Passport access and disclosure</div></div><span>›</span></div>
+    <div class="menu-item-v7 navLinkV83" data-view="shareView" role="button" tabindex="0" style="cursor:pointer"><div><b>Share &amp; Access</b><div class="small">Who can see your Passport, for which assignment, and until when</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Verification Settings</b><div class="small">Monitoring and notification preferences</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Advanced Verification</b><div class="small">Infrastructure and proof settings</div></div><span>›</span></div>
     <div class="menu-item-v7 switchRoleAny" role="button" tabindex="0" style="cursor:pointer"><div><b>Switch Role</b><div class="small">Back to the workspace picker (demo, not real sign-in)</div></div><span>⇄</span></div>
@@ -114,11 +125,12 @@
 
 
 <section id="organizationWorkspace" class="role-workspace">
-<div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">N</div>NurseCredX <span class="small">Organization Demo</span></div><h1>Organization Dashboard</h1><p>Know who is ready before onboarding begins.</p></div><div><span class="demo-tag-v81">DEMO DATA</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
-<div class="role-tabs-v81"><button class="orgTab active" data-target="orgOverview">Dashboard</button><button class="orgTab" data-target="orgCandidates">Candidates</button><button class="orgTab" data-target="orgAssignments">Assignments</button><button class="orgTab" data-target="orgRequirements">Requirement Sets</button><button class="orgTab" data-target="orgAnalytics">Analytics</button></div>
-<div id="orgOverview" class="orgPanel"><div class="metrics-v81"><div class="metric-v81"><span>Ready to Submit</span><b id="orgReadyV81">0</b></div><div class="metric-v81"><span>Missing One</span><b id="orgMissingOneV81">0</b></div><div class="metric-v81"><span>Awaiting Verification</span><b id="orgAwaitV81">0</b></div><div class="metric-v81"><span>Expiring</span><b id="orgExpV81">0</b></div><div class="metric-v81"><span>Median Verification</span><b id="orgMedV81">—</b></div><div class="metric-v81"><span>Credential Reuse</span><b id="orgReuseV81">—</b></div></div><div class="panel-v81"><div class="ph">Candidate Readiness <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="orgSummaryV81"></div></div><div class="panel-v81"><div class="ph" id="orgFeaturedTitleV82">Featured assignment</div><div class="pb" id="orgBostonV81"></div></div></div>
+<div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">N</div>NurseCredX <span class="small">Organization Demo</span></div><h1>Organization Dashboard</h1><p>Know who is ready before onboarding begins.</p><label class="small" for="orgViewAsV83" style="display:inline-block;margin-top:6px">Viewing as (demo): </label> <select id="orgViewAsV83" class="filter"></select></div><div><span class="demo-tag-v81">DEMO DATA</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
+<div class="role-tabs-v81"><button class="orgTab active" data-target="orgOverview">Dashboard</button><button class="orgTab" data-target="orgCandidates">Candidates</button><button class="orgTab" data-target="orgAssignments">Assignments</button><button class="orgTab" data-target="orgShares">Shared Passports</button><button class="orgTab" data-target="orgRequirements">Requirement Sets</button><button class="orgTab" data-target="orgAnalytics">Analytics</button></div>
+<div id="orgOverview" class="orgPanel"><div class="metrics-v81"><div class="metric-v81"><span>Ready to Submit</span><b id="orgReadyV81">0</b></div><div class="metric-v81"><span>Missing One</span><b id="orgMissingOneV81">0</b></div><div class="metric-v81"><span>Awaiting Verification</span><b id="orgAwaitV81">0</b></div><div class="metric-v81"><span>Expiring</span><b id="orgExpV81">0</b></div><div class="metric-v81"><span>Median Verification</span><b id="orgMedV81">—</b></div><div class="metric-v81"><span>Credential Reuse</span><b id="orgReuseV81">—</b></div></div><div class="panel-v81"><div class="ph">Candidate Readiness <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="orgSummaryV81"></div></div><div class="panel-v81"><div class="ph">Passport Access <span class="demo-tag-v81">LIVE SHARES</span></div><div class="pb" id="orgAccessV83"></div></div><div class="panel-v81"><div class="ph" id="orgFeaturedTitleV82">Featured assignment</div><div class="pb" id="orgBostonV81"></div></div></div>
 <div id="orgCandidates" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Candidates</div><div class="pb" id="orgCandidatesBodyV81"></div></div></div>
 <div id="orgAssignments" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Assignment Readiness</div><div class="pb" id="orgAssignmentsBodyV81"></div></div></div>
+<div id="orgShares" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Shared Passports</div><div class="pb" id="orgSharesBodyV83"></div></div></div>
 <div id="orgRequirements" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Requirement Sets</div><div class="pb" id="orgRequirementsBodyV81"></div></div></div>
 <div id="orgAnalytics" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Analytics <span class="demo-tag-v81">DEMO / EVENT-DERIVED</span></div><div class="pb" id="orgAnalyticsBodyV81"></div></div></div></div>
 </section>
@@ -162,20 +174,36 @@
 
 
 <dialog id="shareV7">
-<div class="mh"><b>Share Professional Passport</b><button class="sec xsharev7">✕</button></div>
+<div class="mh"><b id="shareTitleV83">SHARE PROFESSIONAL PASSPORT</b><button class="sec xsharev7">✕</button></div>
 <div class="mb">
-  <div class="small" style="margin-bottom:10px">Select which verified credentials to share.</div>
-  <div id="shareV7Options" class="share-options"></div>
-  <label>Access duration</label>
-  <select id="shareV7Duration"><option>One time</option><option>24 hours</option><option>7 days</option></select>
-  <button class="pri" id="generateV7Share" style="margin-top:12px;width:100%">Generate Share Link</button>
-  <div id="shareV7Result" class="hidden" style="margin-top:14px">
-    <div id="shareV7Link" class="share-link-box"></div>
-    <div class="qr"><canvas id="shareV7QR"></canvas></div>
-    <div class="small">The QR uses an opaque share token. PII and wallet addresses are not exposed in the QR.</div>
-  </div>
+ <div id="shareFormV83">
+  <div class="grid2-v83"><div><label for="shareOrgV83">Organization</label><select id="shareOrgV83"></select></div><div><label for="shareAssignV83">Assignment</label><select id="shareAssignV83"></select></div></div>
+  <div id="shareReadyV83" class="small" style="margin:-4px 0 10px"></div>
+  <div style="font-weight:800;margin:4px 0 6px">Recommended for this assignment <span class="small">— only the minimum it requires</span></div>
+  <div id="shareOptionsV83" class="share-options"></div>
+  <details style="margin:8px 0"><summary class="small">Other Passport items — not needed for this assignment, not shared unless you add them</summary><div id="shareExtraV83" class="share-options"></div></details>
+  <div class="share-option" style="border:1px solid var(--b);border-radius:10px;padding:10px 12px;margin:8px 0"><span><b>Source documents</b><span class="small"> · PDFs, images, uploads, health results</span></span><span class="badge REVOKED">NOT SHARED</span></div>
+  <label for="shareV7Duration">Access duration</label><select id="shareV7Duration"></select>
+  <div id="shareCustomRowV83" class="hidden"><label for="shareCustomV83">Access ends on (11:59 PM)</label><input type="date" id="shareCustomV83"></div>
+  <div id="shareReviewV83" class="provenance small" style="line-height:1.6"></div>
+  <button class="pri" id="generateV7Share" style="margin-top:12px;width:100%">Approve &amp; Share</button>
+ </div>
+ <div id="shareV7Result" class="hidden">
+  <div id="shareDoneV83" class="good-v81"></div>
+  <div id="shareV7Link" class="share-link-box" style="margin-top:10px"></div>
+  <div class="qr"><canvas id="shareV7QR"></canvas></div>
+  <div class="small">Opaque share token — no PII or wallet addresses in the link or QR. <b>Demo limitation:</b> shares are stored in this browser, so the link only opens in this browser.</div>
+ </div>
 </div>
 </dialog>
+
+<dialog id="extendDlgV83"><div class="mh"><b>Extend Access</b><button class="sec xextend">✕</button></div><div class="mb"><div id="extendInfoV83" class="small" style="margin-bottom:10px"></div><label for="extendDurV83">New access duration</label><select id="extendDurV83"></select><div id="extendCustomRowV83" class="hidden"><label for="extendCustomV83">Access ends on (11:59 PM)</label><input type="date" id="extendCustomV83"></div></div><div class="mf"><button class="sec xextend">Cancel</button><button class="pri" id="extendSaveV83">Extend Access</button></div></dialog>
+
+<dialog id="shareDetailDlgV83"><div class="mh"><b>Share Details</b><button class="sec xsharedetail">✕</button></div><div class="mb" id="shareDetailBodyV83"></div><div class="mf"><button class="sec xsharedetail">Close</button></div></dialog>
+
+<dialog id="extReqDlgV83"><div class="mh"><b>Request Access Extension</b><button class="sec xextreq">✕</button></div><div class="mb"><div id="extReqInfoV83" class="small" style="margin-bottom:10px"></div><label for="extReqDateV83">Requested access through (11:59 PM)</label><input type="date" id="extReqDateV83"><label for="extReqReasonV83">Reason</label><input id="extReqReasonV83" placeholder="e.g. Assignment extended by 4 weeks"><p class="small">The clinician must approve. Organizations cannot extend their own access.</p></div><div class="mf"><button class="sec xextreq">Cancel</button><button class="pri" id="extReqSendV83">Send Request</button></div></dialog>
+
+<dialog id="orgShareViewDlgV83"><div class="mh"><b>Shared Passport</b><button class="sec xorgshare">✕</button></div><div class="mb" id="orgShareViewBodyV83"></div><div class="mf"><button class="sec xorgshare">Close</button></div></dialog>
 
 <script src="js/credential-model.js"></script>
 <script src="js/credential-catalog.js"></script>
