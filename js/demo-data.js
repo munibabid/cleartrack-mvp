@@ -1,9 +1,38 @@
-/* DEMO DATA ONLY: Alex Morgan's seed credentials and demo seeding.
-   Nothing here is real verification.
-   v81EnsureDemo() runs only when demo data is (re)created in initNewcomer(),
-   never during rendering, and logs a DEMO_SEEDED event. */
-const requirements=[
-['California RN License','RN_CA_ACTIVE','Licenses & Certifications',true,false,'California BRN / Nursys','2028-04-30'],['BLS','CERT_BLS','Licenses & Certifications',true,false,'AHA / certification issuer','2027-11-12'],['ACLS','CERT_ACLS','Licenses & Certifications',true,false,'AHA / certification issuer','2027-02-18'],['NIHSS','CERT_NIHSS','Licenses & Certifications',true,false,'Certification issuer','2027-06-01'],['TB Screening','HEALTH_TB_CURRENT','Health & Immunizations',true,true,'Occupational health / lab','2027-09-01'],['Influenza Vaccine','HEALTH_FLU_CURRENT','Health & Immunizations',true,true,'Occupational health / provider','2027-09-30'],['Physical Exam','HEALTH_PHYSICAL_CURRENT','Health & Immunizations',true,true,'Occupational health provider','2027-08-15'],['N95 Fit Test','HEALTH_FIT_TEST','Health & Immunizations',true,true,'Occupational health / employer','2027-01-05'],['Drug Screen','SCREEN_DRUG_CURRENT','Screening & Employment',true,true,'Background screening vendor','2027-10-01'],['Background Check','SCREEN_BACKGROUND_CURRENT','Screening & Employment',true,true,'Background screening vendor','2027-10-01'],['ICU Experience','EMP_ICU_VERIFIED','Screening & Employment',true,false,'Employer / HR verification',''],['Clinical Hours','CLINICAL_HOURS_VERIFIED','Clinical Requirements',true,false,'School / employer verification',''],['Education Verification','EDU_BSN','Clinical Requirements',false,false,'School / registrar','']
+/* DEMO DATA ONLY — nothing here is real verification.
+   Alex Morgan, ICU RN. Home state Arizona (NLC member) with a multistate
+   license, plus a single-state California license. Alex's reusable Passport
+   already satisfies 11 of the 12 Boston Travel ICU requirements; the only
+   gap is a Massachusetts RN license (Massachusetts has enacted the NLC but it
+   is not yet in effect, so the Arizona compact license is not honored there).
+   Expiration dates are offsets (days) from the demo anchor, so they stay valid
+   through every demo assignment. */
+const DEMO_SEED_VERSION='2';
+const DEMO_SEED_VERSION_KEY='veridun_demo_seed_version';
+const DEMO_PROFILE={name:'Alex Morgan',credentials:'RN, BSN, CCRN',specialty:'ICU',homeState:'US-AZ'};
+/* [kind, jurisdiction, expiresInDays|null, requiredForOnboardingBaseline] */
+const DEMO_SEED=[
+ ['RN_LICENSE_MULTISTATE','US-AZ',540,true],
+ ['RN_LICENSE','US-CA',570,false],
+ ['CERT_BLS','',400,true],['CERT_ACLS','',480,true],['CERT_NIHSS','',300,true],
+ ['EMP_ICU_VERIFIED','',null,true],['CLINICAL_HOURS_VERIFIED','',null,true],
+ ['HEALTH_PHYSICAL_CURRENT','',330,true],['HEALTH_FIT_TEST','',300,true],['HEALTH_TB_CURRENT','',280,true],['HEALTH_FLU_CURRENT','',200,true],
+ ['SCREEN_DRUG_CURRENT','',250,true],['SCREEN_BACKGROUND_CURRENT','',250,true],
+ ['EDU_BSN','',null,false],['CERT_CCRN','',700,false]
 ];
-function initNewcomer(force=false){if(!force){try{creds=JSON.parse(localStorage.getItem(SK)||'[]')}catch{creds=[]}if(creds.length)return}creds=requirements.map((r,i)=>({id:Date.now()+i,name:r[0],type:r[1],section:r[2],required:r[3],privateOnly:r[4],primary:'UNVERIFIED',chain:'NOT ISSUED',expiration:r[6],file:'',prov:{source:r[5],method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:''}}));save();v81EnsureDemo()}
-function v81EnsureDemo(){creds=creds.map(v81Normalize);const need=['CERT_BLS','CERT_ACLS','CERT_NIHSS','EMP_ICU_VERIFIED','HEALTH_PHYSICAL_CURRENT','HEALTH_FIT_TEST','SCREEN_DRUG_CURRENT','SCREEN_BACKGROUND_CURRENT','HEALTH_TB_CURRENT','HEALTH_FLU_CURRENT','CLINICAL_HOURS_VERIFIED'];let n=0;need.forEach(t=>{const c=creds.find(x=>x.type===t);if(c&&!(c.primary==='VERIFIED'&&c.prov?.active)){n++;c.primary='VERIFIED';c.prov=c.prov||{};c.prov.active=true;c.prov.source=c.prov.source||'Demo verified source';c.prov.method=c.prov.method||'Demo verification';c.prov.verifier=c.prov.verifier||'DEMO SEED (not a real verification)';c.prov.verifiedAt=c.prov.verifiedAt||new Date(Date.now()-86400000).toISOString()}});save();if(n)v81Log('DEMO_SEEDED',null,{actor_type:'SYSTEM',result:'DEMO_SEED_'+n+'_CREDENTIALS'})}
+/* Static comparison candidates for the Organization view (clearly labeled). */
+const DEMO_CANDIDATES=[{name:'Jamie Smith',specialty:'ICU',ok:11,total:12,status:'Missing 1 (static demo)'},{name:'Taylor Reed',specialty:'PCU',ok:8,total:12,status:'Needs attention (static demo)'}];
+function demoSeedCredentials(){
+ const anchor=demoAnchor(),verifiedAt=addDays(anchor,-1).toISOString(),now=new Date().toISOString();
+ return DEMO_SEED.map(([kind,jur,days,required],i)=>v81Normalize({id:Date.now()+i,name:credentialDisplayName(kind,jur),kind,type:credentialTypeCode(kind,jur),jurisdiction:jur,section:catalogKind(kind).section,required,primary:'VERIFIED',chain:'NOT ISSUED',expiration:days==null?'':isoDay(addDays(anchor,days)),file:'',prov:{source:issuerFor(kind,jur)+' (demo seed)',method:'Demo verification',verifier:'DEMO SEED (not a real verification)',verifiedAt,active:true,lastMonitored:now}}));
+}
+/* Loads saved demo data; (re)seeds on first run, on Reset Demo Data, or when
+   the stored data predates the current demo seed version. Never called
+   from rendering. */
+function initNewcomer(force=false){
+ if(!force){try{creds=JSON.parse(localStorage.getItem(SK)||'[]')}catch{creds=[]}
+  if(creds.length&&localStorage.getItem(DEMO_SEED_VERSION_KEY)===DEMO_SEED_VERSION){creds=creds.map(v81Normalize);return}}
+ const reason=force?'RESET':creds.length?'SEED_UPGRADE':'FIRST_RUN';
+ localStorage.setItem(DEMO_ANCHOR_KEY,new Date().toISOString().slice(0,10));
+ creds=demoSeedCredentials();save();localStorage.setItem(DEMO_SEED_VERSION_KEY,DEMO_SEED_VERSION);
+ v81Log('DEMO_SEEDED',null,{actor_type:'SYSTEM',result:`DEMO_SEED_${creds.length}_CREDENTIALS`,detail:{reason,version:DEMO_SEED_VERSION}});
+}
