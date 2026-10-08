@@ -25,13 +25,15 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  const one=async(sql,p=[])=>(await db.query(sql,p)).rows[0];
  const n=async(sql,p=[])=>+Object.values((await db.query(sql,p)).rows[0])[0];
  // Run fn as a signed-in user (JWT claims) inside a transaction that is rolled back unless keep=true.
- const as=async(who,fn,keep=false)=>{await db.query('begin');try{
+ const as=async(who,fn,keep=false,opts={})=>{await db.query('begin');try{
    if(who==='anon'){await db.query("set local role anon");await db.query("select set_config('request.jwt.claims','{\"role\":\"anon\"}',true)")}
-   else{await db.query("set local role authenticated");await db.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({sub:uid('user:'+who),role:'authenticated'})])}
+   else{const sub=uid('user:'+who);let aal=opts.aal;if(!aal){const f=await db.query("select 1 from auth.mfa_factors where user_id=$1 and status='verified'",[sub]);aal=f.rowCount?'aal2':'aal1'}
+    await db.query("set local role authenticated");await db.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify({sub,role:'authenticated',aal})])}
    const r=await fn();await db.query(keep?'commit':'rollback');return r}catch(e){await new Promise(r=>setTimeout(r,5));await db.query('rollback');throw e}};
- const fails=async(who,sql,p=[])=>{try{await as(who,()=>db.query(sql,p));return false}catch(e){return e.message}};
- const rows=async(who,sql,p=[])=>as(who,async()=>(await db.query(sql,p)).rows);
+ const fails=async(who,sql,p=[],opts={})=>{try{await as(who,()=>db.query(sql,p),false,opts);return false}catch(e){return e.message}};
+ const rows=async(who,sql,p=[],opts={})=>as(who,async()=>(await db.query(sql,p)).rows,false,opts);
 
+ await db.query("insert into auth.mfa_factors (user_id,factor_type,status) values ($1,'totp','verified')",[uid('user:verifier')]);
  /* ---------- schema ---------- */
  const tables=['users','clinicians','organizations','organization_members','credential_catalog','jurisdictions','issuers','credentials','credential_verifications','verification_sources','requirement_sets','requirements','assignments','assignment_requirements','share_grants','share_grant_assertions','share_access_events','extension_requests','monitoring_events','audit_events','proofs','analytics_events','specialties'];
  ok('schema: all 23 required tables exist',await n(`select count(*) from pg_tables where schemaname='public' and tablename = any($1)`,[tables])===23);
@@ -188,6 +190,39 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  ok('storage: clinician cannot upload into another user\'s folder',!!(await fails('alex',`insert into storage.objects (bucket_id,name) values ('source-documents',$1)`,[`${jordanU}/x/doc.pdf`])));
  ok('storage: other clinicians and orgs cannot read it (no signed URL possible)',(await rows('jordan',`select name from storage.objects`)).length===0&&(await rows('recruiter-northstar',`select name from storage.objects`)).length===0);
  ok('storage: owner and verifier can read it (signed URLs allowed)',(await rows('alex',`select name from storage.objects`)).length===1&&(await rows('verifier',`select name from storage.objects`)).length===1);
+
+
+ /* ---------- PR 12: MFA step-up, issuer check, anchor commitment ---------- */
+ ok('pr12: lookup pages are real https URLs, not simulated',await n(`select count(*) from verification_sources where lookup_url like 'https://%' and is_simulated=false`)>=6);
+ await db.query(`insert into auth.mfa_factors (user_id,factor_type,status) values ($1,'totp','verified')`,[uid('user:alex')]);
+ ok('pr12: enrolled clinician at aal1 cannot read credentials', (await rows('alex',`select id from credentials`,[],{aal:'aal1'})).length===0);
+ ok('pr12: same clinician at aal2 still sees their credentials', (await rows('alex',`select id from credentials`,[],{aal:'aal2'})).length>=19);
+ ok('pr12: enrolled clinician at aal1 cannot create a share', /row-level security|policy/i.test(String(await fails('alex',`insert into share_grants (clinician_id,org_id,token_hash,duration,expires_at) values ($1,$2,$3,'D7',now()+interval '1 day')`,[uid('clinician:alex'),uid('org:northstar'),sha('tok-pr12-aal1-block')],{aal:'aal1'}))));
+ ok('pr12: enrolled clinician at aal1 cannot read a document row', (await rows('alex',`select name from storage.objects`,[],{aal:'aal1'})).length===0);
+ await db.query('delete from auth.mfa_factors where user_id=$1',[uid('user:alex')]);
+ const alexBls=(await one(`select id from credentials where clinician_id=$1 and kind='CERT_BLS'`,[uid('clinician:alex')])).id;
+ ok('pr12: clinician cannot record a verification', /only a verifier/.test(String(await fails('alex',`select public.record_verification($1,'VERIFIED','Nursys QuickConfirm','REF-1',current_date)`,[alexBls]))));
+ const jordanBls=(await one(`select id from credentials where clinician_id=$1 and kind='CERT_BLS'`,[uid('clinician:jordan')])).id;
+ ok('pr12: verifier at aal1 cannot record a verification', /authenticator/.test(String(await fails('verifier',`select public.record_verification($1,'VERIFIED','AHA eCard verification','ECARD-1',current_date)`,[jordanBls],{aal:'aal1'}))));
+ const bls=await one(`select id, clinician_id, expires_on::text exp from credentials where clinician_id=$1 and kind='CERT_BLS'`,[uid('clinician:alex')]);
+ const rec=await as('verifier',async()=>(await db.query(`select public.record_verification($1,'VERIFIED','AHA eCard verification','SHOULD-NOT-BE-ON-CHAIN',current_date) j`,[bls.id])).rows[0].j,true);
+ ok('pr12: verifier at aal2 records a check and a 64-hex commitment', !!(rec&&rec.result==='VERIFIED'&&/^[0-9a-f]{64}$/.test(rec.commitment)));
+ const anchor=await one(`select commitment, salt from verification_anchors where verification_id=$1`,[rec.verification_id]);
+ const canon=await one(`select private.verification_canonical($1::uuid,'CERT_BLS',$2::uuid,'VERIFIED','AHA eCard verification',to_char(current_date,'YYYY-MM-DD'),coalesce($3,''),$4) t`,[bls.id,bls.clinician_id,bls.exp,anchor.salt]);
+ ok('pr12: commitment matches the canonical record and excludes the reference code', anchor.commitment===sha(canon.t)&&!canon.t.includes('SHOULD-NOT-BE-ON-CHAIN')&&!canon.t.includes('@'));
+ const selfOwn=await (async()=>{
+   const ins=await db.query(`insert into public.clinicians (user_id,full_name,specialty,home_jurisdiction,is_demo) values ($1,'Verifier Self','ICU','US-ME',true) on conflict (user_id) do update set full_name=excluded.full_name returning id`,[uid('user:verifier')]);
+   const cred=(await db.query(`insert into credentials (clinician_id,kind,type_code,display_name,status) values ($1,'CERT_TNCC','CERT_TNCC','Self TNCC','VERIFYING') returning id`,[ins.rows[0].id])).rows[0].id;
+   return /own credential/.test(String(await fails('verifier',`select public.record_verification($1,'VERIFIED','AHA eCard verification','SELF',current_date)`,[cred])));
+ })();
+ ok('pr12: a verifier cannot verify their own credential', selfOwn===true);
+ await db.query(`update credentials set expires_on=current_date+10 where id=$1`,[bls.id]);
+ const now=await one(`select private.sha256_hex(private.verification_canonical($1::uuid,'CERT_BLS',$2::uuid,'VERIFIED','AHA eCard verification',to_char(current_date,'YYYY-MM-DD'),(select coalesce(expires_on::text,'') from credentials where id=$1),$3)) h`,[bls.id,bls.clinician_id,anchor.salt]);
+ ok('pr12: changing expiration makes the recomputed commitment mismatch', now.h!==anchor.commitment);
+ const act=await as('alex',async()=>(await db.query(`select public.prepare_activity_anchor() j`)).rows[0].j,true);
+ const chk=await as('alex',async()=>(await db.query(`select public.check_activity_anchor($1) j`,[act.anchor_id])).rows[0].j);
+ ok('pr12: activity-log fingerprint matches until the covered rows change', act&&/^[0-9a-f]{64}$/.test(act.commitment)&&chk.match===true&&!JSON.stringify(act).includes('@'));
+
 
  await db.end();
  const f=R.filter(r=>r.startsWith('FAIL')).length;console.log(`\n${R.length-f}/${R.length} passed`);process.exit(f?1:0);

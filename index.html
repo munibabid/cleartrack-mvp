@@ -44,7 +44,7 @@
 </div>
 <div id="acctSignedInV10" class="hidden"><p class="acct-who-v10">Signed in as <b id="acctEmailShownV10"></b></p><div class="acct-actions-v10"><button class="pri" id="acctOpenV10" type="button">Open my account</button><button class="sec" id="acctSignOutV10" type="button">Sign out</button></div></div>
 <div class="small acct-msg-v10" id="acctMsgV10" role="status" aria-live="polite"></div>
-<div class="phi-notice-v10"><b>Staging backend, not for real PHI.</b> This is a pre-compliance test environment. Don't upload real health records, real license numbers, SSNs or other protected health information yet. Verification in Veridun is not connected to any board or issuer: account credentials show as <i>Submitted, not verified</i>.</div>
+<div class="phi-notice-v10"><b>Staging backend, not for real PHI.</b> This is a pre-compliance test environment. Don't upload real health records, real license numbers, SSNs or other protected health information yet. A credential shows as verified only after a verifier records an issuer lookup. An XRPL Testnet anchor shows that record was not edited afterwards. It is not the verification itself.</div>
 </div>
 
 </div>
@@ -60,7 +60,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v11.0 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v12.0 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -155,11 +155,14 @@
 <div class="acct-ws-actions-v10"><span class="acct-tag-v10">YOUR ACCOUNT · STAGING</span> <button class="sec mini" id="acctRefreshV10" type="button">Refresh</button> <button class="sec mini" id="acctBackV10" type="button">Back to start</button> <button class="sec mini" id="acctWsSignOutV10" type="button">Sign out</button></div></div>
 <div class="phi-notice-v10" id="acctWsNoticeV10"><b>Pre-compliance staging backend: do not store real PHI yet.</b> Real health records need a HIPAA-eligible plan with a signed BAA, which this project doesn't have yet. Account data is kept in memory on this device and in the staging database, never in this browser's localStorage. Documents go to a private bucket and open only through 60-second signed links.</div>
 <div class="small acct-msg-v10" id="acctWsMsgV10" role="status" aria-live="polite"></div>
-<div class="role-tabs-v81"><button class="acctTab active" data-target="acctPassportV10" type="button">Passport</button><button class="acctTab" data-target="acctSharesV10" type="button">Shares</button><button class="acctTab" data-target="acctOrgV10" type="button">Organization</button><button class="acctTab" data-target="acctActivityV10" type="button">Activity</button></div>
+<div class="role-tabs-v81"><button class="acctTab active" data-target="acctPassportV10" type="button">Passport</button><button class="acctTab" data-target="acctSharesV10" type="button">Shares</button><button class="acctTab" data-target="acctOrgV10" type="button">Organization</button><button class="acctTab" data-target="acctActivityV10" type="button">Activity</button><button class="acctTab" data-target="acctSecurityV12" type="button">Security</button><button class="acctTab hidden" data-target="acctVerifyV12" type="button">Verify</button></div>
+<div id="acctMfaGateV12" class="hidden"></div>
 <div id="acctPassportV10" class="acctPanel"></div>
 <div id="acctSharesV10" class="acctPanel hidden"></div>
 <div id="acctOrgV10" class="acctPanel hidden"></div>
 <div id="acctActivityV10" class="acctPanel hidden"></div>
+<div id="acctSecurityV12" class="acctPanel hidden"></div>
+<div id="acctVerifyV12" class="acctPanel hidden"></div>
 </div>
 </section>
 <section id="organizationWorkspace" class="role-workspace">
@@ -291,6 +294,9 @@
 <script src="js/roles/verifier.js"></script>
 <script src="js/app.js"></script>
 <script src="js/tour.js"></script>
+<script src="js/lookup-sources.js"></script>
+<script src="js/anchor.js"></script>
+<script src="js/account-mfa.js"></script>
 <script src="js/account.js"></script>
 <script src="js/menu.js"></script>
 </body>

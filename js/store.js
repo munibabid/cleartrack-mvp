@@ -86,7 +86,7 @@ function randomHex(bytes){return[...crypto.getRandomValues(new Uint8Array(bytes)
 function safeFileName(name){const n=String(name||'document').normalize('NFKD').replace(/[^A-Za-z0-9._-]+/g,'_').replace(/^_+|_+$/g,'').slice(-80);return n||'document'}
 const DOC_TYPES=['application/pdf','image/png','image/jpeg','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 const DOC_MAX_BYTES=10485760;
-function emptyAccountCache(){return{profile:null,credentials:[],shares:[],requests:[],accessEvents:[],events:[],memberships:[],hydratedAt:null}}
+function emptyAccountCache(){return{profile:null,credentials:[],shares:[],requests:[],accessEvents:[],events:[],memberships:[],verifications:[],anchors:[],accountRole:'clinician',hydratedAt:null}}
 
 class SupabaseAdapter{
  constructor(cfg,deps={}){
@@ -115,11 +115,13 @@ class SupabaseAdapter{
   if(!create){if(!globalThis.supabase?.createClient)await this.loadScript(SUPABASE_JS.src,SUPABASE_JS.integrity);create=globalThis.supabase.createClient}
   this.client=create(this.url,this.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit',storageKey:this.storageKey}});
   this.client.auth.onAuthStateChange((event,session)=>{
-   const prev=this.session?.user?.id;this.session=session||null;
-   if(!session){if(prev){this.cache=emptyAccountCache();this.tokens={};this.emit('signedOut')}return}
-   if(prev!==session.user.id){this.cache=emptyAccountCache();this.tokens={};
+   const prev=this.session?.user?.id,prevAal=this._aal;this.session=session||null;
+   let aal=null;try{aal=session?JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))?.aal||null:null}catch(e){aal=null}
+   this._aal=aal;
+   if(!session){if(prev){this.cache=emptyAccountCache();this.tokens={};this.mfa=null;this.emit('signedOut')}return}
+   if(prev!==session.user.id||aal!==prevAal||event==='MFA_CHALLENGE_VERIFIED'){this.cache=emptyAccountCache();this.tokens={};
     /* never await Supabase calls inside this callback (supabase-js deadlock) */
-    setTimeout(()=>this.hydrate().then(()=>this.emit('signedIn')).catch(e=>{this.lastError=e.message;this.emit('error')}),0)}
+    setTimeout(()=>this.settleAuth().then(()=>this.emit(this.needsMfaChallenge()?'mfaRequired':'signedIn')).catch(e=>{this.lastError=e.message;this.emit('error')}),0)}
   });
   return this.client;
  }
@@ -127,7 +129,7 @@ class SupabaseAdapter{
  init(){if(!this._initP)this._initP=this.restore().finally(()=>{this._initP=null});return this._initP}
  async restore(){
   const c=await this.ensureClient();const{data,error}=await c.auth.getSession();if(error)throw new Error(error.message);
-  this.session=data.session||null;if(this.session&&!this.cache.hydratedAt)await this.hydrate();return this.session;
+  this.session=data.session||null;if(this.session&&!this.cache.hydratedAt)await this.settleAuth();return this.session;
  }
  async sendMagicLink(email,redirectTo){
   const e=String(email||'').trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))throw new Error('Enter a valid email address.');
@@ -136,8 +138,30 @@ class SupabaseAdapter{
   return true;
  }
  /* Not shown in the UI. Used by automated tests with throwaway accounts. */
- async signInWithPassword(email,password){const c=await this.ensureClient();const{data,error}=await c.auth.signInWithPassword({email,password});if(error)throw new Error(error.message);this.session=data.session;await this.hydrate();return data.session}
- async signOut(){if(this.client)await this.client.auth.signOut().catch(()=>{});this.session=null;this.cache=emptyAccountCache();this.tokens={};this.emit('signedOut')}
+ async signInWithPassword(email,password){const c=await this.ensureClient();const{data,error}=await c.auth.signInWithPassword({email,password});if(error)throw new Error(error.message);this.session=data.session;await this.settleAuth();return data.session}
+ async refreshMfa(){
+  this.mfa=this.mfa||{currentLevel:'aal1',nextLevel:'aal1',totp:[]};
+  const mfa=this.client?.auth?.mfa;if(!mfa?.getAuthenticatorAssuranceLevel)return this.mfa;
+  const a=await mfa.getAuthenticatorAssuranceLevel();if(a.error)throw new Error(a.error.message);
+  const f=await mfa.listFactors();if(f.error)throw new Error(f.error.message);
+  this.mfa={currentLevel:a.data?.currentLevel||'aal1',nextLevel:a.data?.nextLevel||'aal1',totp:f.data?.totp||[]};
+  return this.mfa;
+ }
+ needsMfaChallenge(){return this.mfa?.nextLevel==='aal2'&&this.mfa?.currentLevel!=='aal2'}
+ hasVerifiedFactor(){return (this.mfa?.totp||[]).some(f=>f.status==='verified')}
+ /* Loads assurance, then account data. A user who already enrolled must enter
+    the authenticator code before any credential / share / document read. */
+ async settleAuth(){await this.refreshMfa();if(this.needsMfaChallenge()){this.cache=emptyAccountCache();this.emit('mfaRequired');return null}return this.hydrate()}
+ async enrollTotp(){const c=this.need();const{data,error}=await c.auth.mfa.enroll({factorType:'totp',friendlyName:'Authenticator app',issuer:'Veridun'});if(error)throw new Error(error.message);this.pendingFactor=data;return data}
+ async verifyTotp(factorId,code){
+  const c=this.need();const id=factorId||this.pendingFactor?.id;if(!id)throw new Error('Set up the authenticator app first.');
+  const ch=await c.auth.mfa.challenge({factorId:id});if(ch.error)throw new Error(ch.error.message);
+  const v=await c.auth.mfa.verify({factorId:id,challengeId:ch.data.id,code:String(code||'').replace(/\s/g,'')});
+  if(v.error)throw new Error(/invalid/i.test(v.error.message)?'That code did not match. Wait for a new code and try again.':v.error.message);
+  this.pendingFactor=null;if(v.data?.session)this.session=v.data.session;await this.settleAuth();return v.data;
+ }
+ async unenrollTotp(factorId){const c=this.need();const{error}=await c.auth.mfa.unenroll({factorId});if(error)throw new Error(error.message);await this.refreshMfa()}
+ async signOut(){if(this.client)await this.client.auth.signOut().catch(()=>{});this.session=null;this.cache=emptyAccountCache();this.tokens={};this.mfa=null;this.pendingFactor=null;this.emit('signedOut')}
  need(){if(!this.session)throw new Error('Sign in first.');return this.client}
  async run(q,label){const{data,error}=await q;if(error){const m=`${label}: ${error.message}`;this.lastError=m;throw new Error(m)}return data}
  /* Reload everything this user may see. RLS scopes every query. */
@@ -156,7 +180,14 @@ class SupabaseAdapter{
     cache.accessEvents=await this.run(c.from('share_access_events').select('id,grant_id,outcome,assertions_accessed,occurred_at').in('grant_id',ids).order('occurred_at',{ascending:false}).limit(500),'Load access events');
    }
    cache.events=await this.run(c.from('audit_events').select('id,event_type,actor_type,result,detail,occurred_at,grant_id,credential_id').eq('clinician_id',cid).order('occurred_at',{ascending:false}).limit(100),'Load activity');
+   const credIds=cache.credentials.map(x=>x.id);
+   if(credIds.length){
+    cache.verifications=await this.run(c.from('credential_verifications').select('id,credential_id,outcome,source_name,checked_on,completed_at').in('credential_id',credIds).order('completed_at',{ascending:false}),'Load verifications');
+    cache.anchors=await this.run(c.from('verification_anchors').select('verification_id,credential_id,commitment,network,tx_hash,ledger_index,anchor_address,memo_type,anchored_at').in('credential_id',credIds),'Load anchors');
+   }
   }
+  const roleRow=await this.run(c.from('users').select('role').eq('id',uid).maybeSingle(),'Load role');
+  cache.accountRole=roleRow?.role||'clinician';
   cache.hydratedAt=new Date().toISOString();this.cache=cache;this.emit('hydrated');return cache;
  }
  async log(event_type,{result=null,detail={},credential_id=null,grant_id=null,org_id=null,actor_type='CLINICIAN'}={}){
@@ -284,6 +315,25 @@ class SupabaseAdapter{
   await this.log('SHARE_EXTENSION_REQUESTED',{actor_type:'ORGANIZATION',org_id:orgId,grant_id:grantId,result:'PENDING',detail:{requested_until:requestedUntil}});
   return r;
  }
+ async recordVerification({credentialId,result,sourceName,reference,checkedOn}){
+  const c=this.need();
+  return this.run(c.rpc('record_verification',{p_credential:credentialId,p_result:result,p_source_name:sourceName,p_reference:reference,p_checked_on:checkedOn}),'Record verification');
+ }
+ async attachAnchor({verificationId,txHash,ledger,address,network}){
+  const c=this.need();
+  return this.run(c.rpc('attach_verification_anchor',{p_verification:verificationId,p_tx_hash:txHash,p_ledger:ledger,p_address:address,p_network:network||'XRPL_TESTNET'}),'Save anchor');
+ }
+ async verifierQueue(){
+  const c=this.need();
+  return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue');
+ }
+ async shareAnchors(grantId){const c=this.need();return this.run(c.rpc('share_anchor_disclosure',{p_grant:grantId}),'Anchor check')}
+ async prepareActivityAnchor(){const c=this.need();return this.run(c.rpc('prepare_activity_anchor'),'Prepare activity anchor')}
+ async attachActivityAnchor({anchorId,txHash,ledger,address,network}){
+  const c=this.need();
+  return this.run(c.rpc('attach_activity_anchor',{p_anchor:anchorId,p_tx_hash:txHash,p_ledger:ledger,p_address:address,p_network:network||'XRPL_TESTNET'}),'Save activity anchor');
+ }
+ async checkActivityAnchor(anchorId){const c=this.need();return this.run(c.rpc('check_activity_anchor',{p_anchor:anchorId}),'Check activity anchor')}
  /* A share link opened before sign-in survives the magic-link round trip.
     Holds only the share token (no health data); cleared once used. */
  setPendingShare(token){try{token?this.local.setItem(STORE_KEYS.pendingShare,token):this.local.removeItem(STORE_KEYS.pendingShare)}catch{}}
