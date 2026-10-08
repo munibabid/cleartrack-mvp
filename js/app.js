@@ -1,6 +1,6 @@
 /* App shell: role routing, event wiring, and boot. Loaded last. */
-function v81ShowRole(role){$('landing').classList.add('hidden');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');if(role==='clinician'){$('app').classList.remove('hidden');render()}if(role==='organization'){$('organizationWorkspace').classList.add('active');v81RenderRoles()}if(role==='verification'){$('verificationWorkspace').classList.add('active');v81RenderRoles()}}
-function v81RolePicker(){$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');$('landing').classList.remove('hidden');window.scrollTo(0,0)}
+function v81ShowRole(role){document.body.classList.toggle('role-clinician',role==='clinician');$('landing').classList.add('hidden');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');if(role==='clinician'){$('app').classList.remove('hidden');render()}if(role==='organization'){$('organizationWorkspace').classList.add('active');v81RenderRoles()}if(role==='verification'){$('verificationWorkspace').classList.add('active');v81RenderRoles()}}
+function v81RolePicker(){document.body.classList.remove('role-clinician');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');$('landing').classList.remove('hidden');window.scrollTo(0,0)}
 function v81Tabs(btnClass,panelClass,target){document.querySelectorAll('.'+panelClass).forEach(x=>x.classList.toggle('hidden',x.id!==target));document.querySelectorAll('.'+btnClass).forEach(x=>x.classList.toggle('active',x.dataset.target===target))}
 function v81RenderRoles(){if(!creds.length)return;v81EnsureDemo();const x=v81RoleContext();v81RenderOrganization(x);v81RenderVerifier(x)}
 document.addEventListener('DOMContentLoaded',()=>{
@@ -8,10 +8,9 @@ $('roleClinician').onclick=()=>v81ShowRole('clinician');
 $('roleOrganization').onclick=()=>v81ShowRole('organization');
 $('roleVerification').onclick=()=>v81ShowRole('verification');
 $('switchRoleClinician').onclick=v81RolePicker;
-document.querySelectorAll('.switchRoleV81').forEach(b=>b.onclick=v81RolePicker);
+document.querySelectorAll('.switchRoleV81,.switchRoleAny').forEach(b=>b.onclick=v81RolePicker);
 document.querySelectorAll('.orgTab').forEach(b=>b.onclick=()=>v81Tabs('orgTab','orgPanel',b.dataset.target));
 document.querySelectorAll('.verifyTab').forEach(b=>b.onclick=()=>v81Tabs('verifyTab','verifyPanel',b.dataset.target));
-$('loginBtn').onclick=()=>v81ShowRole('clinician');
 $('logout').onclick=v81RolePicker;
 $('addBtn').onclick=()=>$('add').showModal();
 $('resetDemo').onclick=()=>{if(confirm('Reset to the automatic newcomer onboarding list?')){initNewcomer(true);render()}};

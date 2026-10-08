@@ -21,15 +21,21 @@
 </div></div></div></section>
 
 <section id="landing">
-<div class="hero"><div>
-<div class="brand"><div class="mark">N</div>NurseCredX <span class="small">v8.1 · evolved from ClearTrack</span></div>
-<h1>Upload once. Verify once. Reuse everywhere.</h1>
-<p>Portable, primary-source-verified professional credentials for instant healthcare onboarding. Nurses get one reusable professional identity; recruiters get current qualification data without chasing PDFs.</p>
-<span class="position">Secure verification works quietly underneath the experience.</span>
+<div class="entry-v82">
+<div class="entry-head">
+<div class="brand entry-brand"><div class="mark">V</div>VERIDUN</div>
+<div class="small entry-lineage">NurseCredX demo · evolved from ClearTrack · RN credential portability + assignment readiness</div>
+<h1>Verified credentials. Ready anywhere.</h1>
+<p class="entry-sub">A portable RN credential passport and assignment-readiness demo built around one question: can this nurse start this assignment?</p>
+<h2 class="entry-choose">Choose your workspace</h2>
 </div>
-<div class="login"><h2 style="margin-top:0">Nurse login</h2><p class="small">Simple credentialing for nurses. Advanced verification stays in the background.</p><label>Email</label><input id="email" type="email" placeholder="you@example.com"><label>Password</label><input id="pw" type="password" placeholder="••••••••"><button id="loginBtn" class="pri" style="width:100%">Enter Demo</button><p class="small">Prototype login — any email/password works.</p></div></div>
-
-<div class="role-strip"><div class="role-strip-inner"><div><b>Demo roles</b><div class="small">Continue with the existing clinician experience or preview new role views.</div></div><div class="role-actions"><button class="role-pill primary" id="roleClinician">Clinician</button><button class="role-pill" id="roleOrganization">Organization</button><button class="role-pill" id="roleVerification">Verification Console</button></div></div></div>
+<div class="role-cards">
+<div class="role-card"><div class="role-icon">RN</div><h3>Clinician</h3><p>For registered nurses. Keep one reusable credential passport, see exactly what each assignment still needs, and share only what is required.</p><button class="pri" id="roleClinician">Enter Clinician Workspace</button></div>
+<div class="role-card"><div class="role-icon">ORG</div><h3>Organization</h3><p>For staffing agencies and facilities. See which RNs are ready for an assignment before onboarding begins.</p><button class="pri" id="roleOrganization">Enter Organization Workspace</button></div>
+<div class="role-card console"><span class="auth-tag">AUTHORIZED ACCESS</span><div class="role-icon">✓</div><h3>Verification Console</h3><p>For authorized verification staff. Work the verification queue, run source checks (simulated in this demo), and review the audit log.</p><button class="pri" id="roleVerification">Open Verification Console</button></div>
+</div>
+<div class="entry-demo-note" id="roleDemoNote"><b>Demo only:</b> this role picker is not real authentication. No account, password, or access control is involved. All data is demo data stored only in this browser, and credential verification is simulated.</div>
+</div>
 <div class="preview"><div class="center"><h2>One onboarding dashboard. Portable proof underneath.</h2><p class="small">Verification provenance tells an employer where a credential came from, when it was checked, how it was checked, who verified it, whether it is active, and when it was last monitored.</p></div>
 <div class="shell"><div class="bar"><span>NurseCredX v7 — Example Dashboard</span><span>Credential Trust Layer</span></div><div class="inside">
 <div class="top"><div><h2 style="margin:0">Travel RN Onboarding</h2><span class="small">Automatic newcomer requirements</span></div><span class="badge READY">ONBOARDING READY</span></div>
@@ -48,6 +54,7 @@
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
 <button class="v7nav" data-view="opportunitiesView">◎ Opportunities</button>
 <button class="v7nav" data-view="menuView">☰ Menu</button>
+<button class="side-switch switchRoleAny">⇄ Switch Role</button>
 </nav><div class="net"><b>Verification Network</b><div id="walletInfo">Advanced proof infrastructure stays in the background.</div></div></aside>
 <main class="main"><div id="homeView" class="view active"><div class="top"><div><h1>Credential Home</h1><p class="small">See your readiness, what needs attention, and what to do next.</p></div><div class="actions"><button id="onboardBtn" class="sec">☑ View Tasks</button><button id="passBtn" class="sec">▣ View Passport</button><button id="switchRoleClinician" class="sec">Switch Role</button><button id="logout" class="sec">Log out</button><button id="addBtn" class="pri">+ Add Credential</button></div></div>
 
@@ -101,6 +108,7 @@
     <div class="menu-item-v7"><div><b>Sharing & Privacy</b><div class="small">Manage Passport access and disclosure</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Verification Settings</b><div class="small">Monitoring and notification preferences</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Advanced Verification</b><div class="small">Infrastructure and proof settings</div></div><span>›</span></div>
+    <div class="menu-item-v7 switchRoleAny" role="button" tabindex="0" style="cursor:pointer"><div><b>Switch Role</b><div class="small">Back to the workspace picker (demo, not real sign-in)</div></div><span>⇄</span></div>
   </div>
 </div>
 </main></section>
