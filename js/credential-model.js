@@ -24,6 +24,9 @@ function verificationBadge(c){
  if(c.primary==='VERIFIED'&&c.prov?.active)return{cls:'VERIFIED',text:'VERIFIED · DEMO'};
  if(c.primary==='VERIFIED')return{cls:'PENDING',text:'NEEDS RE-VERIFICATION'};
  if(c.primary==='VERIFYING')return{cls:'PENDING',text:'PENDING VERIFICATION'};
+ if(c.primary==='REVOKED')return{cls:'REVOKED',text:'REVOKED BY ISSUER · DEMO'};
+ if(c.primary==='REJECTED')return{cls:'REVOKED',text:'REJECTED AFTER REVIEW'};
+ if(c.primary==='EXPIRED')return{cls:'REVOKED',text:'EXPIRED'};
  if(c.primary==='UNVERIFIED')return{cls:'PENDING',text:'PENDING'};
  return{cls:cls(c.primary),text:String(c.primary||'—')};
 }
