@@ -1,0 +1,13 @@
+{
+  "name": "veridun-backend",
+  "private": true,
+  "description": "Veridun backend groundwork: Supabase SQL migrations, seeds and RLS tests (not connected to any live service).",
+  "scripts": {
+    "seed:generate": "node scripts/generate-seed.js",
+    "test:db": "node tests/db-test.js",
+    "test:store": "node tests/store-test.js"
+  },
+  "devDependencies": {
+    "pg": "^8.13.0"
+  }
+}

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Veridun demo — Portable RN Credentials &amp; Assignment Readiness</title>
+<link rel="icon" href="data:,">
+<!-- Pinned, integrity-checked third-party libraries. xrpl@5.3.0 is the version the old unpinned "latest" URL resolved to. -->
+<script src="https://unpkg.com/xrpl@5.3.0/build/xrpl-latest-min.js" integrity="sha384-ZYUY+olM49qzMChi4X9rVVRYUuL6GcWXCLRhnVwRqVW/EpBX8PzThCiVnjZFi0Pb" crossorigin="anonymous"></script>
+<!-- qrcode@1.5.1 (MIT) is vendored in js/vendor: pinned, integrity-checked, no network request. 1.5.1 is the latest version with a browser build. -->
+<script src="js/vendor/qrcode-1.5.1.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<section id="public" class="public hidden"><div>
+<div class="brand" style="justify-content:center;margin-bottom:20px"><div class="mark">V</div>Veridun</div>
+<div class="passport"><div class="passhead"><h2 style="margin:0">Veridun Passport</h2><div>Shared RN credential summary · demo · proofs checked on the XRPL Devnet test network</div></div><div class="passbody">
+<div id="pubStatus" class="notice">Checking XRPL Devnet…</div><div id="pubRows"></div><div class="demo"><span>Credential Integrity</span><b id="pubScore">—</b></div><div id="pubOnboard" class="provenance"></div>
+<p class="small">Private documents, license numbers, DOB, SSN, addresses, medical records, vaccine records, background checks, and uploaded files remain off-chain.</p>
+</div></div></div></section>
+
+<section id="landing">
+<div class="entry-v82">
+<div class="entry-head">
+<div class="brand entry-brand"><div class="mark">V</div>VERIDUN</div>
+<div class="small entry-lineage">Veridun demo · evolved from ClearTrack (formerly NurseCredX) · RN credential portability + assignment readiness</div>
+<h1>Verified credentials. Ready anywhere.</h1>
+<p class="entry-sub">A portable RN credential passport and assignment-readiness demo built around one question: can this nurse start this assignment?</p>
+<h2 class="entry-choose">Choose your workspace</h2>
+</div>
+<div class="role-cards">
+<div class="role-card"><div class="role-icon">RN</div><h3>Clinician</h3><p>Manage your RN credential Passport, track renewals, see assignment readiness, and securely share verified information.</p><button class="pri" id="roleClinician">ENTER CLINICIAN DEMO</button></div>
+<div class="role-card"><div class="role-icon">ORG</div><h3>Organization</h3><p>Review RN candidate readiness, define assignment requirements, monitor credentials, and identify nurses ready to submit or deploy.</p><button class="pri" id="roleOrganization">ENTER ORGANIZATION DEMO</button></div>
+<div class="role-card console"><span class="auth-tag">AUTHORIZED ACCESS</span><div class="role-icon">✓</div><h3>Verification Console</h3><p>Manage credential verification, source checks, monitoring, discrepancies, revocations, and trust.</p><button class="pri" id="roleVerification">ENTER VERIFICATION CONSOLE DEMO</button></div>
+</div>
+<div class="tour-cta-v86"><button class="sec startTourV86" id="startTourLandingV86">▶ Start Demo Tour</button><span class="small">Optional · about 75 seconds · walks the Boston golden path on fresh demo data</span></div>
+<div class="entry-demo-note" id="roleDemoNote"><b>Demo only:</b> this role picker is not real authentication. No account, password, or access control is involved. All data is demo data stored only in this browser, and credential verification is simulated.</div>
+<div class="acct-card-v10 hidden" id="acctCardV10" aria-labelledby="acctCardTitleV10">
+<div class="acct-card-head-v10"><span class="acct-tag-v10">YOUR ACCOUNT · STAGING</span><h3 id="acctCardTitleV10">Your own Passport, on every device</h3></div>
+<div id="acctSignedOutV10">
+<p class="small">Sign in to keep your real profile, credentials and live shares in your account and open them on your phone and laptop. This is separate from the demo above: demo data stays in this browser.</p>
+<form id="acctSignInFormV10" class="acct-signin-v10" novalidate><label class="sr-only-v10" for="acctEmailV10">Email address</label><input type="email" id="acctEmailV10" placeholder="you@example.com" autocomplete="email" inputmode="email" required><button class="pri" id="acctSendLinkV10" type="submit">Email me a sign-in link</button></form>
+</div>
+<div id="acctSignedInV10" class="hidden"><p class="acct-who-v10">Signed in as <b id="acctEmailShownV10"></b></p><div class="acct-actions-v10"><button class="pri" id="acctOpenV10" type="button">Open my account</button><button class="sec" id="acctSignOutV10" type="button">Sign out</button></div></div>
+<div class="small acct-msg-v10" id="acctMsgV10" role="status" aria-live="polite"></div>
+<div class="phi-notice-v10"><b>Staging backend, not for real PHI.</b> This is a pre-compliance test environment. Don't upload real health records, real license numbers, SSNs or other protected health information yet. Verification in Veridun is not connected to any board or issuer: account credentials show as <i>Submitted, not verified</i>.</div>
+</div>
+
+</div>
+<div class="preview"><div class="center"><h2>One onboarding dashboard. Portable proof underneath.</h2><p class="small">Verification provenance tells an employer where a credential came from, when it was checked, how it was checked, who verified it, whether it is active, and when it was last monitored. In this demo, verification is simulated.</p></div>
+<div class="shell"><div class="bar"><span>Illustrative example · static sample data</span><span>Credential Trust Layer</span></div><div class="inside">
+<div class="top"><div><h2 style="margin:0">Travel RN Onboarding</h2><span class="small">Automatic newcomer requirements</span></div><span class="badge READY">ONBOARDING READY</span></div>
+<div class="stats"><div class="stat"><span>Requirements</span><b>12</b></div><div class="stat"><span>Verified</span><b>10</b></div><div class="stat"><span>Proofs (optional)</span><b>5</b></div><div class="stat"><span>Credential Readiness</span><b>100%</b></div></div>
+<div class="grid"><div class="panel"><div class="ph">Licenses & Certifications</div><table><tr><td>California RN</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>BLS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>ACLS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>NIHSS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof: securing…</span></td></tr></table></div>
+<div class="panel"><div class="ph">Screening & Health</div><table><tr><td>Background Check</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr><tr><td>Drug Screen</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr><tr><td>Physical</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr><tr><td>Fit Test</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr></table></div></div>
+</div></div>
+<div class="cards"><div class="card"><h3>Verification provenance</h3><p>Source, timestamp, verification method, verifier, status, expiration, and monitoring history travel with the credential record. Verification is simulated in this demo.</p></div><div class="card"><h3>Reusable Passport</h3><p>One master QR exposes current shareable credentials instead of generating a disconnected QR for every document.</p></div><div class="card"><h3>Machine-readable graph</h3><p>Structured credential types prepare Veridun for recruiter APIs and AI qualification agents.</p></div></div></div>
+
+<div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
+</section>
+
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v11.0 demo</span></div><nav>
+<button class="active v7nav" data-view="homeView">⌂ Home</button>
+<button class="v7nav" data-view="passportView">▣ Passport</button>
+<button class="v7nav" data-view="tasksView">☑ Tasks</button>
+<button class="v7nav" data-view="opportunitiesView">◎ Opportunities</button>
+<button class="v7nav" data-view="shareView">⇆ Share &amp; Access</button>
+<button class="v7nav" data-view="menuView">☰ Menu</button>
+<button class="side-switch switchRoleAny">⇄ Switch Role</button>
+</nav><div class="net"><b>Verification Network</b><div id="walletInfo">Advanced proof infrastructure stays in the background.</div></div></aside>
+<main class="main"><div id="homeView" class="view active"><div class="top"><div><h1>Credential Home</h1><p class="small">See your readiness, what needs attention, and what to do next.</p></div><div class="actions"><button id="onboardBtn" class="sec">☑ View Tasks</button><button id="passBtn" class="sec">▣ View Passport</button><button id="switchRoleClinician" class="sec">Switch Role</button><button id="logout" class="sec">Log out</button><button id="addBtn" class="pri">+ Add Credential</button></div></div>
+
+<div class="home-actions">
+  <button id="v7Add"><span>＋</span>Add Credential<div class="small">Upload a new item</div></button>
+  <button id="v7Pass"><span>▣</span>View Passport<div class="small">Reusable professional profile</div></button>
+  <button id="v7Share"><span>↗</span>Share Passport<div class="small">QR or secure link</div></button>
+  <button id="v7Tasks"><span>☑</span>View Tasks<div class="small">See what needs attention</div></button>
+</div>
+<div class="demo"><span><b>Demo flow:</b> add a credential → run the simulated check in the Verification Console → readiness updates → optionally secure an XRPL Devnet proof → share your Passport.</span><span class="demo-btns-v86"><button class="sec startTourV86" id="startTourHomeV86">▶ Start Demo Tour</button><button id="resetDemo" class="sec">Reset Demo Data</button></span></div>
+<div class="dash-grid-v85">
+ <div class="panel-v81"><div class="ph">Portable Readiness <span class="demo-tag-v81">LIVE · DEMO DATA</span></div><div class="pb" id="homeReadyV85"></div></div>
+ <div class="panel-v81"><div class="ph">Current Assignments</div><div class="pb" id="homeAssignV85"></div></div>
+ <div class="panel-v81"><div class="ph">Needs Attention</div><div class="pb" id="homeAttnV85"></div></div>
+</div>
+<div class="stats"><div class="stat"><span>Onboarding Progress</span><b id="onboardPct">0%</b></div><div class="stat"><span>Verified</span><b id="vcount">0</b></div><div class="stat"><span>Proofs (optional)</span><b id="acount">0</b></div><div class="stat"><span>Needs Attention</span><b id="ncount">0</b></div></div>
+<div class="onboard-summary"><div class="readybox"><div class="top"><div><h3>Newcomer Onboarding</h3><div class="small">Automatically generated Travel RN baseline</div></div><span id="readyBadge" class="badge PENDING">IN PROGRESS</span></div><div class="progress" style="margin-top:14px"><div id="onboardBar" style="width:0%"></div></div><div id="onboardSummaryText" class="small" style="margin-top:8px">0 of 0 requirements satisfied</div></div><div class="readybox"><h3>Passport readiness</h3><div class="small">Readiness counts verified, current credentials — XRPL proof is optional. The Passport QR uses accepted XRPL Devnet proofs; the Onboarding Complete QR activates when every baseline item is satisfied.</div></div></div>
+<div class="panel"><div class="ph">Credential Requirements <span id="busy" class="small"></span></div><div class="toolbar"><button class="filter on" data-f="all">All</button><button class="filter" data-f="Licenses & Certifications">Licenses & Certifications</button><button class="filter" data-f="Health & Immunizations">Health & Immunizations</button><button class="filter" data-f="Screening & Employment">Screening & Employment</button><button class="filter" data-f="Clinical Requirements">Clinical Requirements</button></div><div id="empty" class="empty hidden"></div><table id="tbl"><thead><tr><th>Requirement</th><th>Type</th><th>Required</th><th>Verification</th><th>Proof <span class="small">(optional)</span></th><th>Expires</th><th>Provenance</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="notice"><b>Security model:</b> PII and private documents remain off-chain. The verification network receives only minimal credential proof data. Each verification retains off-chain provenance. <b>Demo:</b> verification is simulated, data lives only in this browser, and XRPL proofs use the Devnet test network. NFTs are optional visual badges only; Portable credential proofs are the authoritative trust object.</div>
+</div>
+<div id="profileViewV11" class="view"></div>
+<div id="credentialsViewV11" class="view"></div>
+<div id="settingsViewV11" class="view"></div>
+<div id="storageViewV11" class="view"></div>
+<div id="passportView" class="view">
+  <div class="v7-head"><div><h1>Professional Passport</h1><div class="small">Agency-neutral, reusable credential profile</div></div><button class="sec" id="v7SharePass">Share Passport</button></div>
+  <div class="passport-hero-v7">
+    <h2>ICU Registered Nurse</h2>
+    <div class="small" id="v7PassportHeroV85"></div>
+    <div class="small">Credential Readiness <b id="v7PassportReady">0%</b></div>
+    <div class="passport-actions-v7"><button class="sec" id="v7PassportQR">Show QR</button><button class="sec" id="v7PassportShare2">Share Passport</button></div>
+  </div>
+  <div id="v7PassportSummaryV85" class="pass-summary-v85"></div>
+  <div id="v7PassportSections"></div>
+</div>
+
+<div id="tasksView" class="view">
+  <div class="v7-head"><div><h1>Task Center</h1><div class="small">What to do next, in priority order. Computed from your Passport and your opportunities.</div></div></div>
+  <div id="v7TaskCategories"></div>
+</div>
+
+<div id="opportunitiesView" class="view">
+  <div class="v7-head"><div><h1>Opportunities</h1><div class="small">Assignment readiness for the full assignment duration — only missing items are shown as work</div></div></div>
+  <div class="opp-nurse-v84"><label for="oppNurseV84" class="small">Viewing opportunities as</label> <select id="oppNurseV84" class="filter"></select><div id="oppNurseNoteV84" class="small" style="margin-top:6px"></div></div>
+  <div id="oppListV82"></div>
+  <div class="small">Opportunities only demonstrate how verified credentials can power job-readiness matching. Payroll, recruiter chat, contracts, timecards, and assignment management are intentionally out of scope.</div>
+</div>
+
+<div id="shareView" class="view">
+  <div class="v7-head"><div><h1>Share &amp; Access</h1><div class="small">Assignment-scoped access to your live Passport. Source documents are never shared.</div></div><button class="pri" id="shareNewV83">Share Passport</button></div>
+  <div class="notice" style="margin:0 0 14px">Demo: shares and requests are stored in this browser only, so share links open only in this browser.</div>
+  <div class="task-category-v7"><div class="cathead"><b>Active</b></div><div id="shareActiveV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Pending Requests</b></div><div id="sharePendingV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Expired</b></div><div id="shareExpiredV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Revoked</b></div><div id="shareRevokedV83" class="pb-v83"></div></div>
+  <div class="task-category-v7"><div class="cathead"><b>Activity</b><div class="small">Sharing and verification events (this demo session)</div></div><div id="shareActivityV83" class="pb-v83"></div></div>
+</div>
+
+<div id="menuView" class="view">
+  <div class="v7-head"><div><h1>Menu</h1><div class="small">Profile, sharing, and verification settings</div></div></div>
+  <div class="panel">
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="profile"><span><b>Profile</b><span class="small">Specialty and professional information</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="credentials"><span><b>Submitted Credentials</b><span class="small">Uploads and verification history</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11 navLinkV83" data-menu="shares" data-view="shareView"><span><b>Share &amp; Access</b><span class="small">Who can see your Passport, for which assignment, and until when</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="settings"><span><b>Verification Settings</b><span class="small">Reminders and notification preferences</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="advanced"><span><b>Advanced Verification</b><span class="small">Optional XRPL proof settings — never affects readiness</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" id="backendStatusV88" data-menu="storage"><span><b>Data storage</b><span class="small" id="backendStatusTextV88">This browser only (demo)</span></span><span class="badge PENDING">DEMO</span></button>
+    <div class="menu-item-v7 switchRoleAny" role="button" tabindex="0" style="cursor:pointer"><div><b>Switch Role</b><div class="small">Back to the workspace picker (demo, not real sign-in)</div></div><span>⇄</span></div>
+  </div>
+</div>
+</main></section>
+
+<nav class="mobile-nav">
+  <button class="active v7nav" data-view="homeView"><span>⌂</span>Home</button>
+  <button class="v7nav" data-view="passportView"><span>▣</span>Passport</button>
+  <button class="v7nav" data-view="tasksView"><span>☑</span>Tasks</button>
+  <button class="v7nav" data-view="opportunitiesView"><span>◎</span>Opportunities</button>
+  <button class="v7nav" data-view="menuView"><span>☰</span>Menu</button>
+</nav>
+
+
+<section id="accountWorkspace" class="role-workspace acct-ws-v10" aria-label="Your account">
+<div class="role-shell-v81">
+<div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Your account</span></div><h1>My account</h1><p>Signed in as <b id="acctWsEmailV10"></b>. Stored in your Veridun account (Supabase staging). Not demo data.</p></div>
+<div class="acct-ws-actions-v10"><span class="acct-tag-v10">YOUR ACCOUNT · STAGING</span> <button class="sec mini" id="acctRefreshV10" type="button">Refresh</button> <button class="sec mini" id="acctBackV10" type="button">Back to start</button> <button class="sec mini" id="acctWsSignOutV10" type="button">Sign out</button></div></div>
+<div class="phi-notice-v10" id="acctWsNoticeV10"><b>Pre-compliance staging backend: do not store real PHI yet.</b> Real health records need a HIPAA-eligible plan with a signed BAA, which this project doesn't have yet. Account data is kept in memory on this device and in the staging database, never in this browser's localStorage. Documents go to a private bucket and open only through 60-second signed links.</div>
+<div class="small acct-msg-v10" id="acctWsMsgV10" role="status" aria-live="polite"></div>
+<div class="role-tabs-v81"><button class="acctTab active" data-target="acctPassportV10" type="button">Passport</button><button class="acctTab" data-target="acctSharesV10" type="button">Shares</button><button class="acctTab" data-target="acctOrgV10" type="button">Organization</button><button class="acctTab" data-target="acctActivityV10" type="button">Activity</button></div>
+<div id="acctPassportV10" class="acctPanel"></div>
+<div id="acctSharesV10" class="acctPanel hidden"></div>
+<div id="acctOrgV10" class="acctPanel hidden"></div>
+<div id="acctActivityV10" class="acctPanel hidden"></div>
+</div>
+</section>
+<section id="organizationWorkspace" class="role-workspace">
+<div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Organization Demo</span></div><h1>Organization Dashboard</h1><p>Know who is ready before onboarding begins.</p><label class="small" for="orgViewAsV83" style="display:inline-block;margin-top:6px">Viewing as (demo): </label> <select id="orgViewAsV83" class="filter"></select></div><div><span class="demo-tag-v81">DEMO DATA</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
+<div class="role-tabs-v81"><button class="orgTab active" data-target="orgOverview">Dashboard</button><button class="orgTab" data-target="orgCandidates">Candidates</button><button class="orgTab" data-target="orgAssignments">Assignments</button><button class="orgTab" data-target="orgShares">Shared Passports</button><button class="orgTab" data-target="orgRequirements">Requirement Sets</button><button class="orgTab" data-target="orgAnalytics">Analytics</button></div>
+<div id="orgOverview" class="orgPanel"><div class="metrics-v81 metrics7-v85"><div class="metric-v81"><span>Ready to Submit</span><b id="orgReadyV81">0</b></div><div class="metric-v81"><span>Missing One Requirement</span><b id="orgMissingOneV81">0</b></div><div class="metric-v81"><span>Awaiting Verification</span><b id="orgAwaitV81">0</b></div><div class="metric-v81"><span>Expiring ≤90 Days</span><b id="orgExpV81">0</b></div><div class="metric-v81"><span>Passport Access Active</span><b id="orgAccessActiveV85">0</b></div><div class="metric-v81"><span>Median Verification</span><b id="orgMedV81">—</b></div><div class="metric-v81"><span>Credential Reuse</span><b id="orgReuseV81">—</b></div></div><div class="small metrics-note-v85" id="orgMetricsNoteV85"></div><div class="panel-v81"><div class="ph">Needs Attention <span class="demo-tag-v81">LIVE · DEMO DATA</span></div><div class="pb" id="orgAttnV85"></div></div><div class="panel-v81"><div class="ph">Candidate Readiness <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="orgSummaryV81"></div></div><div class="panel-v81"><div class="ph">Passport Access <span class="demo-tag-v81">LIVE SHARES</span></div><div class="pb" id="orgAccessV83"></div></div><div class="panel-v81"><div class="ph">Recent Passport &amp; Assignment Activity <span class="demo-tag-v81">EVENT LOG</span></div><div class="pb" id="orgActivityV85"></div></div><div class="panel-v81"><div class="ph" id="orgFeaturedTitleV82">Featured assignment</div><div class="pb" id="orgBostonV81"></div></div></div>
+<div id="orgCandidates" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Candidates</div><div class="pb" id="orgCandidatesBodyV81"></div></div></div>
+<div id="orgAssignments" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Assignment Readiness</div><div class="pb" id="orgAssignmentsBodyV81"></div></div></div>
+<div id="orgShares" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Shared Passports</div><div class="pb" id="orgSharesBodyV83"></div></div></div>
+<div id="orgRequirements" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Requirement Sets <span class="demo-tag-v81">DEMO TEMPLATES</span></div><div class="pb" id="orgRequirementsBodyV81"></div></div>
+<div class="panel-v81"><div class="ph">Assignment Builder <span class="demo-tag-v81">DEMO</span></div><div class="pb">
+ <p class="small" style="margin-top:0">Build an opportunity from layers: work type + state + dates + facility, and the specialties it accepts. Each nurse is evaluated with the module for their own specialty. Published assignments are stored in this browser and appear in clinician Opportunities.</p>
+ <div class="grid2-v83">
+  <div><label for="abNameV84">Assignment name</label><input id="abNameV84" placeholder="e.g. Sacramento Strike RN"></div>
+  <div><label for="abFacilityV84">Facility</label><input id="abFacilityV84" placeholder="Facility name (demo)"></div>
+  <div><label for="abWorkTypeV84">Work type (base set)</label><select id="abWorkTypeV84"></select></div>
+  <div><label for="abStateV84">State (licensure layer)</label><select id="abStateV84"></select></div>
+  <div><label for="abStartV84">Start date</label><input type="date" id="abStartV84"></div>
+  <div><label for="abWeeksV84">Length (weeks)</label><input type="number" id="abWeeksV84" min="1" max="52" value="13"></div>
+ </div>
+ <div class="ab-group-v84"><b>Specialties accepted</b> <span class="small">— adds the matching specialty module per nurse</span><div id="abSpecV84" class="chips-v84"></div></div>
+ <div class="ab-group-v84"><b>Recent specialty experience</b> <span class="small">— what counts as recent for the experience item in every specialty module of this assignment</span><div class="grid2-v83"><label>Minimum months of work in the specialty<input type="number" id="abExpMinV11" min="1" max="120" value="12"></label><label>…within the last (months before the start date)<input type="number" id="abExpWinV11" min="1" max="120" value="24"></label></div><div class="small">Default: 12 months of work in the last 24. Change it and the preview updates.</div></div>
+ <details class="ab-group-v84"><summary><b>Facility overrides</b> <span class="small">— add items or waive base-set items</span></summary>
+  <div class="small" style="margin-top:8px">Add</div><div id="abAddV84" class="chips-v84"></div>
+  <div class="small" style="margin-top:8px">Waive from work-type base</div><div id="abWaiveV84" class="chips-v84"></div>
+  <label for="abNoteV84">Override reason (shown as the authority note)</label><input id="abNoteV84" placeholder="e.g. Facility policy for perinatal staff">
+ </details>
+ <div id="abPreviewV84" style="margin-top:12px"></div>
+ <button class="pri" id="abPublishV84" style="margin-top:10px">Publish demo assignment</button>
+ <div id="abCustomV84" style="margin-top:12px"></div>
+</div></div></div>
+<div id="orgAnalytics" class="orgPanel hidden"><div class="panel-v81"><div class="ph">Analytics <span class="demo-tag-v81">DEMO / EVENT-DERIVED</span></div><div class="pb" id="orgAnalyticsBodyV81"></div></div></div></div>
+</section>
+
+<section id="verificationWorkspace" class="role-workspace">
+<div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Verification Console</span></div><h1>Verification Console</h1><p>Simulated primary-source checks (demo only), queue, and audit activity. No real licensing board or issuer is contacted. All metrics are computed from the demo event log.</p></div><div><span class="demo-tag-v81">AUTHORIZED DEMO</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
+<div class="role-tabs-v81"><button class="verifyTab active" data-target="verifyOverview">Dashboard</button><button class="verifyTab" data-target="verifyQueueV81">Verification Queue</button><button class="verifyTab" data-target="verifyMismatchV85">Mismatch Alerts</button><button class="verifyTab" data-target="verifyManualV85">Manual Review</button><button class="verifyTab" data-target="verifyMonitorV85">Monitoring</button><button class="verifyTab" data-target="verifyRevokeV85">Revocations</button><button class="verifyTab" data-target="verifyAuditV81">Audit Logs</button><button class="verifyTab" data-target="verifyAnalyticsV81">Analytics</button><button class="verifyTab" data-target="verifyProofsV81">Advanced Proofs</button></div>
+<div id="verifyOverview" class="verifyPanel"><div class="metrics-v81"><div class="metric-v81"><span>Pending</span><b id="verPendingV81">0</b></div><div class="metric-v81"><span>Verified</span><b id="verSuccessV81">0</b></div><div class="metric-v81"><span>Awaiting Manual Review</span><b id="verManualV81">0</b><small id="verManualDoneV85" class="small">0 completed</small></div><div class="metric-v81"><span>Mismatch Alerts</span><b id="verMismatchV85">0</b></div><div class="metric-v81"><span>Failed / Rejected</span><b id="verFailedV81">0</b></div><div class="metric-v81"><span>Revocations</span><b id="verRevokedV85">0</b></div><div class="metric-v81"><span>Median Time</span><b id="verMedianV81">—</b></div><div class="metric-v81"><span>Monitored ≤30 days</span><b id="verMonitorV82">—</b></div></div><div class="panel-v81"><div class="ph">Verification Queue</div><div class="pb" id="verifyQueuePreviewV81"></div></div><div class="panel-v81"><div class="ph">Mismatch Alerts <span class="demo-tag-v81">RULE-DERIVED</span></div><div class="pb" id="verifyMismatchPreviewV85"></div></div><div class="panel-v81"><div class="ph">Recent Audit Events</div><div class="pb audit-v81" id="verifyAuditPreviewV85"></div></div></div>
+<div id="verifyQueueV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Queue <span class="demo-tag-v81">SIMULATED PRIMARY-SOURCE</span></div><div class="pb" id="verifyQueueBodyV81"></div></div></div>
+<div id="verifyMismatchV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Mismatch Alerts <span class="demo-tag-v81">RULE-DERIVED · DEMO</span></div><div class="pb" id="verifyMismatchBodyV85"></div></div></div>
+<div id="verifyManualV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Manual Review <span class="demo-tag-v81">DEMO</span></div><div class="pb" id="verifyManualBodyV85"></div></div></div>
+<div id="verifyMonitorV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Continuous Monitoring <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="verifyMonitorBodyV85"></div></div></div>
+<div id="verifyRevokeV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Revocations <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="verifyRevokeBodyV85"></div></div></div>
+<div id="verifyAuditV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Append-Only Audit Events <select id="auditFilterV85" class="filter" style="margin-left:auto"><option value="all">All events</option><option value="VERIF">Verification</option><option value="MONITOR">Monitoring &amp; revocation</option><option value="SHARE">Sharing</option><option value="ASSIGN">Assignments</option><option value="CRED">Credentials</option></select></div><div class="pb audit-v81" id="verifyAuditBodyV81"></div></div></div>
+<div id="verifyAnalyticsV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Performance <span class="demo-tag-v81">DEMO DATA — NOT PRODUCTION RESULTS</span></div><div class="pb" id="verifyAnalyticsBodyV81"></div></div></div>
+<div id="verifyProofsV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Advanced Verification Proofs</div><div class="pb" id="verifyProofsBodyV81"></div></div></div></div>
+</section>
+
+<dialog id="add" class="modal"><div class="mh"><b>Add Credential</b><button class="sec xadd">✕</button></div><div class="mb">
+<div id="addContextV82" class="notice hidden" style="margin:0 0 12px"></div>
+<label for="kindSearchV82">Credential type</label><input id="kindSearchV82" list="kindListV82" placeholder="Search: RN license, compact, BLS, ACLS, TB…" autocomplete="off"><datalist id="kindListV82"></datalist>
+<div id="jurisdictionRowV81" class="hidden"><label for="jurSearchV82" id="jurLabelV82">License jurisdiction (US state or territory)</label><input id="jurSearchV82" list="jurListV82" placeholder="Search any US state or territory…" autocomplete="off"><datalist id="jurListV82"></datalist><div id="jurHintV82" class="small" style="margin:-6px 0 12px"></div></div>
+<div id="otherRowV81" class="hidden"><label for="nm">Credential name</label><input id="nm" placeholder="e.g. Chemotherapy provider card"></div>
+<div id="experienceHelpV11" class="small hidden" style="margin:6px 0"></div>
+<div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years of experience in this specialty <span class="small">(optional)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
+<label for="dt">Expiration date</label><input id="dt" type="date">
+<label for="fl">Source document (optional)</label><input id="fl" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx">
+<div id="privacyNoteV82" class="provenance small" style="line-height:1.6"></div>
+</div><div class="mf"><button class="sec xadd">Cancel</button><button id="save" class="pri">Add &amp; Submit for Verification</button></div></dialog>
+
+
+<dialog id="proof">
+<div class="mh"><b>Credential Proof</b><button class="sec xproof">✕</button></div>
+<div class="mb">
+  <div id="proofState" class="notice"></div>
+  <details class="advanced-box">
+    <summary>Advanced Verification Details</summary>
+    <div id="proofGrid" class="proof"></div>
+  </details>
+</div>
+<div class="mf"><button id="toPass" class="sec">Show Passport</button><a id="explorer" class="pri" target="_blank" rel="noopener">View Advanced Proof</a></div>
+</dialog>
+
+<dialog id="onboard"><div class="mh"><b>Automatic Newcomer Onboarding Requirements</b><button class="sec xonboard">✕</button></div><div class="mb"><p class="small">Baseline Travel RN requirements are created automatically for a new profile. Employers can later supply custom requirement templates.</p><div id="onboardRows"></div></div><div class="mf"><button class="sec xonboard">Close</button></div></dialog>
+
+<dialog id="passport"><div class="mh"><b>Veridun Passport</b><button class="sec xpass">✕</button></div><div class="mb"><div class="passport"><div class="passhead"><h2 style="margin:0 0 5px">Veridun Passport</h2><div>Reusable RN credential profile (demo)</div></div><div class="passbody"><div id="passRows"></div><div class="demo"><span>Credential Integrity</span><b id="score">0%</b></div><div class="qrgrid"><div class="qrbox"><h3>Professional Passport</h3><div class="small">Accepted XRPL Devnet (test network) proofs</div><div class="qr"><canvas id="qr"></canvas></div><div id="passUrl" class="small mono" style="word-break:break-all"></div></div><div class="qrbox"><h3>Onboarding Complete</h3><div id="onboardQRStatus" class="small">Complete all required items to activate.</div><div class="qr"><canvas id="onboardQR"></canvas></div><div id="onboardUrl" class="small mono" style="word-break:break-all"></div></div></div></div></div></div><div class="mf"><button class="sec xpass">Close</button></div></dialog>
+
+
+<dialog id="shareV7">
+<div class="mh"><b id="shareTitleV83">SHARE PROFESSIONAL PASSPORT</b><button class="sec xsharev7">✕</button></div>
+<div class="mb">
+ <div id="shareFormV83">
+  <div class="grid2-v83"><div><label for="shareOrgV83">Organization</label><select id="shareOrgV83"></select></div><div><label for="shareAssignV83">Assignment</label><select id="shareAssignV83"></select></div></div>
+  <div id="shareReadyV83" class="small" style="margin:-4px 0 10px"></div>
+  <div style="font-weight:800;margin:4px 0 6px">Recommended for this assignment <span class="small">— only the minimum it requires</span></div>
+  <div id="shareOptionsV83" class="share-options"></div>
+  <details style="margin:8px 0"><summary class="small">Other Passport items — not needed for this assignment, not shared unless you add them</summary><div id="shareExtraV83" class="share-options"></div></details>
+  <div class="share-option" style="border:1px solid var(--b);border-radius:10px;padding:10px 12px;margin:8px 0"><span><b>Source documents</b><span class="small"> · PDFs, images, uploads, health results</span></span><span class="badge REVOKED">NOT SHARED</span></div>
+  <label for="shareV7Duration">Access duration</label><select id="shareV7Duration"></select>
+  <div id="shareCustomRowV83" class="hidden"><label for="shareCustomV83">Access ends on (11:59 PM)</label><input type="date" id="shareCustomV83"></div>
+  <div id="shareReviewV83" class="provenance small" style="line-height:1.6"></div>
+  <div id="shareWarnV11" class="alert-v81 small hidden" role="status"></div>
+  <button class="pri" id="generateV7Share" style="margin-top:12px;width:100%">Approve &amp; Share</button>
+ </div>
+ <div id="shareV7Result" class="hidden">
+  <div id="shareDoneV83" class="good-v81"></div>
+  <div id="shareV7Link" class="share-link-box" style="margin-top:10px"></div>
+  <div class="qr"><canvas id="shareV7QR"></canvas></div>
+  <div style="text-align:center"><button class="sec mini" type="button" id="shareQrDlV11">Download QR image</button></div>
+  <div class="small">Opaque share token — no PII or wallet addresses in the link or QR. <b>Demo limitation:</b> shares are stored in this browser, so the link only opens in this browser.</div>
+ </div>
+</div>
+</dialog>
+
+<dialog id="extendDlgV83"><div class="mh"><b>Extend Access</b><button class="sec xextend">✕</button></div><div class="mb"><div id="extendInfoV83" class="small" style="margin-bottom:10px"></div><label for="extendDurV83">New access duration</label><select id="extendDurV83"></select><div id="extendCustomRowV83" class="hidden"><label for="extendCustomV83">Access ends on (11:59 PM)</label><input type="date" id="extendCustomV83"></div></div><div class="mf"><button class="sec xextend">Cancel</button><button class="pri" id="extendSaveV83">Extend Access</button></div></dialog>
+
+<dialog id="shareDetailDlgV83"><div class="mh"><b>Share Details</b><button class="sec xsharedetail">✕</button></div><div class="mb" id="shareDetailBodyV83"></div><div class="mf"><button class="sec xsharedetail">Close</button></div></dialog>
+
+<dialog id="extReqDlgV83"><div class="mh"><b>Request Access Extension</b><button class="sec xextreq">✕</button></div><div class="mb"><div id="extReqInfoV83" class="small" style="margin-bottom:10px"></div><label for="extReqDateV83">Requested access through (11:59 PM)</label><input type="date" id="extReqDateV83"><label for="extReqReasonV83">Reason</label><input id="extReqReasonV83" placeholder="e.g. Assignment extended by 4 weeks"><p class="small">The clinician must approve. Organizations cannot extend their own access.</p></div><div class="mf"><button class="sec xextreq">Cancel</button><button class="pri" id="extReqSendV83">Send Request</button></div></dialog>
+
+<dialog id="orgShareViewDlgV83"><div class="mh"><b>Shared Passport</b><button class="sec xorgshare">✕</button></div><div class="mb" id="orgShareViewBodyV83"></div><div class="mf"><button class="sec xorgshare">Close</button></div></dialog>
+
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/credential-model.js"></script>
+<script src="js/specialties.js"></script>
+<script src="js/credential-catalog.js"></script>
+<script src="js/demo-data.js"></script>
+<script src="js/requirements.js"></script>
+<script src="js/assignments.js"></script>
+<script src="js/readiness-engine.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/verification.js"></script>
+<script src="js/xrpl.js"></script>
+<script src="js/sharing.js"></script>
+<script src="js/insights.js"></script>
+<script src="js/roles/clinician.js"></script>
+<script src="js/roles/organization.js"></script>
+<script src="js/roles/verifier.js"></script>
+<script src="js/app.js"></script>
+<script src="js/tour.js"></script>
+<script src="js/account.js"></script>
+<script src="js/menu.js"></script>
+</body>
+</html>
