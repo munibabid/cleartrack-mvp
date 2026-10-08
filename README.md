@@ -87,16 +87,14 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 
 Each item is checked by the headless-Chrome suite `p6` (desktop 1280px + 390px; IDs `AC1`–`AC26`), with p2–p5 as regressions. ✅ = passing on the live site.
 
-> Note: in our copy of the handoff, the text of §52 items 1–6 was cut off. Items 1–6 below are inferred from §53–54 and the "immediate focus" list.
-
 | # | Criterion | Status | Where |
 |---|---|---|---|
-| 1 | RN-only scope (no APRN/NP/CRNA/physician/PA) | ✅ | Copy, catalog, README |
-| 2 | Three-role entry (Clinician / Organization / Verification Console), demo-only note | ✅ | Entry screen, Switch Role |
-| 3 | RN credential catalog with all 56 US jurisdictions, boards, NLC status | ✅ | `js/credential-catalog.js` |
-| 4 | Searchable dropdowns for credential type and jurisdiction | ✅ | Add Credential |
-| 5 | Privacy set automatically; manual required/private checkboxes removed | ✅ | Add Credential |
-| 6 | System decides what stays off-chain (private kinds never XRPL-eligible) | ✅ | `catalogPrivacy`, `eligible` |
+| 1 | Three-role entry works (Clinician / Organization / Verification Console), demo-only note | ✅ | Entry screen |
+| 2 | Each role can switch back | ✅ | Switch Role in every workspace |
+| 3 | Add Credential uses structured searchable selections (category, credential, jurisdiction, issuer) | ✅ | Add Credential |
+| 4 | Nurse never types machine-readable credential IDs (custom credentials get an auto-generated `CUSTOM_*` type) | ✅ | Add Credential |
+| 5 | Nurse no longer checks "Required for onboarding" (requirements come from the assignment) | ✅ | Add Credential, requirement sets |
+| 6 | Nurse no longer decides what is off-chain (catalog decides; private kinds never XRPL-eligible) | ✅ | `catalogPrivacy`, `eligible` |
 | 7 | Source documents private by default (file name only, never shared) | ✅ | Add Credential, shares (`documentsShared:false`) |
 | 8 | Catalog sets privacy and verification policy | ✅ | Add Credential classification panel |
 | 9 | Organizations use the same taxonomy | ✅ | Requirement sets / assignments use catalog kinds |
