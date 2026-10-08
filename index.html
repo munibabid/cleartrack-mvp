@@ -49,7 +49,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v8.6 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v8.8 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -119,6 +119,7 @@
     <div class="menu-item-v7 navLinkV83" data-view="shareView" role="button" tabindex="0" style="cursor:pointer"><div><b>Share &amp; Access</b><div class="small">Who can see your Passport, for which assignment, and until when</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Verification Settings</b><div class="small">Monitoring and notification preferences</div></div><span>›</span></div>
     <div class="menu-item-v7"><div><b>Advanced Verification</b><div class="small">Infrastructure and proof settings</div></div><span>›</span></div>
+    <div class="menu-item-v7" id="backendStatusV88"><div><b>Data storage</b><div class="small" id="backendStatusTextV88">This browser only (demo)</div></div><span class="badge PENDING">DEMO</span></div>
     <div class="menu-item-v7 switchRoleAny" role="button" tabindex="0" style="cursor:pointer"><div><b>Switch Role</b><div class="small">Back to the workspace picker (demo, not real sign-in)</div></div><span>⇄</span></div>
   </div>
 </div>
@@ -238,6 +239,8 @@
 
 <dialog id="orgShareViewDlgV83"><div class="mh"><b>Shared Passport</b><button class="sec xorgshare">✕</button></div><div class="mb" id="orgShareViewBodyV83"></div><div class="mf"><button class="sec xorgshare">Close</button></div></dialog>
 
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
 <script src="js/credential-model.js"></script>
 <script src="js/credential-catalog.js"></script>
 <script src="js/demo-data.js"></script>

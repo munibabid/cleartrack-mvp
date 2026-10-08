@@ -1,9 +1,9 @@
-/* Append-only event log (localStorage) and event-derived metrics.
+/* Append-only event log (via the data store, js/store.js) and event-derived metrics.
    Every metric shown in the Organization and Verification views is computed
    from these events or from current credential state — no hardcoded numbers. */
 const V81_EVENTS='nursecredx_v81_events';
-function v81Events(){try{return JSON.parse(localStorage.getItem(V81_EVENTS)||'[]')}catch{return[]}}
-function v81Log(type,id=null,extra={}){const e=v81Events();e.push({event_id:'e'+Date.now()+Math.random().toString(16).slice(2),event_type:type,credential_id:id,assignment_id:extra.assignment_id||null,timestamp:extra.timestamp||new Date().toISOString(),actor_type:extra.actor_type||'SYSTEM',verification_method:extra.verification_method||null,result:extra.result||null,duration_ms:extra.duration_ms??null,manual_intervention:!!extra.manual_intervention,detail:extra.detail||null});localStorage.setItem(V81_EVENTS,JSON.stringify(e))}
+function v81Events(){return store.events.list()}
+function v81Log(type,id=null,extra={}){store.events.append({event_id:'e'+Date.now()+Math.random().toString(16).slice(2),event_type:type,credential_id:id,assignment_id:extra.assignment_id||null,timestamp:extra.timestamp||new Date().toISOString(),actor_type:extra.actor_type||'SYSTEM',verification_method:extra.verification_method||null,result:extra.result||null,duration_ms:extra.duration_ms??null,manual_intervention:!!extra.manual_intervention,detail:extra.detail||null})}
 function v81Median(a){if(!a.length)return null;a=[...a].sort((x,y)=>x-y);const m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2}
 /* Real elapsed time from VERIFICATION_STARTED (logged at upload/submission)
    to VERIFICATION_SUCCEEDED for each credential. */
