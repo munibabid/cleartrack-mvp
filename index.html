@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NurseCredX v8.1 — Portable Healthcare Credentials</title>
-<script src="https://unpkg.com/xrpl/build/xrpl-latest-min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<link rel="icon" href="data:,">
+<!-- Pinned, integrity-checked third-party libraries. xrpl@5.3.0 is the version the old unpinned "latest" URL resolved to. -->
+<script src="https://unpkg.com/xrpl@5.3.0/build/xrpl-latest-min.js" integrity="sha384-ZYUY+olM49qzMChi4X9rVVRYUuL6GcWXCLRhnVwRqVW/EpBX8PzThCiVnjZFi0Pb" crossorigin="anonymous"></script>
+<!-- qrcode@1.5.4 ships no browser build (the old URL 404d, so QR codes never rendered); 1.5.1 is the latest version with build/qrcode.js. -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
