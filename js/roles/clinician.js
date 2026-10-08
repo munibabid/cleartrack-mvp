@@ -1,6 +1,6 @@
 /* Clinician workspace: Home, Passport, Tasks, Opportunities, onboarding dialog. */
 function setBusy(s){$('busy').textContent=s||''}
-function render(){creds=creds.map(v81Normalize);const ob=onboarding();$('onboardPct').textContent=ob.pct+'%';$('vcount').textContent=creds.filter(c=>c.primary==='VERIFIED').length;$('acount').textContent=creds.filter(c=>c.chain==='ACCEPTED').length;$('ncount').textContent=creds.filter(c=>['UNVERIFIED','VERIFYING'].includes(c.primary)||c.chain==='SECURING').length;$('onboardBar').style.width=ob.pct+'%';$('onboardSummaryText').textContent=`${ob.ok} of ${ob.req.length} required items satisfied`;$('readyBadge').textContent=ob.ready?'ONBOARDING READY':'IN PROGRESS';$('readyBadge').className='badge '+(ob.ready?'READY':'PENDING');let a=filter==='all'?creds:creds.filter(c=>c.section===filter);$('empty').classList.toggle('hidden',a.length>0);$('tbl').classList.toggle('hidden',!a.length);$('rows').innerHTML=a.map(c=>{let z=`<button class="mini details" data-id="${c.id}">Details</button>`;if(c.primary==='UNVERIFIED')z+=`<button class="mini verify" data-id="${c.id}">Submit for Verification</button>`;if(c.primary==='VERIFYING')z+=`<button class="mini" disabled>Verification in Progress</button>`;if(eligible(c))z+=`<button class="mini chainbtn issue" data-id="${c.id}">Secure Credential</button>`;if(c.chain==='SECURING')z+=`<button class="mini goodbtn accept" data-id="${c.id}">Accept</button>`;if(['SECURING','ACCEPTED'].includes(c.chain))z+=`<button class="mini showproof" data-id="${c.id}">XRPL Proof</button>`;z+=`<button class="mini del" data-id="${c.id}">Delete</button>`;let prov=c.prov?.verifiedAt?`${ec(c.prov.source)}<div class="source">${ec(c.prov.method)} · ${new Date(c.prov.verifiedAt).toLocaleDateString()}</div>`:'Not yet verified';return `<tr><td><b>${ec(c.name)}</b>${c.privateOnly?'<div class="small">Private/off-chain only</div>':''}</td><td class="mono">${ec(c.type)}</td><td>${c.required?'<span class="badge REQ">REQUIRED</span>':'Optional'}</td><td><span class="badge ${cls(c.primary)}">${ec(c.primary)}</span></td><td><span class="badge ${userChainClass(c)}">${ec(userChain(c))}</span></td><td>${fd(c.expiration)}</td><td>${prov}</td><td><div class="rowact">${z}</div></td></tr>`}).join('');document.querySelectorAll('.verify').forEach(b=>b.onclick=()=>openVerify(+b.dataset.id));document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>issue(+b.dataset.id));document.querySelectorAll('.accept').forEach(b=>b.onclick=()=>accept(+b.dataset.id));document.querySelectorAll('.showproof,.details').forEach(b=>b.onclick=()=>showProof(+b.dataset.id));document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{creds=creds.filter(c=>c.id!=b.dataset.id);save();render()});renderV7Views()}
+function render(){creds=creds.map(v81Normalize);const ob=onboarding();$('onboardPct').textContent=ob.pct+'%';$('vcount').textContent=creds.filter(c=>c.primary==='VERIFIED').length;$('acount').textContent=creds.filter(c=>c.chain==='ACCEPTED').length;$('ncount').textContent=creds.filter(c=>['UNVERIFIED','VERIFYING'].includes(c.primary)||c.chain==='SECURING').length;$('onboardBar').style.width=ob.pct+'%';$('onboardSummaryText').textContent=`${ob.ok} of ${ob.req.length} required items satisfied`;$('readyBadge').textContent=ob.ready?'ONBOARDING READY':'IN PROGRESS';$('readyBadge').className='badge '+(ob.ready?'READY':'PENDING');let a=filter==='all'?creds:creds.filter(c=>c.section===filter);$('empty').classList.toggle('hidden',a.length>0);$('tbl').classList.toggle('hidden',!a.length);$('rows').innerHTML=a.map(c=>{let z=`<button class="mini details" data-id="${c.id}">Details</button>`;if(c.primary==='UNVERIFIED')z+=`<button class="mini verify" data-id="${c.id}">Submit for Verification</button>`;if(c.primary==='VERIFYING')z+=`<button class="mini" disabled>Verification in Progress</button>`;if(eligible(c))z+=`<button class="mini chainbtn issue" data-id="${c.id}">Secure Credential</button>`;if(c.chain==='SECURING')z+=`<button class="mini goodbtn accept" data-id="${c.id}">Accept</button>`;if(['SECURING','ACCEPTED'].includes(c.chain))z+=`<button class="mini showproof" data-id="${c.id}">XRPL Proof</button>`;z+=`<button class="mini del" data-id="${c.id}">Delete</button>`;let prov=c.prov?.verifiedAt?`${ec(c.prov.source)}<div class="source">${ec(c.prov.method)} · ${new Date(c.prov.verifiedAt).toLocaleDateString()}</div>`:'Not yet verified';return `<tr><td><b>${ec(c.name)}</b>${c.privateOnly?'<div class="small">Private/off-chain only</div>':''}</td><td class="mono">${ec(c.type)}</td><td>${c.required?'<span class="badge REQ">REQUIRED</span>':'Optional'}</td><td>${verificationBadgeHtml(c)}</td><td>${proofLabelHtml(c)}</td><td>${fd(c.expiration)}</td><td>${prov}</td><td><div class="rowact">${z}</div></td></tr>`}).join('');document.querySelectorAll('.verify').forEach(b=>b.onclick=()=>openVerify(+b.dataset.id));document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>issue(+b.dataset.id));document.querySelectorAll('.accept').forEach(b=>b.onclick=()=>accept(+b.dataset.id));document.querySelectorAll('.showproof,.details').forEach(b=>b.onclick=()=>showProof(+b.dataset.id));document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{creds=creds.filter(c=>c.id!=b.dataset.id);save();render()});renderV7Views()}
 function showV7View(id){
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));
  document.querySelectorAll('.v7nav').forEach(b=>b.classList.toggle('active',b.dataset.view===id));
@@ -14,12 +14,12 @@ function renderV7Views(){
  if($('v7PassportSections'))$('v7PassportSections').innerHTML=passCats.map(cat=>{
    const arr=creds.filter(c=>catFor(c)===cat&&c.primary==='VERIFIED'&&c.prov?.active);
    if(!arr.length)return'';
-   return `<div class="task-category-v7"><div class="cathead"><b>${ec(cat==='Employment & HR'?'Employment Experience':cat)}</b></div>${arr.map(c=>`<div class="passport-item-v7"><div><b>✓ ${ec(c.name)}</b><div class="small">${ec(c.prov?.source||'Verified source')}</div></div><div><span class="badge ${userChainClass(c)}">${ec(userChain(c))}</span> <button class="mini details" data-id="${c.id}">View</button></div></div>`).join('')}</div>`
+   return `<div class="task-category-v7"><div class="cathead"><b>${ec(cat==='Employment & HR'?'Employment Experience':cat)}</b></div>${arr.map(c=>`<div class="passport-item-v7"><div><b>✓ ${ec(c.name)}</b><div class="small">${ec(c.prov?.source||'Verified source')}</div></div><div class="pass-badges-v84">${verificationBadgeHtml(c)} ${proofLabelHtml(c)} <button class="mini details" data-id="${c.id}">View</button></div></div>`).join('')}</div>`
  }).join('');
  const cats=['Licenses','Certifications','Education','Employment & HR','Employee Health','Clinical Qualifications','Background & Screening','Additional Professional Qualifications','Submitted Credentials'];
  if($('v7TaskCategories'))$('v7TaskCategories').innerHTML=cats.map(cat=>{
    const arr=creds.filter(c=>catFor(c)===cat),verified=arr.filter(c=>c.primary==='VERIFIED').length,exp=arr.filter(c=>c.primary==='EXPIRING').length,missing=arr.filter(c=>['UNVERIFIED','EXPIRED','REVOKED'].includes(c.primary)).length;
-   return `<div class="task-category-v7"><div class="cathead"><b>${ec(cat)}</b><div class="counts"><span class="chip">${arr.length} items</span><span class="chip">${verified} verified</span><span class="chip">${exp} expiring</span><span class="chip">${missing} missing/action</span></div></div>${arr.map(c=>`<div class="task-item-v7"><div><b>${ec(c.name)}</b><div class="small">${ec(c.primary)}${c.expiration?' · '+fd(c.expiration):''}</div></div><button class="mini details" data-id="${c.id}">${c.primary==='EXPIRING'?'Renew':'Open'}</button></div>`).join('')}</div>`
+   return `<div class="task-category-v7"><div class="cathead"><b>${ec(cat)}</b><div class="counts"><span class="chip">${arr.length} items</span><span class="chip">${verified} verified</span><span class="chip">${exp} expiring</span><span class="chip">${missing} missing/action</span></div></div>${arr.map(c=>`<div class="task-item-v7"><div><b>${ec(c.name)}</b><div class="small">${ec(verificationBadge(c).text)}${c.expiration?' · '+fd(c.expiration):''}</div></div><button class="mini details" data-id="${c.id}">${c.primary==='EXPIRING'?'Renew':'Open'}</button></div>`).join('')}</div>`
  }).join('');
  renderOpportunities();
  renderShareAccess();
@@ -27,14 +27,23 @@ function renderV7Views(){
 }
 function openOnboard(){const ob=onboarding();$('onboardRows').innerHTML=ob.req.map(c=>`<div class="reqrow"><div><b>${ec(c.name)}</b><div class="source">${ec(c.prov?.source||'Primary source pending')}</div></div><span class="badge ${reqSatisfied(c)?'READY':'PENDING'}">${reqSatisfied(c)?'SATISFIED':'PENDING'}</span></div>`).join('');$('onboard').showModal()}
 
-/* Opportunities: every demo assignment, evaluated by the readiness engine. */
+/* Opportunities: each assignment that accepts the selected nurse's profile
+   specialty, evaluated by the readiness engine with that nurse's specialty
+   module. Alex is the live Passport; the other nurses are read-only demos. */
+let oppNurseId='alex';
 function renderOpportunities(){
  if(!$('oppListV82'))return;
- $('oppListV82').innerHTML=getAssignments().map(a=>{
-  const r=v81Assignment(a),next=r.items.find(i=>i.status==='MISSING'||i.status==='EXPIRES_BEFORE_END'),pend=r.items.some(i=>i.status==='PENDING_VERIFICATION');
-  const org=organization(a.orgId),action=r.ready?`<span class="badge READY">${r.ok}/${r.total} · ASSIGNMENT READY</span> <button class="pri oppShare" data-aid="${a.id}" style="margin-top:8px">SHARE WITH ${ec((org?.name||'ORGANIZATION').toUpperCase())}</button>`:next?`<button class="pri oppComplete" data-aid="${a.id}">COMPLETE MISSING REQUIREMENT</button>`:pend?'<button class="sec" disabled>Pending verification</button>':'';
-  return`<div class="opp-card-v7"><div class="opp-item-v7"><div><b>${ec(a.name)}</b><div class="small">${org?ec(org.name)+' · ':''}${ec(a.templateName)} · ${ec(jurisdictionName(a.jurisdiction))} · ${a.start} → ${a.end}</div></div><div class="opp-score">${r.ok}/${r.total}</div></div><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul>${action}</div>`;
- }).join('');
+ const sel=$('oppNurseV84');
+ if(sel&&!sel.options.length){sel.innerHTML=DEMO_NURSES.map(n=>`<option value="${n.id}">${ec(n.name)} — ${ec(specialtyShort(n.specialty))}${n.live?' (your live Passport)':' (demo nurse, read-only)'}</option>`).join('');sel.onchange=()=>{oppNurseId=sel.value;renderOpportunities()}}
+ if(sel)sel.value=oppNurseId;
+ const n=demoNurse(oppNurseId),all=getAssignments(),elig=all.filter(a=>assignmentAccepts(a,n.specialty)),other=all.filter(a=>!assignmentAccepts(a,n.specialty));
+ if($('oppNurseNoteV84'))$('oppNurseNoteV84').innerHTML=`Specialty from profile: <b>${ec(specialtyName(n.specialty))}</b> · home state ${ec(jurisdictionName(n.homeState))}. Opportunities that accept ${ec(specialtyShort(n.specialty))} are evaluated with the <b>${ec(specialtyShort(n.specialty))} module</b>.${n.live?'':' <span class="demo-tag-v81">DEMO NURSE · READ-ONLY</span>'}`;
+ $('oppListV82').innerHTML=elig.map(a=>{
+  const r=v81Assignment(a,n),next=r.items.find(i=>['MISSING','EXPIRES_BEFORE_END','NOT_RECENT'].includes(i.status)),pend=r.items.some(i=>i.status==='PENDING_VERIFICATION');
+  const org=organization(a.orgId);
+  const action=!n.live?(r.ready?`<span class="badge READY">${r.ok}/${r.total} · ASSIGNMENT READY</span>`:''):r.ready?`<span class="badge READY">${r.ok}/${r.total} · ASSIGNMENT READY</span> <button class="pri oppShare" data-aid="${a.id}" style="margin-top:8px">SHARE WITH ${ec((org?.name||'ORGANIZATION').toUpperCase())}</button>`:next?`<button class="pri oppComplete" data-aid="${a.id}">COMPLETE MISSING REQUIREMENT</button>`:pend?'<button class="sec" disabled>Pending verification</button>':'';
+  return`<div class="opp-card-v7"><div class="opp-item-v7"><div><b>${ec(a.name)}</b><div class="small">${org?ec(org.name)+' · ':''}${ec(a.facility||'')}</div><div class="small">${ec(a.workTypeName)} · ${ec(jurisdictionName(a.jurisdiction))} · ${a.start} → ${a.end} · accepts ${ec(a.specialtyText)}</div></div><div class="opp-score">${r.ok}/${r.total}</div></div><div style="margin:8px 0">${layerSummaryHtml(a,r.reqs)}</div><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul>${action}</div>`;
+ }).join('')+(other.length?`<div class="small opp-other-v84">Not shown — these opportunities don't accept ${ec(specialtyShort(n.specialty))}: ${other.map(a=>`${ec(a.name)} (${ec(a.specialtyText)})`).join(', ')}</div>`:'');
  document.querySelectorAll('.oppComplete').forEach(b=>b.onclick=()=>completeMissingRequirement(b.dataset.aid));
  document.querySelectorAll('.oppShare').forEach(b=>b.onclick=()=>{const x=getAssignment(b.dataset.aid);openShareDialog({orgId:x.orgId,assignmentId:x.id})});
 }
@@ -42,7 +51,7 @@ function renderOpportunities(){
    session) and opens the Add Credential form pre-filled for the first
    missing requirement. */
 function completeMissingRequirement(aid){
- const a=getAssignment(aid);if(!a)return;const r=v81Assignment(a),next=r.items.find(i=>i.status==='MISSING'||i.status==='EXPIRES_BEFORE_END');if(!next)return;
+ const a=getAssignment(aid);if(!a)return;const r=v81Assignment(a),next=r.items.find(i=>['MISSING','EXPIRES_BEFORE_END','NOT_RECENT'].includes(i.status));if(!next)return;
  if(!eventsSinceSeed().some(e=>e.event_type==='ASSIGNMENT_INTEREST'&&e.assignment_id===aid))v81Log('ASSIGNMENT_INTEREST',null,{assignment_id:aid,actor_type:'CLINICIAN',result:`${r.ok}/${r.total}`,detail:{total:r.total,missing:r.total-r.ok,missingLabels:r.missing}});
  const kind=next.req.kind===RN_AUTHORIZATION?'RN_LICENSE':next.req.kind;
  openAddForm({kind,jurisdiction:next.req.jurisdiction||'',context:`Completing <b>${ec(a.name)}</b>: ${ec(next.label)}${next.note?' <span class="small">('+ec(next.note)+')</span>':''}`});
@@ -93,13 +102,13 @@ function assertionRow(x,checked){return`<label class="share-option"><span><b>${e
 function openShareDialog(pre={}){
  shareEditId=null;$('shareTitleV83').textContent='SHARE PROFESSIONAL PASSPORT';$('generateV7Share').textContent='Approve & Share';
  $('shareOrgV83').disabled=false;$('shareAssignV83').disabled=false;
- $('shareOrgV83').innerHTML=ORGANIZATIONS.map(o=>`<option value="${o.id}">${ec(o.name)}</option>`).join('');
+ $('shareOrgV83').innerHTML=ORGANIZATIONS.filter(o=>getAssignments().some(a=>a.orgId===o.id&&assignmentAccepts(a,DEMO_PROFILE.specialty))).map(o=>`<option value="${o.id}">${ec(o.name)}</option>`).join('');
  const a0=pre.assignmentId?getAssignment(pre.assignmentId):featuredAssignment();
  $('shareOrgV83').value=pre.orgId||a0.orgId;fillShareAssignments(a0.id);
  durationOptions($('shareV7Duration'));$('shareV7Duration').value='THROUGH_ASSIGNMENT_END';$('shareCustomV83').value='';
  refreshShareOptions();$('shareFormV83').classList.remove('hidden');$('shareV7Result').classList.add('hidden');$('shareV7').showModal();
 }
-function fillShareAssignments(selectId){const list=getAssignments().filter(a=>a.orgId===$('shareOrgV83').value);$('shareAssignV83').innerHTML=list.map(a=>`<option value="${a.id}">${ec(a.name)} · ${a.start} → ${a.end}</option>`).join('');if(selectId&&list.some(a=>a.id===selectId))$('shareAssignV83').value=selectId}
+function fillShareAssignments(selectId){const list=getAssignments().filter(a=>a.orgId===$('shareOrgV83').value&&assignmentAccepts(a,DEMO_PROFILE.specialty));$('shareAssignV83').innerHTML=list.map(a=>`<option value="${a.id}">${ec(a.name)} · ${a.start} → ${a.end}</option>`).join('');if(selectId&&list.some(a=>a.id===selectId))$('shareAssignV83').value=selectId}
 function refreshShareOptions(preset){
  const a=getAssignment($('shareAssignV83').value);if(!a)return;const r=v81Assignment(a),rec=recommendedAssertions(a),extra=optionalAssertions(a,rec);
  const isOn=x=>preset?preset.some(p=>p.credId===x.credId):true;
@@ -116,6 +125,7 @@ function updateShareReview(){
 }
 function approveShare(){
  const a=getAssignment($('shareAssignV83').value),d=$('shareV7Duration').value,cd=$('shareCustomV83').value,sel=selectedAssertions();
+ if(!a){alert('Choose an assignment that accepts your specialty.');return}
  if(!sel.length){alert('Select at least one assertion to share.');return}
  if(d==='CUSTOM_DATE'&&(!cd||endOfDay(cd)<=new Date())){alert('Choose a future end date for custom access.');return}
  if(shareEditId){modifyShare(shareEditId,{assertions:sel,duration:d,customDate:cd});$('shareV7').close();render();return}
@@ -174,6 +184,7 @@ function activityText(e){
   SHARE_EXTENDED:`Extended access for ${w} → ${d.expiresTo?fmtDT(d.expiresTo):'until revoked'}${d.via==='ORGANIZATION_REQUEST'?' (approved request)':''}`,
   SHARE_EXTENSION_DECLINED:`Declined extension request from ${d.org}`,
   SHARE_REVOKED:`Revoked Passport access for ${w}`,
+  ASSIGNMENT_PUBLISHED:`${d.org||'Organization'} published ${d.name} (${(d.specialties||[]).map(specialtyShort).join(' / ')})`,
   SHARE_EXPIRED:`Access expired for ${w}${e.result&&e.result.startsWith('ACCESS_REFUSED')?' — a view attempt was refused':''}`,
   CREDENTIAL_UPLOADED:`Added ${cn}`,CLASSIFICATION_COMPLETED:`Classified ${cn} as ${d.kind||''}${d.jurisdiction?' · '+d.jurisdiction:''}`,
   VERIFICATION_STARTED:`${cn} entered the verification queue`,VERIFICATION_SUCCEEDED:`${cn} verified (simulated check)`,VERIFICATION_FAILED:`${cn} verification failed (${e.result})`,SOURCE_CHECK_COMPLETED:`Simulated source check completed for ${cn}`,
