@@ -3,10 +3,17 @@
    Featured: Boston (Massachusetts — NLC enacted but not yet in effect, so a
    compact license does NOT authorize practice there) and Houston (Texas —
    NLC member, so Alex's Arizona multistate license is honored). */
+/* Demo organizations (fictional). Each demo assignment belongs to one. */
+const ORGANIZATIONS=[
+ {id:'northstar',name:'Northstar Travel Nursing',type:'Travel staffing agency (demo)'},
+ {id:'lonestar',name:'Lone Star Rapid Response',type:'Rapid response agency (demo)'},
+ {id:'pacific',name:'Pacific Strike Staffing',type:'Strike staffing agency (demo)'}
+];
+function organization(id){return ORGANIZATIONS.find(o=>o.id===id)||null}
 const ASSIGNMENT_DEFS=[
- {id:'boston-icu',name:'Boston Travel ICU',city:'Boston',jurisdiction:'US-MA',template:'TRAVEL_ICU_RN',startInDays:45,weeks:13,featured:true},
- {id:'houston-rapid',name:'Houston Rapid Response ICU',city:'Houston',jurisdiction:'US-TX',template:'RAPID_RESPONSE_RN',startInDays:21,weeks:8},
- {id:'oakland-strike',name:'California Strike ICU',city:'Oakland',jurisdiction:'US-CA',template:'STRIKE_ICU_RN',startInDays:7,weeks:6}
+ {id:'boston-icu',orgId:'northstar',name:'Boston Travel ICU',city:'Boston',jurisdiction:'US-MA',template:'TRAVEL_ICU_RN',startInDays:45,weeks:13,featured:true},
+ {id:'houston-rapid',orgId:'lonestar',name:'Houston Rapid Response ICU',city:'Houston',jurisdiction:'US-TX',template:'RAPID_RESPONSE_RN',startInDays:21,weeks:8},
+ {id:'oakland-strike',orgId:'pacific',name:'California Strike ICU',city:'Oakland',jurisdiction:'US-CA',template:'STRIKE_ICU_RN',startInDays:7,weeks:6}
 ];
 const DEMO_ANCHOR_KEY='veridun_demo_anchor';
 function demoAnchor(){const s=localStorage.getItem(DEMO_ANCHOR_KEY);return s?new Date(s+'T00:00:00'):new Date(new Date().toISOString().slice(0,10)+'T00:00:00')}
