@@ -1,5 +1,17 @@
-/* Assignment definitions (DEMO DATA). The organization and readiness
-   engine use the same credential type codes. */
-const V81_ASSIGNMENTS=[
-{id:'boston',name:'Boston Travel ICU',start:'2026-12-01',end:'2027-03-01',reqs:[{label:'Massachusetts RN License',type:'RN_LICENSE',jurisdiction:'US_MA'},{label:'BLS',type:'CERT_BLS'},{label:'ACLS',type:'CERT_ACLS'},{label:'NIHSS',type:'CERT_NIHSS'},{label:'ICU Experience',type:'EMP_ICU_VERIFIED'},{label:'Physical Exam',type:'HEALTH_PHYSICAL_CURRENT'},{label:'N95 Fit Test',type:'HEALTH_FIT_TEST'},{label:'Drug Screen',type:'SCREEN_DRUG_CURRENT'},{label:'Background Check',type:'SCREEN_BACKGROUND_CURRENT'},{label:'TB Screening',type:'HEALTH_TB_CURRENT'},{label:'Influenza Vaccine',type:'HEALTH_FLU_CURRENT'},{label:'Clinical Hours',type:'CLINICAL_HOURS_VERIFIED'}]},
-{id:'ca-strike',name:'California Strike ICU',start:'2026-10-15',end:'2026-11-30',reqs:[{label:'California RN License',type:'RN_CA_ACTIVE'},{label:'BLS',type:'CERT_BLS'},{label:'ACLS',type:'CERT_ACLS'},{label:'ICU Experience',type:'EMP_ICU_VERIFIED'},{label:'Background Check',type:'SCREEN_BACKGROUND_CURRENT'},{label:'Drug Screen',type:'SCREEN_DRUG_CURRENT'},{label:'Physical Exam',type:'HEALTH_PHYSICAL_CURRENT'},{label:'N95 Fit Test',type:'HEALTH_FIT_TEST'},{label:'Clinical Hours',type:'CLINICAL_HOURS_VERIFIED'}]}];
+/* Assignment definitions (DEMO DATA). Dates are relative to the demo anchor
+   (the day demo data was seeded) so the demo never silently goes stale.
+   Featured: Boston (Massachusetts — NLC enacted but not yet in effect, so a
+   compact license does NOT authorize practice there) and Houston (Texas —
+   NLC member, so Alex's Arizona multistate license is honored). */
+const ASSIGNMENT_DEFS=[
+ {id:'boston-icu',name:'Boston Travel ICU',city:'Boston',jurisdiction:'US-MA',template:'TRAVEL_ICU_RN',startInDays:45,weeks:13,featured:true},
+ {id:'houston-rapid',name:'Houston Rapid Response ICU',city:'Houston',jurisdiction:'US-TX',template:'RAPID_RESPONSE_RN',startInDays:21,weeks:8},
+ {id:'oakland-strike',name:'California Strike ICU',city:'Oakland',jurisdiction:'US-CA',template:'STRIKE_ICU_RN',startInDays:7,weeks:6}
+];
+const DEMO_ANCHOR_KEY='veridun_demo_anchor';
+function demoAnchor(){const s=localStorage.getItem(DEMO_ANCHOR_KEY);return s?new Date(s+'T00:00:00'):new Date(new Date().toISOString().slice(0,10)+'T00:00:00')}
+function isoDay(d){return d.toISOString().slice(0,10)}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function getAssignments(){const a=demoAnchor();return ASSIGNMENT_DEFS.map(d=>{const start=addDays(a,d.startInDays),end=addDays(start,d.weeks*7);return{...d,start:isoDay(start),end:isoDay(end),templateName:requirementTemplate(d.template)?.name||d.template,reqs:templateRequirements(d.template,d.jurisdiction)}})}
+function getAssignment(id){return getAssignments().find(a=>a.id===id)||null}
+function featuredAssignment(){const all=getAssignments();return all.find(a=>a.featured)||all[0]}
