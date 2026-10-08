@@ -117,6 +117,7 @@ Nothing here was created on your behalf. When you're ready:
 
 1. **Create a Supabase project** at supabase.com (US region; Postgres 15+ is the default). Note the **Project URL** and the **anon / publishable key** (Project Settings → API). Keep the `service_role` / secret key private: it never goes in this repo or the browser.
 2. **Apply the schema:** run the three files in `backend/supabase/migrations/`, in order, in the SQL Editor. Alternatively, use the Supabase CLI: `cd backend && supabase init` (keep the existing `migrations/`), then `supabase link --project-ref <ref>` and `supabase db push`. Do **not** run `tests/00_local_supabase_shim.sql`.
+   From a terminal, `psql -v ON_ERROR_STOP=1 --single-transaction -f <file>` per migration also works (connection string from Connect → Shared/Session pooler, kept in an env var, never committed). Status (Oct 8, 2026): migrations 1–3 and `01_reference.sql` are applied to Munib's staging project and verified (22 tables, RLS on all, private `source-documents` bucket). `02_demo.sql` was not applied.
 3. **Load reference data:** run `backend/supabase/seed/01_reference.sql`. Run `02_demo.sql` only on a demo/staging project. It creates passwordless demo users in `auth.users`.
 4. **Enable Auth:** turn on the Email provider (magic link). Set the Site URL to `https://munibabid.github.io/cleartrack-mvp/` and add it to the redirect URLs. Decide whether sign-ups are open or invite-only.
 5. **Assign roles (server-side only)**, in the SQL Editor:

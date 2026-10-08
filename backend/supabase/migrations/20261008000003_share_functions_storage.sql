@@ -131,7 +131,9 @@ begin
   get diagnostics n = row_count;
   return n;
 end $$;
-revoke execute on function private.sweep_expired_grants() from authenticated;
+-- Functions get EXECUTE for PUBLIC by default, so revoking from "authenticated"
+-- alone is a no-op. Only the owner (postgres / pg_cron) may run the sweep.
+revoke execute on function private.sweep_expired_grants() from public, anon, authenticated;
 
 revoke execute on function public.get_share_assertions(uuid), public.access_share_by_token(text),
   public.revoke_share_grant(uuid), public.resolve_extension_request(uuid, boolean) from public, anon;

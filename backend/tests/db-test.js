@@ -37,6 +37,9 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  ok('schema: all 22 required tables exist',await n(`select count(*) from pg_tables where schemaname='public' and tablename = any($1)`,[tables])===22);
  ok('schema: RLS enabled on every public table',await n(`select count(*) from pg_class c join pg_namespace s on s.oid=c.relnamespace where s.nspname='public' and c.relkind='r' and not c.relrowsecurity`)===0);
  ok('schema: private helper schema is not granted to anon',!(await one(`select has_schema_privilege('anon','private','USAGE') u`)).u);
+ ok('schema: only the owner can run private.sweep_expired_grants()',!(await one(`select has_function_privilege('authenticated','private.sweep_expired_grants()','EXECUTE') a`)).a&&!(await one(`select has_function_privilege('anon','private.sweep_expired_grants()','EXECUTE') a`)).a);
+ ok('schema: every private/public function pins search_path (Supabase advisor 0011)',await n(`select count(*) from pg_proc p join pg_namespace s on s.oid=p.pronamespace where s.nspname in ('public','private') and p.prokind='f' and not exists (select 1 from unnest(coalesce(p.proconfig,'{}')) c where c like 'search_path=%')`)===0);
+ ok('schema: anon has no privileges on public sequences',await n(`select count(*) from pg_class c join pg_namespace s on s.oid=c.relnamespace where s.nspname='public' and c.relkind='S' and (has_sequence_privilege('anon',c.oid,'USAGE') or has_sequence_privilege('anon',c.oid,'UPDATE'))`)===0);
 
  /* ---------- seeds ---------- */
  ok('seed: 56 jurisdictions, 36 catalog kinds, Massachusetts NLC PENDING',await n(`select count(*) from jurisdictions`)===56&&await n(`select count(*) from credential_catalog`)===36&&(await one(`select nlc_status from jurisdictions where code='US-MA'`)).nlc_status==='PENDING');

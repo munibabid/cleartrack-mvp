@@ -317,13 +317,13 @@ create table public.analytics_events (
 );
 
 -- ---------- integrity triggers ----------
-create or replace function private.touch_updated_at() returns trigger language plpgsql as $$
+create or replace function private.touch_updated_at() returns trigger language plpgsql set search_path = '' as $$
 begin new.updated_at := now(); return new; end $$;
 create trigger credentials_touch before update on public.credentials
   for each row execute function private.touch_updated_at();
 
 -- Append-only event tables: no UPDATE or DELETE, for anyone.
-create or replace function private.forbid_mutation() returns trigger language plpgsql as $$
+create or replace function private.forbid_mutation() returns trigger language plpgsql set search_path = '' as $$
 begin raise exception '% is append-only', tg_table_name using errcode = '42501'; end $$;
 create trigger audit_events_append_only before update or delete on public.audit_events
   for each row execute function private.forbid_mutation();
@@ -336,7 +336,7 @@ create trigger analytics_events_append_only before update or delete on public.an
 
 -- PRIVATE kinds (health, screening, references) carry no structured detail,
 -- and can never get an on-chain proof.
-create or replace function private.credentials_privacy_guard() returns trigger language plpgsql as $$
+create or replace function private.credentials_privacy_guard() returns trigger language plpgsql set search_path = '' as $$
 declare p public.privacy_level;
 begin
   select privacy into p from public.credential_catalog where kind = new.kind;
@@ -348,7 +348,7 @@ end $$;
 create trigger credentials_privacy before insert or update on public.credentials
   for each row execute function private.credentials_privacy_guard();
 
-create or replace function private.proofs_guard() returns trigger language plpgsql as $$
+create or replace function private.proofs_guard() returns trigger language plpgsql set search_path = '' as $$
 begin
   if exists (select 1 from public.credentials c join public.credential_catalog k on k.kind = c.kind
              where c.id = new.credential_id and k.privacy = 'PRIVATE') then
@@ -360,7 +360,7 @@ create trigger proofs_private_guard before insert or update on public.proofs
   for each row execute function private.proofs_guard();
 
 -- Assertions for PRIVATE kinds are always "Requirement Satisfied" only.
-create or replace function private.assertion_mode_guard() returns trigger language plpgsql as $$
+create or replace function private.assertion_mode_guard() returns trigger language plpgsql set search_path = '' as $$
 begin
   if new.mode <> 'REQUIREMENT_SATISFIED' and exists (
      select 1 from public.credentials c join public.credential_catalog k on k.kind = c.kind
