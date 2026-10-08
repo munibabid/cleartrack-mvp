@@ -24,8 +24,12 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 ### Functional (works as described)
 - Three-role entry screen and role switching (demo only, no auth)
 - Clinician: Home (onboarding progress), Credential Requirements table, **Passport**, **Tasks**, **Opportunities** (readiness matching), Menu
-- **Add Credential**: structured credential type + RN license jurisdiction; enters *Verifying* and appears in the Verification Console queue
-- **Assignment readiness** (Organization → Assignments): compares verified credentials against each assignment's requirements, including whether credentials stay current through the assignment end date. XRPL proof is not required.
+- **RN credential catalog** (`js/credential-catalog.js`): credential kinds, all US states, DC and territories (codes like `US-MA`), the board of nursing for each, NLC compact status, and per-kind privacy policy. Everything below reads from it; nothing is hardcoded to one state.
+- **Add Credential**: searchable dropdowns for credential type and jurisdiction. Classification, section and privacy are set automatically from the catalog (the old "required" and "off-chain" checkboxes are gone). The source document is always private. A new credential enters *Pending Verification* and appears in the Verification Console queue.
+- **Assignment readiness** (Clinician → Opportunities; Organization → Dashboard / Assignments): each assignment is a requirement template plus a jurisdiction. The engine checks every requirement against verified credentials that stay current through the assignment end date, and shows only the missing items as work. XRPL proof is not required.
+- **NLC compact privilege**: an RN authorization requirement is met by a single-state license in that state, or by a multistate license from an NLC home state when that state honors the compact. In the demo, Alex's Arizona multistate license covers Texas but not Massachusetts, where the NLC is enacted but not yet in effect.
+- **Golden path**: Opportunities → Boston Travel ICU **11/12** → **COMPLETE MISSING REQUIREMENT** opens the form pre-filled with *RN License — single-state · Massachusetts (US-MA)* → Pending Verification → Verification Console simulated check → Boston **12/12 · ASSIGNMENT READY**.
+- **Event-derived analytics**: credential reuse, new credentials required, assignment-readiness time, verification time (real elapsed), manual touches, share links created, monitoring coverage. All are computed from the event log, not hardcoded.
 - **Provenance** record per credential (source, method, verifier, timestamps, status) in the Details / proof dialog
 - **XRPL proof (optional):** real `CredentialCreate` / `CredentialAccept` transactions on the **XRPL Devnet test network** using disposable, faucet-funded wallets, plus a live on-chain check when a Passport QR link is opened
 - **QR codes** for the Passport, onboarding completion and selective share links
@@ -34,21 +38,23 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 ### Simulated (looks real, isn't)
 - **Primary-source verification.** "Run Simulated Primary-Source Check" marks a credential verified locally. No licensing board, Nursys, AHA or issuer is contacted. Provenance records the method as `Simulated primary-source check (DEMO)`.
 - Credential classification (`SIMULATED_CLASSIFICATION`) and uploads: only the **file name** is kept; file contents are never read or uploaded.
-- Verification duration is a fixed demo value (2m 14s).
+- Verification durations are real elapsed times within the demo (seconds), not real-world turnaround.
 
 ### Demo data
-- Alex Morgan's seed credentials; 11 are pre-marked verified as `DEMO SEED (not a real verification)`, logged as a `DEMO_SEEDED` event.
-- Boston Travel ICU and California Strike ICU assignments, the candidates Jamie Smith and Taylor Reed, requirement templates, and the "92% credential reuse" and "100% monitoring" figures are static placeholders.
+- Alex Morgan (ICU RN, home state Arizona): 15 seed credentials pre-marked verified as `DEMO SEED (not a real verification)`, logged as a `DEMO_SEEDED` event. Expiration and assignment dates are offsets from the day the demo was seeded, so the demo never goes stale. Data saved by an older demo seed is replaced automatically.
+- Three assignments: Boston Travel ICU (US-MA), Houston Rapid Response ICU (US-TX, NLC) and California Strike ICU (US-CA). Four requirement templates.
+- Comparison candidates Jamie Smith and Taylor Reed are static rows, labeled STATIC DEMO.
+- NLC status and board names are reference data as of 2026-10-08 (NCSBN NLC map, Nursys). They are not an authoritative licensure source.
 - The landing-page dashboard preview is an illustrative static example.
 
 ### Not built yet (future)
-- RN credential catalog with searchable dropdowns and automatic privacy rules (data-driven, US state-level jurisdictions plus the NLC compact privilege)
+- International jurisdictions
 - Assignment-scoped selective sharing with access lasting "through assignment end" or "until revoked", clinician revocation, and organization extension requests that the nurse approves
 - Share-view logging and fully event-derived analytics
 - Real authentication, back end, primary-source integrations, continuous monitoring and notifications
 
 ## Privacy notes (demo)
-- Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`) on this site's origin.
+- Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`, plus `veridun_demo_anchor` / `veridun_demo_seed_version`) on this site's origin.
 - XRPL **Devnet** wallet seeds are stored in `sessionStorage` (`nursecredx_wallets_v2`). They are disposable test-network wallets and are not suitable for production.
 - Private items (health, screening) are never sent to XRPL. Only minimal credential-type proofs are.
 - Passport QR links carry a readable (unsigned) base64 summary, including Devnet wallet addresses.
@@ -59,11 +65,11 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 index.html                 markup only; loads css/ and js/ with plain <script> tags
 css/app.css                all styles
 js/credential-model.js     shared state (creds), persistence, status/format helpers (load first)
-js/credential-catalog.js   stub: RN credential catalog (PR 2)
-js/demo-data.js            demo seed credentials + demo seeding
-js/requirements.js         newcomer onboarding requirement evaluation
-js/assignments.js          assignment definitions (demo)
-js/readiness-engine.js     assignment readiness matching
+js/credential-catalog.js   RN credential catalog: kinds, US jurisdictions, issuers, NLC, privacy
+js/demo-data.js            demo profile, seed credentials, static candidates, seeding
+js/requirements.js         requirement templates + newcomer onboarding baseline
+js/assignments.js          assignment definitions (template + jurisdiction + dates)
+js/readiness-engine.js     assignment readiness (NLC-aware, full assignment duration)
 js/analytics.js            event log + event-derived metrics
 js/verification.js         simulated verification + provenance/proof dialog
 js/xrpl.js                 XRPL Devnet issue/accept/live check
