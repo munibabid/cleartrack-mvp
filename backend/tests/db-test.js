@@ -136,6 +136,30 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  ok('audit: clinician can log own events, not verifier events',await as('alex',async()=>{await db.query(`insert into audit_events (event_type,actor_user_id,actor_type,clinician_id) values ('CREDENTIAL_UPLOADED',auth.uid(),'CLINICIAN',$1)`,[uid('clinician:alex')]);return true})&&!!(await fails('alex',`insert into audit_events (event_type,actor_user_id,actor_type) values ('VERIFICATION_SUCCEEDED',auth.uid(),'VERIFIER')`)));
  ok('audit: org sees its own org events, not other orgs\'',(await rows('recruiter-lonestar',`select org_id from audit_events`)).every(r=>r.org_id===uid('org:lonestar')));
 
+ /* ---------- PR 10: accounts + cross-device sync (migration 4) ---------- */
+ ok('accounts: anon cannot create an organization',!!(await fails('anon',`select public.create_organization('Anon Org')`)));
+ const newOrg=await as('jordan',async()=>(await db.query(`select * from public.create_organization('Jordan Staffing (test)','STAFFING_AGENCY')`)).rows[0],true);
+ ok('accounts: signed-in user can create an organization and becomes its owner',!!newOrg&&/^jordan-staffing-test-[0-9a-f]{6}$/.test(newOrg.slug)&&newOrg.is_demo===false&&await n(`select count(*) from organization_members where org_id=$1 and user_id=$2 and role='owner'`,[newOrg.id,uid('user:jordan')])===1,newOrg&&newOrg.slug);
+ ok('accounts: organization creation is audited',await n(`select count(*) from audit_events where org_id=$1 and event_type='ORGANIZATION_CREATED'`,[newOrg.id])===1);
+ await as('jordan',async()=>{await db.query(`select public.create_organization('J2')`);await db.query(`select public.create_organization('J3')`)},true);
+ ok('accounts: staging limit of 3 owned organizations per account',/staging limit/.test(await fails('jordan',`select public.create_organization('J4')`)));
+ ok('accounts: organization name is validated',/2-120/.test(await fails('alex',`select public.create_organization(' ')`)));
+ // Alex shares a not-yet-verified credential with Jordan's new org, with assignment context.
+ const pendTok='tok-pr10-pending-000000001';
+ const pg=(await as('alex',async()=>{const c=(await db.query(`insert into credentials (clinician_id,kind,type_code,display_name,jurisdiction_code) values ($1,'RN_LICENSE','RN_LICENSE:US-NV','Nevada RN License','US-NV') returning id`,[uid('clinician:alex')])).rows[0].id;
+   const g=(await db.query(`insert into share_grants (clinician_id,org_id,token_hash,duration,expires_at,assignment_label,assignment_starts_on,assignment_ends_on) values ($1,$2,$3,'D7',now()+interval '7 days','Las Vegas ICU travel (test)',current_date+10,current_date+100) returning id`,[uid('clinician:alex'),newOrg.id,sha(pendTok)])).rows[0].id;
+   await db.query(`insert into share_grant_assertions (grant_id,credential_id,requirement_label,mode) values ($1,$2,'Nevada RN License','VERIFIED_CREDENTIAL')`,[g,c]);return g},true));
+ const pv=await as('jordan',async()=>(await db.query(`select * from access_share_by_token($1)`,[pendTok])).rows,true);
+ ok('assertions: unverified credential is shown as PENDING_VERIFICATION, never VERIFIED',pv.length===1&&pv[0].status==='PENDING_VERIFICATION',JSON.stringify(pv));
+ ok('grants: assignment context is stored and visible to the receiving org',(await rows('jordan',`select assignment_label,assignment_ends_on from share_grants where id=$1`,[pg])).every(r=>r.assignment_label==='Las Vegas ICU travel (test)'&&r.assignment_ends_on));
+ ok('grants: assignment context is immutable',/immutable/.test(await fails('alex',`update share_grants set assignment_label='Other' where id=$1`,[pg])));
+ ok('grants: assignment window must be ordered',!!(await fails('alex',`insert into share_grants (clinician_id,org_id,token_hash,duration,expires_at,assignment_starts_on,assignment_ends_on) values ($1,$2,$3,'D7',now()+interval '7 days',current_date+10,current_date+1)`,[uid('clinician:alex'),newOrg.id,sha('tok-pr10-badwindow-0001')])));
+ ok('grants: a used one-time grant cannot be reactivated',/used one-time/.test(await fails('alex',`update share_grants set status='ACTIVE' where id=$1`,[G.ot])));
+ ok('grants: other orgs still cannot open it',/not authorized/.test(await fails('recruiter-northstar',`select * from access_share_by_token($1)`,[pendTok])));
+ ok('append-only: owner still cannot rewrite event content',/append-only/.test(await db.query(`update share_access_events set outcome='GRANTED' where outcome='REFUSED_USED'`).then(()=>'',e=>e.message)));
+ const del=await db.query('begin').then(async()=>{try{await db.query(`delete from auth.users where id=$1`,[uid('user:alex')]);const left=await n(`select count(*) from audit_events where clinician_id=$1`,[uid('clinician:alex')]);const kept=await n(`select count(*) from audit_events where event_type='SHARE_VIEWED'`);return{ok:true,left,kept}}catch(e){return{ok:false,e:e.message}}finally{await db.query('rollback')}});
+ ok('accounts: deleting a user with history works (events keep content, FKs set null)',del.ok&&del.left===0&&del.kept>0,JSON.stringify(del));
+
  /* ---------- org membership & assignments ---------- */
  ok('org members: cannot list another org\'s members',(await rows('recruiter-northstar',`select org_id from organization_members`)).every(r=>r.org_id===uid('org:northstar')));
  ok('assignments: published opportunities visible to signed-in users (5)',(await rows('jordan',`select id from assignments`)).length===5);
