@@ -2,7 +2,7 @@
 function v81ShowRole(role){document.body.classList.toggle('role-clinician',role==='clinician');$('landing').classList.add('hidden');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');if(role==='clinician'){$('app').classList.remove('hidden');render()}if(role==='organization'){$('organizationWorkspace').classList.add('active');v81RenderRoles()}if(role==='verification'){$('verificationWorkspace').classList.add('active');v81RenderRoles()}}
 function v81RolePicker(){document.body.classList.remove('role-clinician');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');$('landing').classList.remove('hidden');window.scrollTo(0,0)}
 function v81Tabs(btnClass,panelClass,target){document.querySelectorAll('.'+panelClass).forEach(x=>x.classList.toggle('hidden',x.id!==target));document.querySelectorAll('.'+btnClass).forEach(x=>x.classList.toggle('active',x.dataset.target===target))}
-function v81RenderRoles(){if(!creds.length)return;v81EnsureDemo();const x=v81RoleContext();v81RenderOrganization(x);v81RenderVerifier(x)}
+function v81RenderRoles(){if(!creds.length)return;creds=creds.map(v81Normalize);const x=v81RoleContext();v81RenderOrganization(x);v81RenderVerifier(x)}
 document.addEventListener('DOMContentLoaded',()=>{
 $('roleClinician').onclick=()=>v81ShowRole('clinician');
 $('roleOrganization').onclick=()=>v81ShowRole('organization');
@@ -13,7 +13,7 @@ document.querySelectorAll('.orgTab').forEach(b=>b.onclick=()=>v81Tabs('orgTab','
 document.querySelectorAll('.verifyTab').forEach(b=>b.onclick=()=>v81Tabs('verifyTab','verifyPanel',b.dataset.target));
 $('logout').onclick=v81RolePicker;
 $('addBtn').onclick=()=>$('add').showModal();
-$('resetDemo').onclick=()=>{if(confirm('Reset to the automatic newcomer onboarding list?')){initNewcomer(true);render()}};
+$('resetDemo').onclick=()=>{if(confirm('Reset demo data to the starting state? Demo credentials stored in this browser will be replaced.')){initNewcomer(true);render()}};
 $('save').onclick=()=>{const kind=$('credentialKindV81').value,jur=kind==='RN_LICENSE'?$('jurisdictionV81').value:'';if(kind==='RN_LICENSE'&&!jur){alert('Choose the nursing license jurisdiction.');return}const n=kind==='OTHER'?$('nm').value.trim():v81Name(kind,jur),t=kind==='OTHER'?($('tp').value.trim()||'OTHER'):v81Type(kind,jur),f=$('fl').files[0];if(!n){alert('Enter a credential name.');return}const c=v81Normalize({id:Date.now(),name:n,type:t,jurisdiction:jur,section:$('sec').value,required:$('reqcheck').checked,privateOnly:$('privcheck').checked,primary:'VERIFYING',chain:'NOT ISSUED',expiration:$('dt').value,file:f?f.name:'',prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});creds.push(c);save();v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION'});v81Log('CLASSIFICATION_COMPLETED',c.id,{actor_type:'SYSTEM',result:'SIMULATED_CLASSIFICATION'});render();
 $('add').close();if(kind==='RN_LICENSE'&&jur==='US_MA')alert('Massachusetts RN License uploaded. It is Pending Verification and now appears in the Verification Console queue.')};
 document.querySelectorAll('.xadd').forEach(b=>b.onclick=()=>$('add').close());
