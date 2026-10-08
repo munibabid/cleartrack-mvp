@@ -7,8 +7,8 @@
 <link rel="icon" href="data:,">
 <!-- Pinned, integrity-checked third-party libraries. xrpl@5.3.0 is the version the old unpinned "latest" URL resolved to. -->
 <script src="https://unpkg.com/xrpl@5.3.0/build/xrpl-latest-min.js" integrity="sha384-ZYUY+olM49qzMChi4X9rVVRYUuL6GcWXCLRhnVwRqVW/EpBX8PzThCiVnjZFi0Pb" crossorigin="anonymous"></script>
-<!-- qrcode@1.5.4 ships no browser build (the old URL 404d, so QR codes never rendered); 1.5.1 is the latest version with build/qrcode.js. -->
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
+<!-- qrcode@1.5.1 (MIT) is vendored in js/vendor: pinned, integrity-checked, no network request. 1.5.1 is the latest version with a browser build. -->
+<script src="js/vendor/qrcode-1.5.1.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -60,7 +60,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v10.0 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v11.0 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -88,6 +88,10 @@
 <div class="panel"><div class="ph">Credential Requirements <span id="busy" class="small"></span></div><div class="toolbar"><button class="filter on" data-f="all">All</button><button class="filter" data-f="Licenses & Certifications">Licenses & Certifications</button><button class="filter" data-f="Health & Immunizations">Health & Immunizations</button><button class="filter" data-f="Screening & Employment">Screening & Employment</button><button class="filter" data-f="Clinical Requirements">Clinical Requirements</button></div><div id="empty" class="empty hidden"></div><table id="tbl"><thead><tr><th>Requirement</th><th>Type</th><th>Required</th><th>Verification</th><th>Proof <span class="small">(optional)</span></th><th>Expires</th><th>Provenance</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="notice"><b>Security model:</b> PII and private documents remain off-chain. The verification network receives only minimal credential proof data. Each verification retains off-chain provenance. <b>Demo:</b> verification is simulated, data lives only in this browser, and XRPL proofs use the Devnet test network. NFTs are optional visual badges only; Portable credential proofs are the authoritative trust object.</div>
 </div>
+<div id="profileViewV11" class="view"></div>
+<div id="credentialsViewV11" class="view"></div>
+<div id="settingsViewV11" class="view"></div>
+<div id="storageViewV11" class="view"></div>
 <div id="passportView" class="view">
   <div class="v7-head"><div><h1>Professional Passport</h1><div class="small">Agency-neutral, reusable credential profile</div></div><button class="sec" id="v7SharePass">Share Passport</button></div>
   <div class="passport-hero-v7">
@@ -125,12 +129,12 @@
 <div id="menuView" class="view">
   <div class="v7-head"><div><h1>Menu</h1><div class="small">Profile, sharing, and verification settings</div></div></div>
   <div class="panel">
-    <div class="menu-item-v7"><div><b>Profile</b><div class="small">Specialty and professional information</div></div><span>›</span></div>
-    <div class="menu-item-v7"><div><b>Submitted Credentials</b><div class="small">Uploads and verification history</div></div><span>›</span></div>
-    <div class="menu-item-v7 navLinkV83" data-view="shareView" role="button" tabindex="0" style="cursor:pointer"><div><b>Share &amp; Access</b><div class="small">Who can see your Passport, for which assignment, and until when</div></div><span>›</span></div>
-    <div class="menu-item-v7"><div><b>Verification Settings</b><div class="small">Monitoring and notification preferences</div></div><span>›</span></div>
-    <div class="menu-item-v7"><div><b>Advanced Verification</b><div class="small">Infrastructure and proof settings</div></div><span>›</span></div>
-    <div class="menu-item-v7" id="backendStatusV88"><div><b>Data storage</b><div class="small" id="backendStatusTextV88">This browser only (demo)</div></div><span class="badge PENDING">DEMO</span></div>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="profile"><span><b>Profile</b><span class="small">Specialty and professional information</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="credentials"><span><b>Submitted Credentials</b><span class="small">Uploads and verification history</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11 navLinkV83" data-menu="shares" data-view="shareView"><span><b>Share &amp; Access</b><span class="small">Who can see your Passport, for which assignment, and until when</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="settings"><span><b>Verification Settings</b><span class="small">Reminders and notification preferences</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="advanced"><span><b>Advanced Verification</b><span class="small">Optional XRPL proof settings — never affects readiness</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" id="backendStatusV88" data-menu="storage"><span><b>Data storage</b><span class="small" id="backendStatusTextV88">This browser only (demo)</span></span><span class="badge PENDING">DEMO</span></button>
     <div class="menu-item-v7 switchRoleAny" role="button" tabindex="0" style="cursor:pointer"><div><b>Switch Role</b><div class="small">Back to the workspace picker (demo, not real sign-in)</div></div><span>⇄</span></div>
   </div>
 </div>
@@ -177,6 +181,7 @@
   <div><label for="abWeeksV84">Length (weeks)</label><input type="number" id="abWeeksV84" min="1" max="52" value="13"></div>
  </div>
  <div class="ab-group-v84"><b>Specialties accepted</b> <span class="small">— adds the matching specialty module per nurse</span><div id="abSpecV84" class="chips-v84"></div></div>
+ <div class="ab-group-v84"><b>Recent specialty experience</b> <span class="small">— what counts as recent for the experience item in every specialty module of this assignment</span><div class="grid2-v83"><label>Minimum months of work in the specialty<input type="number" id="abExpMinV11" min="1" max="120" value="12"></label><label>…within the last (months before the start date)<input type="number" id="abExpWinV11" min="1" max="120" value="24"></label></div><div class="small">Default: 12 months of work in the last 24. Change it and the preview updates.</div></div>
  <details class="ab-group-v84"><summary><b>Facility overrides</b> <span class="small">— add items or waive base-set items</span></summary>
   <div class="small" style="margin-top:8px">Add</div><div id="abAddV84" class="chips-v84"></div>
   <div class="small" style="margin-top:8px">Waive from work-type base</div><div id="abWaiveV84" class="chips-v84"></div>
@@ -208,6 +213,8 @@
 <label for="kindSearchV82">Credential type</label><input id="kindSearchV82" list="kindListV82" placeholder="Search: RN license, compact, BLS, ACLS, TB…" autocomplete="off"><datalist id="kindListV82"></datalist>
 <div id="jurisdictionRowV81" class="hidden"><label for="jurSearchV82" id="jurLabelV82">License jurisdiction (US state or territory)</label><input id="jurSearchV82" list="jurListV82" placeholder="Search any US state or territory…" autocomplete="off"><datalist id="jurListV82"></datalist><div id="jurHintV82" class="small" style="margin:-6px 0 12px"></div></div>
 <div id="otherRowV81" class="hidden"><label for="nm">Credential name</label><input id="nm" placeholder="e.g. Chemotherapy provider card"></div>
+<div id="experienceHelpV11" class="small hidden" style="margin:6px 0"></div>
+<div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years of experience in this specialty <span class="small">(optional)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
 <label for="dt">Expiration date</label><input id="dt" type="date">
 <label for="fl">Source document (optional)</label><input id="fl" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx">
 <div id="privacyNoteV82" class="provenance small" style="line-height:1.6"></div>
@@ -244,12 +251,14 @@
   <label for="shareV7Duration">Access duration</label><select id="shareV7Duration"></select>
   <div id="shareCustomRowV83" class="hidden"><label for="shareCustomV83">Access ends on (11:59 PM)</label><input type="date" id="shareCustomV83"></div>
   <div id="shareReviewV83" class="provenance small" style="line-height:1.6"></div>
+  <div id="shareWarnV11" class="alert-v81 small hidden" role="status"></div>
   <button class="pri" id="generateV7Share" style="margin-top:12px;width:100%">Approve &amp; Share</button>
  </div>
  <div id="shareV7Result" class="hidden">
   <div id="shareDoneV83" class="good-v81"></div>
   <div id="shareV7Link" class="share-link-box" style="margin-top:10px"></div>
   <div class="qr"><canvas id="shareV7QR"></canvas></div>
+  <div style="text-align:center"><button class="sec mini" type="button" id="shareQrDlV11">Download QR image</button></div>
   <div class="small">Opaque share token — no PII or wallet addresses in the link or QR. <b>Demo limitation:</b> shares are stored in this browser, so the link only opens in this browser.</div>
  </div>
 </div>
@@ -266,6 +275,7 @@
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/credential-model.js"></script>
+<script src="js/specialties.js"></script>
 <script src="js/credential-catalog.js"></script>
 <script src="js/demo-data.js"></script>
 <script src="js/requirements.js"></script>
@@ -282,5 +292,6 @@
 <script src="js/app.js"></script>
 <script src="js/tour.js"></script>
 <script src="js/account.js"></script>
+<script src="js/menu.js"></script>
 </body>
 </html>

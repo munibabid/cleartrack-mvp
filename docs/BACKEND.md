@@ -6,13 +6,14 @@
 
 | Path | What it is |
 |---|---|
-| `backend/supabase/migrations/*.sql` | Postgres schema, row-level security (RLS), share-access functions, private storage bucket + policies. **4 migrations, all applied to staging** |
+| `backend/supabase/migrations/*.sql` | Postgres schema, row-level security (RLS), share-access functions, private storage bucket + policies. **5 migrations, all applied to staging** |
 | `backend/supabase/migrations/20261008000004_accounts_sync.sql` | PR 10: self-serve organizations (`create_organization`), assignment context on grants, `PENDING_VERIFICATION` in share assertions, append-only tables that still allow account deletion |
+| `backend/supabase/migrations/20261008000005_specialties_experience.sql` | PR 11: `specialties` reference table (64 RN specialties, read-only to clients), specialty ids validated by trigger, `clinicians.secondary_specialties` (max 5) + `preferences`, `requirements.min_months` / `is_preferred`, `kind` returned by share-assertion functions (for compact-license coverage) |
 | `backend/supabase/seed/01_reference.sql` | Jurisdictions (56), issuers, the RN credential catalog (36 kinds), verification sources, platform requirement templates. **Generated from `js/`.** Applied to staging |
 | `backend/supabase/seed/02_demo.sql` | Demo data (Alex / Jordan / Sam, 4 fictional agencies, 5 opportunities). Local tests only, **not applied** to staging |
 | `backend/scripts/generate-seed.js` | Regenerates both seed files from the app's JS data, so the database can't drift from the demo |
 | `backend/supabase/tests/00_local_supabase_shim.sql` | **Test-only** stand-ins for Supabase's `auth`/`storage` schemas and API roles. Never apply to a real project |
-| `backend/tests/db-test.js` | Applies migrations + seeds to a throwaway local Postgres; 92 schema / seed / RLS tests |
+| `backend/tests/db-test.js` | Applies migrations + seeds to a throwaway local Postgres; 105 schema / seed / RLS tests |
 | `backend/tests/store-test.js` | 42 unit tests for the data-access layer (mocked supabase-js client, no network) |
 | `js/config.js` | Demo: `backend: 'local'`. Accounts: project URL + **publishable** key (public by design; RLS protects data) + redirect URL |
 | `js/store.js` | `LocalStorageAdapter` (demo) and `SupabaseAdapter` (accounts: auth, hydrate, writes, RPCs, storage) |
@@ -125,7 +126,7 @@ node backend/tests/store-test.js
 node backend/scripts/generate-seed.js
 ```
 
-`db-test.js` creates and drops a database named `veridun_rls_test`. It loads the test shim, the 4 migrations and both seeds, and also checks that the seeds can be re-run.
+`db-test.js` creates and drops a database named `veridun_rls_test`. It loads the test shim, the 5 migrations and both seeds, and also checks that the seeds can be re-run.
 
 ## Staging setup: done and left to do
 
@@ -156,7 +157,7 @@ Still to do:
 
 | Suite | Where | What |
 |---|---|---|
-| `db-test.js` | local Postgres 17 + shim | 92 schema / seed / RLS / function tests, incl. migration 4 |
+| `db-test.js` | local Postgres 17 + shim | 105 schema / seed / RLS / function tests, incl. migrations 4 and 5 |
 | `store-test.js` | Node, mocked supabase-js | 42 adapter tests: config/key validation, lazy client, magic-link redirect, `VERIFYING`-only inserts, private upload paths, signed URLs, hash-only tokens, no localStorage writes, final revocation |
 | `p2`–`p6`, `p8` | headless Chrome, signed out | existing demo regressions, unchanged except `p8` §3, which asserted the PR 8 stub's outbox and now asserts that the real adapter stays signed out and sends nothing |
 | `p10` | headless Chrome, **real staging project** | 43 signed-in checks with two throwaway users. Covers laptop + phone sync, org creation, share by link/code, honest statuses, isolation (A vs B, org vs credentials/documents, anon), extension request → approval, access events, activity, revoke (final), real-time expiry, one-time use, document delete, sign-out, demo intact. The test users and every row and object they created are deleted afterwards |

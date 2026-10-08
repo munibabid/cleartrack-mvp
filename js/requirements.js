@@ -10,14 +10,7 @@
    plus DATES: every item must stay current through the assignment end date.
    All templates below are illustrative demo templates, not any real agency's
    or facility's requirements. */
-const SPECIALTIES=[
- {id:'ICU',name:'ICU / Critical Care'},
- {id:'ED',name:'Emergency Department'},
- {id:'LD',name:'Labor & Delivery'},
- {id:'MEDSURG',name:'Med-Surg'}
-];
-function specialtyName(id){return SPECIALTIES.find(s=>s.id===id)?.name||id}
-function specialtyShort(id){return{ICU:'ICU',ED:'ED',LD:'L&D',MEDSURG:'Med-Surg'}[id]||id}
+/* Specialties live in js/specialties.js (one shared list, PR 11). */
 const WORK_TYPE_BASES=[
  {id:'TRAVEL_RN',name:'Travel RN',summary:'Multi-week contracts away from home',kinds:['CERT_BLS','HEALTH_PHYSICAL_CURRENT','HEALTH_FIT_TEST','HEALTH_TB_CURRENT','HEALTH_FLU_CURRENT','SCREEN_DRUG_CURRENT','SCREEN_BACKGROUND_CURRENT']},
  {id:'STRIKE_RN',name:'Strike RN',summary:'Short-notice labor-action coverage',kinds:['CERT_BLS','HEALTH_PHYSICAL_CURRENT','HEALTH_FIT_TEST','SCREEN_DRUG_CURRENT','SCREEN_BACKGROUND_CURRENT']},
@@ -27,22 +20,31 @@ const WORK_TYPE_BASES=[
 /* Specialty modules: certifications plus clinical qualifications for an
    experienced RN — employer-verified recent specialty experience, a
    completed specialty skills checklist, and a specialty reference. (School
-   clinical hours are not relevant for travel/strike RNs.) */
-const SPECIALTY_MODULES={
- ICU:['CERT_ACLS','EMP_ICU_VERIFIED','SKILLS_ICU','REF_SPECIALTY'],
- ED:['CERT_ACLS','CERT_PALS','CERT_TNCC','EMP_ED_VERIFIED','SKILLS_ED','REF_SPECIALTY'],
- LD:['CERT_NRP','CERT_FETAL_MONITORING','EMP_LD_VERIFIED','SKILLS_LD','REF_SPECIALTY'],
- MEDSURG:['EMP_MEDSURG_VERIFIED','SKILLS_MEDSURG','REF_SPECIALTY']
-};
+   clinical hours are not relevant for travel/strike RNs.) Generated from
+   js/specialties.js: SPECIALTY_MODULES holds the REQUIRED items (they count
+   toward readiness); SPECIALTY_PREFERRED is shown but never blocks. */
+const SPECIALTY_MODULES=Object.fromEntries(SPECIALTIES.map(s=>[s.id,s.required]));
+const SPECIALTY_PREFERRED=Object.fromEntries(SPECIALTIES.map(s=>[s.id,s.preferred]));
+function specialtyPreferred(id){return SPECIALTY_PREFERRED[id]||[]}
+/* Recent-experience rule for one requirement: minimum months of work in the
+   specialty within a window before the assignment start. Defaults to the
+   catalog kind (12 of the last 24 months); an organization can set its own
+   per assignment (overrides.experience) — see the Assignment Builder. */
+function experienceRule(kind,ov){const k=catalogKind(kind);if(!k?.recencyMonths)return null;const o=(ov&&ov.experience)||{};
+ const windowMonths=Math.max(1,Math.min(120,+o.windowMonths||k.recencyMonths)),minMonths=Math.max(1,Math.min(windowMonths,+o.minMonths||k.minMonths||windowMonths));
+ return{minMonths,windowMonths,custom:!!(o.minMonths||o.windowMonths)}}
 const LAYERS={STATE:'State',WORK_TYPE:'Work type',SPECIALTY:'Specialty',FACILITY:'Facility'};
 function workTypeBase(id){return WORK_TYPE_BASES.find(w=>w.id===id)||null}
 function assignmentAccepts(a,specialty){return(a.specialties||[]).includes(specialty)}
+/* The specialty a nurse is evaluated with for an opportunity: the primary
+   specialty if accepted, else the first accepted secondary specialty. */
+function matchedSpecialty(a,n){return[n?.specialty,...(n?.secondarySpecialties||[])].filter(Boolean).find(sp=>assignmentAccepts(a,sp))||null}
 /* Merge the layers for one assignment + one specialty. Each requirement
    carries its layer and the authority that imposes it. A kind already
    required by an earlier layer keeps that earlier authority. */
 function layeredRequirements(a,specialty){
  const base=workTypeBase(a.workType),ov=a.overrides||{},waive=ov.waive||[],out=[],seen=new Set();
- const push=(kind,layer,authority)=>{if(seen.has(kind))return;seen.add(kind);out.push({kind,layer,authority})};
+ const push=(kind,layer,authority)=>{if(seen.has(kind))return;seen.add(kind);const x=experienceRule(kind,ov),r={kind,layer,authority};if(x){r.minMonths=x.minMonths;r.windowMonths=x.windowMonths;if(x.custom)r.experienceSetBy=a.facility||a.name}out.push(r)};
  const j=normalizeJurisdictionCode(a.jurisdiction);seen.add(RN_AUTHORIZATION);
  out.push({kind:RN_AUTHORIZATION,jurisdiction:j,layer:'STATE',authority:`State licensure · ${issuerFor('RN_LICENSE',j)}`});
  (base?.kinds||[]).filter(k=>!waive.includes(k)).forEach(k=>push(k,'WORK_TYPE',`${base.name} base set (demo template)`));

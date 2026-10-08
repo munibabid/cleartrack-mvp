@@ -225,3 +225,33 @@ dialog select,dialog input:not([type=checkbox]):not([type=radio]){max-width:100%
 .acct-event-v10{padding:7px 0;border-bottom:1px solid var(--b)}
 body.acct-busy-v10 #accountWorkspace button,body.acct-busy-v10 #acctCardV10 button{opacity:.6;pointer-events:none}
 @media(max-width:620px){.acct-card-v10{margin:16px 12px 0;padding:14px}.acct-item-v10{flex-direction:column}.acct-item-side-v10{flex-direction:row;align-items:center;flex-wrap:wrap}.acct-form-v10 .grid2-v83{grid-template-columns:1fr}.acct-ws-actions-v10{justify-content:flex-start}}
+/* ---- PR 11: menu buttons, specialties, QR, warnings ---- */
+button.menu-item-v7{width:100%;background:none;border:0;border-bottom:1px solid var(--b);border-radius:0;text-align:left;font:inherit;color:inherit;cursor:pointer;padding:14px 4px;min-height:52px}
+button.menu-item-v7:last-child{border-bottom:0}
+button.menu-item-v7:hover,button.menu-item-v7:focus-visible{background:rgba(37,99,235,.06)}
+button.menu-item-v7:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}
+button.menu-item-v7 b,button.menu-item-v7 .small{display:block}
+.menuBackV11{align-self:flex-start}
+.spec-group-v11>summary,.ab-spec-group-v11>summary{cursor:pointer;padding:4px 0}
+.spec-mod-v11{margin:6px 0 6px 10px;border-left:3px solid var(--b);padding-left:10px}
+.spec-mod-v11>summary{cursor:pointer}
+.pref-v11 li{opacity:.85}
+.ab-spec-group-v11{margin:4px 0}
+.ab-spec-group-v11 .chips-v84{margin:4px 0 8px}
+.acct-sec-specs-v11 details{margin:2px 0}
+.acct-sec-specs-v11 summary{cursor:pointer;padding:6px 0;font-weight:600}
+.acct-sec-v11{display:flex;align-items:center;gap:8px;padding:6px 0;font-weight:400}
+.acct-sec-v11 input{width:auto;margin:0}
+.pref-row-v11{display:flex;align-items:center;gap:10px;padding:8px 0}
+.pref-row-v11 input{width:auto;margin:0}
+.acct-qr-v11{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.acct-qr-v11 canvas{background:#fff;border:1px solid var(--b);border-radius:8px;max-width:220px}
+.warn-v11{color:#b45309;font-weight:600}
+.acct-cov-v11,.opp-pref-v11{margin-top:2px}
+.acct-hist-v11{opacity:.85}
+.acct-ready-list-v11 li[data-status="PENDING_VERIFICATION"]{color:#92400e}
+select optgroup{font-weight:700}
+/* phone: native specialty dropdowns must be big enough to tap */
+@media(max-width:620px){
+ #profSpecV11,#acctSpecV10,#acctHomeV10,#acctKindV10,#acctJurV10,#acctReadyStateV11,#acctReadyWorkV11,#acctShareDurV10,#shareV7Duration,#prefLeadV11{font-size:16px;padding:12px;min-height:48px;width:100%}
+}

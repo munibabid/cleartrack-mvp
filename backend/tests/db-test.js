@@ -33,8 +33,8 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  const rows=async(who,sql,p=[])=>as(who,async()=>(await db.query(sql,p)).rows);
 
  /* ---------- schema ---------- */
- const tables=['users','clinicians','organizations','organization_members','credential_catalog','jurisdictions','issuers','credentials','credential_verifications','verification_sources','requirement_sets','requirements','assignments','assignment_requirements','share_grants','share_grant_assertions','share_access_events','extension_requests','monitoring_events','audit_events','proofs','analytics_events'];
- ok('schema: all 22 required tables exist',await n(`select count(*) from pg_tables where schemaname='public' and tablename = any($1)`,[tables])===22);
+ const tables=['users','clinicians','organizations','organization_members','credential_catalog','jurisdictions','issuers','credentials','credential_verifications','verification_sources','requirement_sets','requirements','assignments','assignment_requirements','share_grants','share_grant_assertions','share_access_events','extension_requests','monitoring_events','audit_events','proofs','analytics_events','specialties'];
+ ok('schema: all 23 required tables exist',await n(`select count(*) from pg_tables where schemaname='public' and tablename = any($1)`,[tables])===23);
  ok('schema: RLS enabled on every public table',await n(`select count(*) from pg_class c join pg_namespace s on s.oid=c.relnamespace where s.nspname='public' and c.relkind='r' and not c.relrowsecurity`)===0);
  ok('schema: private helper schema is not granted to anon',!(await one(`select has_schema_privilege('anon','private','USAGE') u`)).u);
  ok('schema: only the owner can run private.sweep_expired_grants()',!(await one(`select has_function_privilege('authenticated','private.sweep_expired_grants()','EXECUTE') a`)).a&&!(await one(`select has_function_privilege('anon','private.sweep_expired_grants()','EXECUTE') a`)).a);
@@ -42,18 +42,33 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  ok('schema: anon has no privileges on public sequences',await n(`select count(*) from pg_class c join pg_namespace s on s.oid=c.relnamespace where s.nspname='public' and c.relkind='S' and (has_sequence_privilege('anon',c.oid,'USAGE') or has_sequence_privilege('anon',c.oid,'UPDATE'))`)===0);
 
  /* ---------- seeds ---------- */
- ok('seed: 56 jurisdictions, 36 catalog kinds, Massachusetts NLC PENDING',await n(`select count(*) from jurisdictions`)===56&&await n(`select count(*) from credential_catalog`)===36&&(await one(`select nlc_status from jurisdictions where code='US-MA'`)).nlc_status==='PENDING');
+ ok('seed: 56 jurisdictions, 217 catalog kinds, 64 specialties, Massachusetts NLC PENDING',await n(`select count(*) from jurisdictions`)===56&&await n(`select count(*) from credential_catalog`)===217&&await n(`select count(*) from specialties`)===64&&(await one(`select nlc_status from jurisdictions where code='US-MA'`)).nlc_status==='PENDING');
  ok('seed: privacy comes from the catalog (health/screening/reference PRIVATE)',await n(`select count(*) from credential_catalog where privacy='PRIVATE' and (kind like 'HEALTH_%' or kind like 'SCREEN_%' or kind='REF_SPECIALTY')`)===await n(`select count(*) from credential_catalog where kind like 'HEALTH_%' or kind like 'SCREEN_%' or kind='REF_SPECIALTY'`));
  ok('seed: demo data — 3 clinicians, 4 orgs, 5 assignments, Alex 19 credentials',await n(`select count(*) from clinicians where is_demo`)===3&&await n(`select count(*) from organizations`)===4&&await n(`select count(*) from assignments`)===5&&await n(`select count(*) from credentials where clinician_id=$1`,[uid('clinician:alex')])===19);
  // Layered requirement count per assignment × specialty must match the JS engine (Boston ICU 12, Houston 11, Oakland ICU/ED/LD 10/12/11, Phoenix ED 13, Denver LD 12)
  const layered=async(slug,spec)=>n(`with sets as (select s.* from assignment_requirements ar join assignments a on a.id=ar.assignment_id join requirement_sets s on s.id=ar.requirement_set_id where a.slug=$1 and (s.layer<>'SPECIALTY' or s.key=$2)),
-   r as (select coalesce(r.kind,'RN_AUTH:'||r.jurisdiction_code) k, r.action from requirements r join sets on sets.id=r.requirement_set_id)
+   r as (select coalesce(r.kind,'RN_AUTH:'||r.jurisdiction_code) k, r.action from requirements r join sets on sets.id=r.requirement_set_id where not r.is_preferred)
    select count(distinct k) from r where action='ADD' and k not in (select k from r where action='WAIVE')`,[slug,spec]);
  const counts=[await layered('boston-icu','ICU'),await layered('houston-rapid','ICU'),await layered('oakland-strike','ICU'),await layered('oakland-strike','ED'),await layered('oakland-strike','LD'),await layered('phoenix-ed','ED'),await layered('denver-ld','LD')];
  ok('seed: layered requirement counts match the browser engine',counts.join()==='12,11,10,12,11,13,12',counts.join());
 
+
+ /* ---------- specialties (PR 11) ---------- */
+ ok('seed: one SPECIALTY requirement set per specialty, each with experience + skills + reference',await n(`select count(*) from requirement_sets where owner_org_id is null and layer='SPECIALTY'`)===64&&await n(`select count(*) from specialties s where not exists (select 1 from requirement_sets r join requirements q on q.requirement_set_id=r.id where r.layer='SPECIALTY' and r.key=s.id and q.kind='EMP_'||s.id||'_VERIFIED' and not q.is_preferred and q.min_months=12 and q.recency_months=24) or not exists (select 1 from requirement_sets r join requirements q on q.requirement_set_id=r.id where r.layer='SPECIALTY' and r.key=s.id and q.kind='SKILLS_'||s.id)`)===0);
+ ok('seed: preferred items are stored but flagged (CCRN preferred for ICU, not required)',await n(`select count(*) from requirements q join requirement_sets r on r.id=q.requirement_set_id where r.layer='SPECIALTY' and r.key='ICU' and q.kind='CERT_CCRN' and q.is_preferred`)===1&&await n(`select count(*) from requirements where is_preferred`)>60);
+ ok('seed: every requirement kind exists in the catalog',await n(`select count(*) from requirements q where q.kind is not null and not exists (select 1 from credential_catalog k where k.kind=q.kind)`)===0);
+ ok('anon: can read the specialty list',(await rows('anon',`select id from specialties`)).length===64);
+ ok('anon/clinician: cannot write the specialty list',!!(await fails('anon',`insert into specialties (id,grp,name,short_name,sort_order) values ('X','g','x','x',1)`))&&!!(await fails('alex',`update specialties set name='x' where id='ICU'`)));
+ ok('clinician: can set a new specialty + secondary specialties',(await as('alex',async()=>(await db.query(`update clinicians set specialty='CVICU', secondary_specialties=array['PCU','TELE'] where id=$1`,[uid('clinician:alex')])).rowCount))===1);
+ ok('clinician: unknown specialty rejected',/unknown specialty/.test(await fails('alex',`update clinicians set specialty='NOPE' where id=$1`,[uid('clinician:alex')])));
+ ok('clinician: unknown secondary specialty rejected; primary cannot repeat as secondary; max 5',/unknown specialty/.test(await fails('alex',`update clinicians set secondary_specialties=array['NOPE'] where id=$1`,[uid('clinician:alex')]))&&/cannot also be/.test(await fails('alex',`update clinicians set secondary_specialties=array['ICU'] where id=$1`,[uid('clinician:alex')]))&&!!(await fails('alex',`update clinicians set secondary_specialties=array['PCU','TELE','ED','LD','OR','PACU'] where id=$1`,[uid('clinician:alex')])));
+ ok('clinician: preferences (reminder settings) save on own row',(await as('alex',async()=>(await db.query(`update clinicians set preferences='{"reminderDays":30}' where id=$1`,[uid('clinician:alex')])).rowCount))===1);
+ ok('assignments: accepted specialties must be known ids',/unknown specialty/.test((await (async()=>{try{await db.query(`update assignments set accepted_specialties=array['NOPE'] where slug='boston-icu'`);return''}catch(e){return e.message}})())));
+ ok('requirements: min_months must fit in the recency window',!!(await (async()=>{try{await db.query('begin');await db.query(`update requirements set min_months=30 where kind='EMP_ICU_VERIFIED'`);await db.query('rollback');return''}catch(e){await db.query('rollback');return e.message}})()));
+ ok('get_share_assertions returns kind (for NLC coverage in the org view)',await n(`select count(*) from information_schema.parameters where specific_schema='public' and specific_name like 'get_share_assertions%' and parameter_name='kind' and parameter_mode='OUT'`)===1);
+
  /* ---------- anon ---------- */
- ok('anon: can read the credential catalog',(await rows('anon',`select kind from credential_catalog`)).length===36);
+ ok('anon: can read the credential catalog',(await rows('anon',`select kind from credential_catalog`)).length===217);
  ok('anon: cannot read credentials',!!(await fails('anon',`select * from credentials`)));
  ok('anon: cannot read clinicians or share grants',!!(await fails('anon',`select * from clinicians`))&&!!(await fails('anon',`select * from share_grants`)));
 

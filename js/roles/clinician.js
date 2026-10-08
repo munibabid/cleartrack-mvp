@@ -28,13 +28,13 @@ function renderOpportunities(){
  const sel=$('oppNurseV84');
  if(sel&&!sel.options.length){sel.innerHTML=DEMO_NURSES.map(n=>`<option value="${n.id}">${ec(n.name)} — ${ec(specialtyShort(n.specialty))}${n.live?' (your live Passport)':' (demo nurse, read-only)'}</option>`).join('');sel.onchange=()=>{oppNurseId=sel.value;renderOpportunities()}}
  if(sel)sel.value=oppNurseId;
- const n=demoNurse(oppNurseId),all=getAssignments(),elig=all.filter(a=>assignmentAccepts(a,n.specialty)),other=all.filter(a=>!assignmentAccepts(a,n.specialty));
- if($('oppNurseNoteV84'))$('oppNurseNoteV84').innerHTML=`Specialty from profile: <b>${ec(specialtyName(n.specialty))}</b> · home state ${ec(jurisdictionName(n.homeState))}. Opportunities that accept ${ec(specialtyShort(n.specialty))} are evaluated with the <b>${ec(specialtyShort(n.specialty))} module</b>.${n.live?'':' <span class="demo-tag-v81">DEMO NURSE · READ-ONLY</span>'}`;
+ const n=demoNurse(oppNurseId),all=getAssignments(),elig=all.filter(a=>matchedSpecialty(a,n)),other=all.filter(a=>!matchedSpecialty(a,n));
+ if($('oppNurseNoteV84'))$('oppNurseNoteV84').innerHTML=`Specialty from profile: <b>${ec(specialtyName(n.specialty))}</b>${(n.secondarySpecialties||[]).length?' · also '+ec(n.secondarySpecialties.map(specialtyShort).join(', '))+' (used when the opportunity accepts it)':''} · home state ${ec(jurisdictionName(n.homeState))}${nlcCanIssueMultistate(n.homeState)?' (compact — a multistate license issued here covers every compact state)':''}. Opportunities that accept ${ec(specialtyShort(n.specialty))} are evaluated with the <b>${ec(specialtyShort(n.specialty))} module</b>.${n.live?'':' <span class="demo-tag-v81">DEMO NURSE · READ-ONLY</span>'}`;
  $('oppListV82').innerHTML=elig.map(a=>{
   const r=v81Assignment(a,n),next=r.items.find(i=>['MISSING','EXPIRES_BEFORE_END','NOT_RECENT'].includes(i.status)),pend=r.items.some(i=>i.status==='PENDING_VERIFICATION');
   const org=organization(a.orgId);
   const action=!n.live?(r.ready?`<span class="badge READY">${r.ok}/${r.total} · ASSIGNMENT READY</span>`:''):r.ready?`<span class="badge READY">${r.ok}/${r.total} · ASSIGNMENT READY</span> <button class="pri oppShare" data-aid="${a.id}" style="margin-top:8px">SHARE WITH ${ec((org?.name||'ORGANIZATION').toUpperCase())}</button>`:next?`<button class="pri oppComplete" data-aid="${a.id}">COMPLETE MISSING REQUIREMENT</button>`:pend?'<button class="sec" disabled>Pending verification</button>':'';
-  return`<div class="opp-card-v7"><div class="opp-item-v7"><div><b>${ec(a.name)}</b><div class="small">${org?ec(org.name)+' · ':''}${ec(a.facility||'')}</div><div class="small">${ec(a.workTypeName)} · ${ec(jurisdictionName(a.jurisdiction))} · ${a.start} → ${a.end} · accepts ${ec(a.specialtyText)}</div></div><div class="opp-score">${r.ok}/${r.total}</div></div><div style="margin:8px 0">${layerSummaryHtml(a,r.reqs)}</div><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul>${action}</div>`;
+  const pref=specialtyPreferred(r.specialty).filter(k=>!r.reqs.some(q=>q.kind===k));return`<div class="opp-card-v7"><div class="opp-item-v7"><div><b>${ec(a.name)}</b><div class="small">${org?ec(org.name)+' · ':''}${ec(a.facility||'')}</div><div class="small">${ec(a.workTypeName)} · ${ec(jurisdictionName(a.jurisdiction))} · ${a.start} → ${a.end} · accepts ${ec(a.specialtyText)}</div></div><div class="opp-score">${r.ok}/${r.total}</div></div><div style="margin:8px 0">${layerSummaryHtml(a,r.reqs)}</div><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul>${pref.length?`<div class="small opp-pref-v11">Preferred, not required: ${pref.map(k=>ec(catalogKind(k)?.short||k)).join(' · ')}</div>`:''}${action}</div>`;
  }).join('')+(other.length?`<div class="small opp-other-v84">Not shown — these opportunities don't accept ${ec(specialtyShort(n.specialty))}: ${other.map(a=>`${ec(a.name)} (${ec(a.specialtyText)})`).join(', ')}</div>`:'');
  document.querySelectorAll('.oppComplete').forEach(b=>b.onclick=()=>completeMissingRequirement(b.dataset.aid));
  document.querySelectorAll('.oppShare').forEach(b=>b.onclick=()=>{const x=getAssignment(b.dataset.aid);openShareDialog({orgId:x.orgId,assignmentId:x.id})});
@@ -66,10 +66,12 @@ function v81SyncAddForm(){
  $('otherRowV81').classList.toggle('hidden',k?.kind!=='OTHER');
  if(needsJur){fillDatalist('jurListV82',list.map(jurisdictionOptionLabel));$('jurLabelV82').textContent=k.jurisdiction==='NLC_HOME'?'NLC home state (primary state of residence)':'License jurisdiction (US state or territory)'}
  const j=needsJur?resolveJurisdiction($('jurSearchV82').value,list):null;
- $('jurHintV82').textContent=!needsJur?'':j?`${j.name}: ${nlcStatusLabel(j.code)} · issuer: ${j.issuer}`:k.jurisdiction==='NLC_HOME'?`Only the ${list.length} NLC states that issue multistate licenses are listed.`:`Type to search all ${list.length} US states and territories.`;
+ $('jurHintV82').textContent=!needsJur?'':j?`${j.name}: ${nlcStatusLabel(j.code)} · issuer: ${j.issuer}${licenseHomeStateHint(k.kind,j.code,DEMO_PROFILE.homeState)}`:k.jurisdiction==='NLC_HOME'?`Only the ${list.length} NLC states that issue multistate licenses are listed.`:`Type to search all ${list.length} US states and territories.`;
  let note='Choose a credential type to see how it will be handled.';
+ const expHelp=k?.experience?experienceHelpText(k.kind):'';$('experienceHelpV11').classList.toggle('hidden',!expHelp);$('experienceHelpV11').innerHTML=expHelp;
+ const expRow=$('experienceRowV11');if(expRow){expRow.classList.toggle('hidden',!k?.experience);if(!k?.experience){$('expYearsV11').value='';$('expLastV11').value='';$('expRecentV11').value=''}}
  if(k){const priv=catalogPrivacy(k.kind)==='PRIVATE';
-  note=`<b>Classification:</b> ${ec(k.kind)}${j?' · '+ec(j.code):''}<br><b>Source document:</b> always private — never shared or put on-chain.<br><b>Verified result:</b> ${priv?'private — shared only as a status when an assignment requires it; never on-chain.':'can be shared selectively; optional XRPL Devnet proof.'}${k.readiness===false?'<br><b>Assignment readiness:</b> listed as an Additional Professional Qualification; does not affect RN readiness unless an organization requires it.':''}<br><b>Verification:</b> simulated check against ${ec(k.jurisdiction?(j?.issuer||'the state board of nursing'):(k.issuer||'the issuer'))} (DEMO).`}
+  note=`<b>Classification:</b> ${ec(k.kind)}${j?' · '+ec(j.code):''}<br><b>Source document:</b> always private — never shared or put on-chain.<br><b>Verified result:</b> ${priv?'private — shared only as a status when an assignment requires it; never on-chain.':'can be shared selectively; optional XRPL Devnet proof.'}${k.readiness===false?'<br><b>Assignment readiness:</b> listed as an Additional Professional Qualification; does not affect RN readiness unless an organization requires it.':''}<br><b>Verification:</b> simulated check against ${ec(k.jurisdiction?licensePrimarySource(k.kind,j?.code):(k.issuer||'the issuer'))} (DEMO).`}
  $('privacyNoteV82').innerHTML=note;
 }
 function addCredentialFromForm(){
@@ -78,7 +80,8 @@ function addCredentialFromForm(){
  if(k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS,j=resolveJurisdiction($('jurSearchV82').value,list);if(!j){alert(k.jurisdiction==='NLC_HOME'?'Choose your NLC home state from the list (only states that issue multistate licenses).':'Choose the license jurisdiction from the list (any US state or territory).');return}jur=j.code}
  const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur);if(!name){alert('Enter a credential name.');return}
  const type=k.kind==='OTHER'?('CUSTOM_'+(($('nm').value||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL')):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
- const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:$('dt').value,file:f?f.name:'',prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
+  const exp=k.experience?{years:$('expYearsV11').value!==''?+ $('expYearsV11').value:undefined,recentMonths:$('expRecentV11').value!==''?+$('expRecentV11').value:undefined,lastWorked:$('expLastV11').value||''}:{};
+ const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:$('dt').value,file:f?f.name:'',...exp,prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
  const old=renewalTargetV85!=null?creds.find(x=>x.id===renewalTargetV85&&x.kind===c.kind&&(x.jurisdiction||'')===(jur||'')):null;if(old)c.renews=old.id;renewalTargetV85=null;
  creds.push(c);save();
  v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION',detail:{document:f?'PRIVATE_FILENAME_ONLY':'NONE',...(c.renews?{renews:c.renews}:{})}});
@@ -115,17 +118,19 @@ function updateShareReview(){
  const a=getAssignment($('shareAssignV83').value),d=$('shareV7Duration').value;$('shareCustomRowV83').classList.toggle('hidden',d!=='CUSTOM_DATE');
  const exp=computeExpiry(d,a,$('shareCustomV83').value),sel=selectedAssertions(),priv=sel.filter(x=>x.mode==='REQUIREMENT_SATISFIED').length;
  $('shareReviewV83').innerHTML=`<b>Review before approving</b><br>Organization: <b>${ec(organization($('shareOrgV83').value)?.name||'')}</b> · Assignment: <b>${ec(a?.name||'')}</b><br>Sharing <b>${sel.length}</b> live assertion${sel.length===1?'':'s'} (${priv} as “Requirement Satisfied” only) · Source documents: <b>NOT SHARED</b><br>Access: <b>${ec(durationLabel(d))}</b> — ${d==='UNTIL_REVOKED'?'no expiration; you can revoke at any time':d==='CUSTOM_DATE'&&!exp?'choose a date':'expires '+ec(fmtDT(exp?.toISOString()))}${d==='ONE_TIME'?' or after the first view':''}. Views are logged. You can modify or revoke access at any time.`;
+ const gap=a?shareCoverageGap(exp,a.end,d):'';$('shareWarnV11').textContent=gap;$('shareWarnV11').classList.toggle('hidden',!gap);
 }
 function approveShare(){
  const a=getAssignment($('shareAssignV83').value),d=$('shareV7Duration').value,cd=$('shareCustomV83').value,sel=selectedAssertions();
  if(!a){alert('Choose an assignment that accepts your specialty.');return}
  if(!sel.length){alert('Select at least one assertion to share.');return}
  if(d==='CUSTOM_DATE'&&(!cd||endOfDay(cd)<=new Date())){alert('Choose a future end date for custom access.');return}
+ const gap=shareCoverageGap(computeExpiry(d,a,cd),a.end,d);if(gap&&!confirm(gap+'\n\nShare anyway?'))return;
  if(shareEditId){modifyShare(shareEditId,{assertions:sel,duration:d,customDate:cd});$('shareV7').close();render();return}
  const s=createShare({orgId:$('shareOrgV83').value,assignmentId:a.id,assertions:sel,duration:d,customDate:cd});
  const url=shareUrl(s);$('shareDoneV83').innerHTML=`<b>Shared with ${ec(s.orgName)}</b> for ${ec(s.assignmentName)} · ${sel.length} assertions · access ${ec(durationLabel(d))} (expires ${ec(expiryText(s))}).`;
  $('shareV7Link').textContent=url;$('shareFormV83').classList.add('hidden');$('shareV7Result').classList.remove('hidden');
- if(window.QRCode)QRCode.toCanvas($('shareV7QR'),url,{width:230,margin:2});render();
+ drawShareQr($('shareV7QR'),url);render();
 }
 function openModifyShare(id){
  const s=loadShares().find(x=>x.id===id);if(!s)return;openShareDialog({orgId:s.orgId,assignmentId:s.assignmentId});
@@ -163,14 +168,14 @@ function renderShareAccess(){
  $('sharePendingV83').innerHTML=pend.map(r=>`<div class="share-card-v83"><b>${ec(r.orgName)}</b> requests access through <b>${ec(fd(r.requestedUntil))} 11:59 PM</b><div class="small">${ec(r.assignmentName)}${r.reason?' · “'+ec(r.reason)+'”':''} · requested ${ec(fmtDT(r.createdAt))}</div><div class="acts" style="margin-top:8px"><button class="mini goodbtn reqAct" data-act="APPROVED" data-id="${r.id}">Approve</button><button class="mini reqAct" data-act="DECLINED" data-id="${r.id}">Decline</button></div></div>`).join('')||empty('No pending requests.');
  $('shareExpiredV83').innerHTML=by('EXPIRED').map(card).join('')||empty('None.');
  $('shareRevokedV83').innerHTML=by('REVOKED').map(card).join('')||empty('None.');
- $('shareActivityV83').innerHTML=eventsSinceSeed().slice().reverse().slice(0,40).map(e=>`<div class="activity-v83">${ec(activityText(e))}<div class="small">${ec(fmtDT(e.timestamp))} · ${ec(e.actor_type)}</div></div>`).join('')||empty('No activity yet.');
+ $('shareActivityV83').innerHTML=eventsSinceSeed().slice().reverse().slice(0,40).map(e=>`<div class="activity-v83">${ec(activityText(e))}<div class="small">${ec(fmtDT(e.timestamp))} · ${ec(plainCode(e.actor_type))}</div></div>`).join('')||empty('No activity yet.');
  document.querySelectorAll('.shareAct').forEach(b=>b.onclick=()=>({details:showShareDetails,modify:openModifyShare,extend:openExtend,revoke:confirmRevoke})[b.dataset.act](b.dataset.id));
  document.querySelectorAll('.reqAct').forEach(b=>b.onclick=()=>{resolveShareRequest(b.dataset.id,b.dataset.act);render()});
 }
 function activityText(e){
  const d=e.detail||{},c=e.credential_id?creds.find(x=>x.id===e.credential_id):null,cn=c?c.name:'credential',w=`${d.org||''}${d.assignment?' · '+d.assignment:''}`;
  return({
-  SHARE_CREATED:`Shared Passport with ${w} — ${e.result}; ${(d.assertions||[]).length} assertions; documents not shared`,
+  SHARE_CREATED:`Shared Passport with ${w} — ${plainCode(e.result)}; ${(d.assertions||[]).length} assertions; documents not shared`,
   SHARE_VIEWED:`${d.org} viewed your shared Passport (${(d.assertionsAccessed||[]).length} assertions: ${(d.assertionsAccessed||[]).join(', ')})`,
   SHARE_SCOPE_CHANGED:`Modified access for ${w}${d.added?.length?' · added '+d.added.join(', '):''}${d.removed?.length?' · removed '+d.removed.join(', '):''}${d.durationFrom!==d.durationTo?' · '+durationLabel(d.durationFrom)+' → '+durationLabel(d.durationTo):''}`,
   SHARE_EXTENSION_REQUESTED:`${d.org} requested access through ${fd(d.requestedUntil)} (${d.assignment})`,
@@ -178,12 +183,12 @@ function activityText(e){
   SHARE_EXTENSION_DECLINED:`Declined extension request from ${d.org}`,
   SHARE_REVOKED:`Revoked Passport access for ${w}`,
   ASSIGNMENT_PUBLISHED:`${d.org||'Organization'} published ${d.name} (${(d.specialties||[]).map(specialtyShort).join(' / ')})`,
-  MONITORING_RUN:`Monitoring check (simulated): ${e.result}`,CREDENTIAL_REVOKED:`${cn} revoked by issuer (simulated)`,CREDENTIAL_REINSTATED:`${cn} reinstated after simulated re-check`,CREDENTIAL_EXPIRED:`${cn} expired (monitoring)`,DEMO_TOUR_STARTED:'Demo tour started (demo data reset)',DEMO_TOUR_COMPLETED:'Demo tour completed',CREDENTIAL_RENEWED:`${cn} renewed — replaces the previous record${e.detail?.previous_expiration?' (expired '+fd(e.detail.previous_expiration)+')':''}`,
+  MONITORING_RUN:`Monitoring check (simulated): ${plainCode(e.result)}`,CREDENTIAL_REVOKED:`${cn} revoked by issuer (simulated)`,CREDENTIAL_REINSTATED:`${cn} reinstated after simulated re-check`,CREDENTIAL_EXPIRED:`${cn} expired (monitoring)`,DEMO_TOUR_STARTED:'Demo tour started (demo data reset)',DEMO_TOUR_COMPLETED:'Demo tour completed',CREDENTIAL_RENEWED:`${cn} renewed — replaces the previous record${e.detail?.previous_expiration?' (expired '+fd(e.detail.previous_expiration)+')':''}`,
   MANUAL_REVIEW_APPROVED:`${cn} approved after manual review`,MANUAL_REVIEW_REJECTED:`${cn} rejected after manual review`,
   SHARE_EXPIRED:`Access expired for ${w}${e.result&&e.result.startsWith('ACCESS_REFUSED')?' — a view attempt was refused':''}`,
   CREDENTIAL_UPLOADED:`Added ${cn}`,CLASSIFICATION_COMPLETED:`Classified ${cn} as ${d.kind||''}${d.jurisdiction?' · '+d.jurisdiction:''}`,
-  VERIFICATION_STARTED:`${cn} entered the verification queue`,VERIFICATION_SUCCEEDED:`${cn} verified (simulated check)`,VERIFICATION_FAILED:`${cn} verification failed (${e.result})`,SOURCE_CHECK_COMPLETED:`Simulated source check completed for ${cn}`,
-  ASSIGNMENT_INTEREST:`Started completing ${getAssignment(e.assignment_id)?.name||e.assignment_id} (${e.result})`,ASSIGNMENT_READY:`${getAssignment(e.assignment_id)?.name||e.assignment_id} is assignment ready (${e.result})`,
+  VERIFICATION_STARTED:`${cn} entered the verification queue`,VERIFICATION_SUCCEEDED:`${cn} verified (simulated check)`,VERIFICATION_FAILED:`${cn} verification failed (${plainCode(e.result)})`,SOURCE_CHECK_COMPLETED:`Simulated source check completed for ${cn}`,
+  ASSIGNMENT_INTEREST:`Started completing ${getAssignment(e.assignment_id)?.name||e.assignment_id} (${plainCode(e.result)})`,ASSIGNMENT_READY:`${getAssignment(e.assignment_id)?.name||e.assignment_id} is assignment ready (${plainCode(e.result)})`,
   DEMO_SEEDED:'Demo data seeded'
  })[e.event_type]||e.event_type;
 }
@@ -202,7 +207,7 @@ function passportRowHtml(c){const d=daysUntil(credExpiry(c));return`<div class="
 function renderPassportView(){
  if(!$('v7PassportSections'))return;
  const live=creds.filter(isCurrentVerified),auth=practiceAuthorization(),soon=live.filter(c=>{const d=daysUntil(credExpiry(c));return d!=null&&d<=90}).length;
- if($('v7PassportHeroV85'))$('v7PassportHeroV85').innerHTML=`<b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · ${ec(specialtyName(DEMO_PROFILE.specialty))} · home state ${ec(jurisdictionName(DEMO_PROFILE.homeState))}`;
+ if($('v7PassportHeroV85'))$('v7PassportHeroV85').innerHTML=`<b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · ${ec(specialtyName(DEMO_PROFILE.specialty))}${(DEMO_PROFILE.secondarySpecialties||[]).length?' · also '+ec(DEMO_PROFILE.secondarySpecialties.map(specialtyShort).join(', ')):' '} · home state ${ec(jurisdictionName(DEMO_PROFILE.homeState))} (${ec(nlcStatusLabel(DEMO_PROFILE.homeState))})`;
  $('v7PassportSummaryV85').innerHTML=`<span class="chip">${live.length} verified &amp; current</span><span class="chip">Authorized to practice in ${auth.size} jurisdictions</span><span class="chip">${soon} expiring ≤90 days</span><span class="chip">${live.filter(c=>c.privateOnly).length} private</span><span class="demo-tag-v81">DEMO DATA</span>`;
  const lic=[...auth.entries()],single=lic.filter(x=>x[1]==='single-state license').map(x=>x[0]),ms=lic.find(x=>x[1]==='multistate home');
  $('v7PassportSections').innerHTML=PASSPORT_GROUPS.map(g=>{
