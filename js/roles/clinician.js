@@ -1,6 +1,6 @@
 /* Clinician workspace: Home, Passport, Tasks, Opportunities, onboarding dialog. */
 function setBusy(s){$('busy').textContent=s||''}
-function render(){creds=creds.map(v81Normalize);const ob=onboarding();$('onboardPct').textContent=ob.pct+'%';$('vcount').textContent=creds.filter(c=>c.primary==='VERIFIED').length;$('acount').textContent=creds.filter(c=>c.chain==='ACCEPTED').length;$('ncount').textContent=creds.filter(c=>['UNVERIFIED','VERIFYING'].includes(c.primary)||c.chain==='SECURING').length;$('onboardBar').style.width=ob.pct+'%';$('onboardSummaryText').textContent=`${ob.ok} of ${ob.req.length} required items satisfied`;$('readyBadge').textContent=ob.ready?'ONBOARDING READY':'IN PROGRESS';$('readyBadge').className='badge '+(ob.ready?'READY':'PENDING');let a=filter==='all'?creds:creds.filter(c=>c.section===filter);$('empty').classList.toggle('hidden',a.length>0);$('tbl').classList.toggle('hidden',!a.length);$('rows').innerHTML=a.map(c=>{let z=`<button class="mini details" data-id="${c.id}">Details</button>`;if(c.primary==='UNVERIFIED')z+=`<button class="mini verify" data-id="${c.id}">Submit for Verification</button>`;if(c.primary==='VERIFYING')z+=`<button class="mini" disabled>Verification in Progress</button>`;if(eligible(c))z+=`<button class="mini chainbtn issue" data-id="${c.id}">Secure Credential</button>`;if(c.chain==='SECURING')z+=`<button class="mini goodbtn accept" data-id="${c.id}">Accept</button>`;if(['SECURING','ACCEPTED'].includes(c.chain))z+=`<button class="mini showproof" data-id="${c.id}">XRPL Proof</button>`;z+=`<button class="mini del" data-id="${c.id}">Delete</button>`;let prov=c.prov?.verifiedAt?`${ec(c.prov.source)}<div class="source">${ec(c.prov.method)} · ${new Date(c.prov.verifiedAt).toLocaleDateString()}</div>`:'Not yet verified';return `<tr><td><b>${ec(c.name)}</b>${c.privateOnly?'<div class="small">Private/off-chain only</div>':''}</td><td class="mono">${ec(c.type)}</td><td>${c.required?'<span class="badge REQ">REQUIRED</span>':'Optional'}</td><td>${verificationBadgeHtml(c)}</td><td>${proofLabelHtml(c)}</td><td>${fd(c.expiration)}</td><td>${prov}</td><td><div class="rowact">${z}</div></td></tr>`}).join('');document.querySelectorAll('.verify').forEach(b=>b.onclick=()=>openVerify(+b.dataset.id));document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>issue(+b.dataset.id));document.querySelectorAll('.accept').forEach(b=>b.onclick=()=>accept(+b.dataset.id));document.querySelectorAll('.showproof,.details').forEach(b=>b.onclick=()=>showProof(+b.dataset.id));document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{creds=creds.filter(c=>c.id!=b.dataset.id);save();render()});renderV7Views()}
+function render(){creds=creds.map(v81Normalize);const ob=onboarding();$('onboardPct').textContent=ob.pct+'%';$('vcount').textContent=creds.filter(c=>c.primary==='VERIFIED').length;$('acount').textContent=creds.filter(c=>c.chain==='ACCEPTED').length;$('ncount').textContent=clinicianAttention().length;$('onboardBar').style.width=ob.pct+'%';$('onboardSummaryText').textContent=`${ob.ok} of ${ob.req.length} required items satisfied`;$('readyBadge').textContent=ob.ready?'ONBOARDING READY':'IN PROGRESS';$('readyBadge').className='badge '+(ob.ready?'READY':'PENDING');let a=filter==='all'?creds:creds.filter(c=>c.section===filter);$('empty').classList.toggle('hidden',a.length>0);$('tbl').classList.toggle('hidden',!a.length);$('rows').innerHTML=a.map(c=>{let z=`<button class="mini details" data-id="${c.id}">Details</button>`;if(c.primary==='UNVERIFIED')z+=`<button class="mini verify" data-id="${c.id}">Submit for Verification</button>`;if(c.primary==='VERIFYING')z+=`<button class="mini" disabled>Verification in Progress</button>`;if(eligible(c))z+=`<button class="mini chainbtn issue" data-id="${c.id}">Secure Credential</button>`;if(c.chain==='SECURING')z+=`<button class="mini goodbtn accept" data-id="${c.id}">Accept</button>`;if(['SECURING','ACCEPTED'].includes(c.chain))z+=`<button class="mini showproof" data-id="${c.id}">XRPL Proof</button>`;z+=`<button class="mini del" data-id="${c.id}">Delete</button>`;let prov=c.prov?.verifiedAt?`${ec(c.prov.source)}<div class="source">${ec(c.prov.method)} · ${new Date(c.prov.verifiedAt).toLocaleDateString()}</div>`:'Not yet verified';return `<tr><td><b>${ec(c.name)}</b>${c.privateOnly?'<div class="small">Private/off-chain only</div>':''}</td><td class="mono">${ec(c.type)}</td><td>${c.required?'<span class="badge REQ">REQUIRED</span>':'Optional'}</td><td>${verificationBadgeHtml(c)}</td><td>${proofLabelHtml(c)}</td><td>${fd(c.expiration)}</td><td>${prov}</td><td><div class="rowact">${z}</div></td></tr>`}).join('');document.querySelectorAll('.verify').forEach(b=>b.onclick=()=>openVerify(+b.dataset.id));document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>issue(+b.dataset.id));document.querySelectorAll('.accept').forEach(b=>b.onclick=()=>accept(+b.dataset.id));document.querySelectorAll('.showproof,.details').forEach(b=>b.onclick=()=>showProof(+b.dataset.id));document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{creds=creds.filter(c=>c.id!=b.dataset.id);save();render()});renderV7Views()}
 function showV7View(id){
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));
  document.querySelectorAll('.v7nav').forEach(b=>b.classList.toggle('active',b.dataset.view===id));
@@ -10,17 +10,9 @@ function showV7View(id){
 }
 function renderV7Views(){
  const ready=v7Readiness();if($('v7PassportReady'))$('v7PassportReady').textContent=ready+'%';
- const passCats=['Licenses','Certifications','Education','Employment & HR','Clinical Qualifications','Additional Professional Qualifications'];
- if($('v7PassportSections'))$('v7PassportSections').innerHTML=passCats.map(cat=>{
-   const arr=creds.filter(c=>catFor(c)===cat&&c.primary==='VERIFIED'&&c.prov?.active);
-   if(!arr.length)return'';
-   return `<div class="task-category-v7"><div class="cathead"><b>${ec(cat==='Employment & HR'?'Employment Experience':cat)}</b></div>${arr.map(c=>`<div class="passport-item-v7"><div><b>✓ ${ec(c.name)}</b><div class="small">${ec(c.prov?.source||'Verified source')}</div></div><div class="pass-badges-v84">${verificationBadgeHtml(c)} ${proofLabelHtml(c)} <button class="mini details" data-id="${c.id}">View</button></div></div>`).join('')}</div>`
- }).join('');
- const cats=['Licenses','Certifications','Education','Employment & HR','Employee Health','Clinical Qualifications','Background & Screening','Additional Professional Qualifications','Submitted Credentials'];
- if($('v7TaskCategories'))$('v7TaskCategories').innerHTML=cats.map(cat=>{
-   const arr=creds.filter(c=>catFor(c)===cat),verified=arr.filter(c=>c.primary==='VERIFIED').length,exp=arr.filter(c=>c.primary==='EXPIRING').length,missing=arr.filter(c=>['UNVERIFIED','EXPIRED','REVOKED'].includes(c.primary)).length;
-   return `<div class="task-category-v7"><div class="cathead"><b>${ec(cat)}</b><div class="counts"><span class="chip">${arr.length} items</span><span class="chip">${verified} verified</span><span class="chip">${exp} expiring</span><span class="chip">${missing} missing/action</span></div></div>${arr.map(c=>`<div class="task-item-v7"><div><b>${ec(c.name)}</b><div class="small">${ec(verificationBadge(c).text)}${c.expiration?' · '+fd(c.expiration):''}</div></div><button class="mini details" data-id="${c.id}">${c.primary==='EXPIRING'?'Renew':'Open'}</button></div>`).join('')}</div>`
- }).join('');
+ renderPassportView();
+ renderTaskCenter();
+ renderHomeDashboard();
  renderOpportunities();
  renderShareAccess();
  document.querySelectorAll('.details').forEach(btn=>btn.onclick=()=>showProof(+btn.dataset.id))
@@ -66,7 +58,7 @@ function openAddForm(pre={}){
  $('addContextV82').innerHTML=pre.context||'';$('addContextV82').classList.toggle('hidden',!pre.context);
  v81SyncAddForm();$('add').showModal();
 }
-function resetAddForm(){['kindSearchV82','jurSearchV82','nm','tp','dt','fl'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
+function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','tp','dt','fl'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
 function v81SyncAddForm(){
  const k=resolveCatalogKind($('kindSearchV82').value);
  const needsJur=!!k?.jurisdiction,list=k?.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;
@@ -87,8 +79,9 @@ function addCredentialFromForm(){
  const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur);if(!name){alert('Enter a credential name.');return}
  const type=k.kind==='OTHER'?($('tp').value.trim()||'OTHER'):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
  const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:$('dt').value,file:f?f.name:'',prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
+ const old=renewalTargetV85!=null?creds.find(x=>x.id===renewalTargetV85&&x.kind===c.kind&&(x.jurisdiction||'')===(jur||'')):null;if(old)c.renews=old.id;renewalTargetV85=null;
  creds.push(c);save();
- v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION',detail:{document:f?'PRIVATE_FILENAME_ONLY':'NONE'}});
+ v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION',detail:{document:f?'PRIVATE_FILENAME_ONLY':'NONE',...(c.renews?{renews:c.renews}:{})}});
  v81Log('CLASSIFICATION_COMPLETED',c.id,{actor_type:'SYSTEM',result:'SIMULATED_CLASSIFICATION',detail:{kind:c.kind,jurisdiction:jur||null,privacy:catalogPrivacy(c.kind)}});
  v81Log('VERIFICATION_STARTED',c.id,{actor_type:'SYSTEM',result:'QUEUED'});
  $('add').close();render();
@@ -185,10 +178,64 @@ function activityText(e){
   SHARE_EXTENSION_DECLINED:`Declined extension request from ${d.org}`,
   SHARE_REVOKED:`Revoked Passport access for ${w}`,
   ASSIGNMENT_PUBLISHED:`${d.org||'Organization'} published ${d.name} (${(d.specialties||[]).map(specialtyShort).join(' / ')})`,
+  MONITORING_RUN:`Monitoring check (simulated): ${e.result}`,CREDENTIAL_REVOKED:`${cn} revoked by issuer (simulated)`,CREDENTIAL_REINSTATED:`${cn} reinstated after simulated re-check`,CREDENTIAL_EXPIRED:`${cn} expired (monitoring)`,CREDENTIAL_RENEWED:`${cn} renewed — replaces the previous record${e.detail?.previous_expiration?' (expired '+fd(e.detail.previous_expiration)+')':''}`,
+  MANUAL_REVIEW_APPROVED:`${cn} approved after manual review`,MANUAL_REVIEW_REJECTED:`${cn} rejected after manual review`,
   SHARE_EXPIRED:`Access expired for ${w}${e.result&&e.result.startsWith('ACCESS_REFUSED')?' — a view attempt was refused':''}`,
   CREDENTIAL_UPLOADED:`Added ${cn}`,CLASSIFICATION_COMPLETED:`Classified ${cn} as ${d.kind||''}${d.jurisdiction?' · '+d.jurisdiction:''}`,
   VERIFICATION_STARTED:`${cn} entered the verification queue`,VERIFICATION_SUCCEEDED:`${cn} verified (simulated check)`,VERIFICATION_FAILED:`${cn} verification failed (${e.result})`,SOURCE_CHECK_COMPLETED:`Simulated source check completed for ${cn}`,
   ASSIGNMENT_INTEREST:`Started completing ${getAssignment(e.assignment_id)?.name||e.assignment_id} (${e.result})`,ASSIGNMENT_READY:`${getAssignment(e.assignment_id)?.name||e.assignment_id} is assignment ready (${e.result})`,
   DEMO_SEEDED:'Demo data seeded'
  })[e.event_type]||e.event_type;
+}
+
+/* ---- Passport view (handoff §38): grouped, verification-first ---- */
+const PASSPORT_GROUPS=[
+ {title:'Licenses & Practice Authorization',cats:['Licenses']},
+ {title:'Certifications',cats:['Certifications']},
+ {title:'Clinical Qualifications',cats:['Clinical Qualifications']},
+ {title:'Employment Experience',cats:['Employment & HR']},
+ {title:'Education',cats:['Education']},
+ {title:'Health & Screening',cats:['Employee Health','Background & Screening'],note:'Private: organizations only ever see “Requirement Satisfied”.'},
+ {title:'Additional Professional Qualifications',cats:['Additional Professional Qualifications']}
+];
+function passportRowHtml(c){const d=daysUntil(credExpiry(c));return`<div class="passport-item-v7"><div><b>✓ ${ec(c.name)}</b><div class="small">${ec(c.prov?.source||'Verified source')}${credExpiry(c)?' · expires '+fd(credExpiry(c))+(d!=null&&d<=90?` <span class="exp-chip-v85">expires in ${d}d</span>`:''):''}</div></div><div class="pass-badges-v84">${verificationBadgeHtml(c)} ${proofLabelHtml(c)} <button class="mini details" data-id="${c.id}">View</button></div></div>`}
+function renderPassportView(){
+ if(!$('v7PassportSections'))return;
+ const live=creds.filter(isCurrentVerified),auth=practiceAuthorization(),soon=live.filter(c=>{const d=daysUntil(credExpiry(c));return d!=null&&d<=90}).length;
+ if($('v7PassportHeroV85'))$('v7PassportHeroV85').innerHTML=`<b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · ${ec(specialtyName(DEMO_PROFILE.specialty))} · home state ${ec(jurisdictionName(DEMO_PROFILE.homeState))}`;
+ $('v7PassportSummaryV85').innerHTML=`<span class="chip">${live.length} verified &amp; current</span><span class="chip">Authorized to practice in ${auth.size} jurisdictions</span><span class="chip">${soon} expiring ≤90 days</span><span class="chip">${live.filter(c=>c.privateOnly).length} private</span><span class="demo-tag-v81">DEMO DATA</span>`;
+ const lic=[...auth.entries()],single=lic.filter(x=>x[1]==='single-state license').map(x=>x[0]),ms=lic.find(x=>x[1]==='multistate home');
+ $('v7PassportSections').innerHTML=PASSPORT_GROUPS.map(g=>{
+  const arr=live.filter(c=>g.cats.includes(catFor(c)));if(!arr.length)return'';
+  const extra=g.cats[0]==='Licenses'?`<div class="small pass-auth-v85">Practice authorization: ${ms?`multistate (NLC) from ${ec(jurisdictionName(ms[0]))} — privilege in ${lic.filter(x=>x[1]==='NLC privilege').length+1} compact jurisdictions`:'no multistate license'}${single.length?` · single-state: ${single.map(j=>ec(jurisdictionName(j))).join(', ')}`:''}</div>`:'';
+  return`<div class="task-category-v7"><div class="cathead"><b>${ec(g.title)}</b><span class="chip">${arr.length}</span></div>${g.note?`<div class="small pass-auth-v85">${ec(g.note)}</div>`:''}${extra}${arr.map(passportRowHtml).join('')}</div>`;
+ }).join('');
+}
+/* ---- Task Center (handoff §39) ---- */
+let renewalTargetV85=null;
+function openRenewal(id){const c=creds.find(x=>x.id===id);if(!c)return;openAddForm({kind:c.kind,jurisdiction:c.jurisdiction||'',context:`Renewing <b>${ec(c.name)}</b> (current one expires ${fd(credExpiry(c))}). The renewed credential goes through verification; once verified it replaces the current record and any live shares update automatically.`});renewalTargetV85=c.id}
+function taskRow(name,sub,btn){return`<div class="task-item-v7"><div><b>${ec(name)}</b><div class="small">${sub}</div></div>${btn||''}</div>`}
+function renderTaskCenter(){
+ if(!$('v7TaskCategories'))return;const t=taskSections(),cat=c=>ec(catFor(c));
+ const sec=(id,title,hint,rows,empty,open=true)=>`<div class="task-category-v7 task-sec-v85" id="${id}"><div class="cathead"><b>${title}</b><span class="chip">${rows.length}</span></div><div class="small task-hint-v85">${hint}</div>${rows.length?(open?rows.join(''):`<details><summary class="small">Show ${rows.length}</summary>${rows.join('')}</details>`):`<div class="small task-empty-v85">${empty}</div>`}</div>`;
+ $('v7TaskCategories').innerHTML=[
+  sec('taskReqV85','Required Before Submission','Blocking at least one opportunity that accepts your specialty.',t.required.map(b=>taskRow(b.item.label,`${ec(b.item.note||'Missing')} · for ${b.assignments.map(a=>ec(a.name)).join(', ')}`,`<button class="mini pri" onclick="completeMissingRequirement('${b.assignments[0].id}')">Complete</button>`)),'Nothing is blocking your opportunities.'),
+  sec('taskExp30V85','Expiring Within 30 Days','Renew now to stay assignment-ready.',t.exp30.map(x=>taskRow(x.c.name,`${cat(x.c)} · expires ${fd(credExpiry(x.c))} (${x.d} days)${x.renewing?' · renewal submitted — awaiting verification':''}`,x.renewing?'<span class="badge PENDING">RENEWAL PENDING</span>':`<button class="mini pri" onclick="openRenewal(${x.c.id})">Renew</button>`)),'Nothing expires in the next 30 days.'),
+  sec('taskRenewV85','Renewal Recommended','Expires in 31–90 days.',t.renew.map(x=>taskRow(x.c.name,`${cat(x.c)} · expires ${fd(credExpiry(x.c))} (${x.d} days)${x.renewing?' · renewal submitted — awaiting verification':''}`,x.renewing?'<span class="badge PENDING">RENEWAL PENDING</span>':`<button class="mini" onclick="openRenewal(${x.c.id})">Renew</button>`)),'No renewals due in the next 90 days.'),
+  sec('taskAwaitV85','Awaiting Verification','In the Verification Console queue (simulated checks).',t.awaiting.map(c=>taskRow(c.name,`${cat(c)} · ${ec(verificationBadge(c).text)}${c.renews?' · renewal — replaces the current record once verified':''}`,`<button class="mini details" data-id="${c.id}">Open</button>`)),'Nothing is waiting for verification.'),
+  sec('taskMissingV85','Missing','Onboarding-baseline items not on your Passport, and credentials that need replacing.',t.missing.map(m=>m.c?taskRow(m.c.name,`${cat(m.c)} · ${ec(m.reason)}`,`<button class="mini pri" onclick="openRenewal(${m.c.id})">Replace</button>`):taskRow(catalogKind(m.kind)?.label||m.kind,ec(m.reason),`<button class="mini pri" onclick="openAddForm({kind:'${m.kind}'})">Add</button>`)),'Nothing missing from your onboarding baseline.'),
+  sec('taskCompleteV85','Complete','Verified and current — reusable across assignments.',t.complete.map(c=>taskRow('✓ '+c.name,`${cat(c)}${credExpiry(c)?' · expires '+fd(credExpiry(c)):''} · ${ec(verificationBadge(c).text)}`,`<button class="mini details" data-id="${c.id}">View</button>`)),'No completed items yet.',false)
+ ].join('');
+}
+/* ---- Clinician dashboard (handoff §37) ---- */
+function renderHomeDashboard(){
+ if(!$('homeReadyV85'))return;
+ const elig=eligibleAssignments(),rs=elig.map(a=>({a,r:v81Assignment(a)})),ready=rs.filter(x=>x.r.ready).length,auth=practiceAuthorization(),live=creds.filter(isCurrentVerified);
+ $('homeReadyV85').innerHTML=`<div class="big-v85">${ready}<span>/${rs.length}</span></div><div class="small">opportunities you could submit to today (${ec(specialtyShort(DEMO_PROFILE.specialty))} specialty)</div>
+<ul class="kv-v85"><li><b>${live.length}</b> verified credentials reusable across assignments</li><li>Authorized to practice in <b>${auth.size}</b> US jurisdictions</li><li>Passport readiness <b>${v7Readiness()}%</b> of your onboarding baseline</li></ul>`;
+ const pursued=pursuedAssignmentIds(),shares=loadShares();
+ $('homeAssignV85').innerHTML=rs.sort((x,y)=>(pursued.has(y.a.id)-pursued.has(x.a.id))||x.a.start.localeCompare(y.a.start)).map(({a,r})=>{const sh=shares.filter(s=>s.assignmentId===a.id).reverse()[0],st=sh?shareStatus(sh):null;
+  return`<div class="home-assign-v85"><div><b>${ec(a.name)}</b>${pursued.has(a.id)?' <span class="chip">pursuing</span>':''}<div class="small">${ec(organization(a.orgId)?.name||'')} · ${a.start} → ${a.end}</div><div class="small">${st?`Passport access: <b>${st}</b>`:'Passport not shared'}</div></div><span class="badge ${r.ready?'READY':'PENDING'}">${r.ok}/${r.total}${r.ready?' READY':''}</span></div>`}).join('')+`<button class="sec mini" onclick="showV7View('opportunitiesView')" style="margin-top:8px">All opportunities</button>`;
+ const att=clinicianAttention();
+ $('homeAttnV85').innerHTML=att.length?att.slice(0,8).map(x=>`<div class="attn-v85"><span class="attn-ic-v85">${x.icon}</span><div><b>${ec(x.text)}</b><div class="small">${ec(x.sub)}</div></div>${x.action?`<button class="mini" onclick="${x.action.fn}">${x.action.label}</button>`:''}</div>`).join('')+(att.length>8?`<div class="small">+${att.length-8} more in the Task Center</div>`:''):'<div class="small">Nothing needs your attention. 🎉</div>';
 }

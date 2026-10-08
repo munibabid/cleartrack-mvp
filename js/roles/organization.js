@@ -16,9 +16,11 @@ function v81RenderOrganization(x){
  const rows=[{name:`${DEMO_PROFILE.name}, ${DEMO_PROFILE.credentials}`,specialty:DEMO_PROFILE.specialty,ok:b.ok,total:b.total,live:true,status:b.ready?'Assignment Ready':`Missing ${b.missing.length}`},...DEMO_CANDIDATES];
  const am=assignmentMetrics(featured.id,ev);
  const set=(id,v)=>{if($(id))$(id).textContent=v};
- set('orgReadyV81',rows.filter(r=>r.ok===r.total).length);
- set('orgMissingOneV81',rows.filter(r=>r.total-r.ok===1).length);
- set('orgAwaitV81',pending.length);set('orgExpV81',exp);set('orgMedV81',v81Fmt(med));
+ const om=orgMetrics(orgViewAs);
+ set('orgReadyV81',om.ready);set('orgMissingOneV81',om.missingOne);
+ set('orgAwaitV81',pending.length);set('orgExpV81',om.expiring);set('orgAccessActiveV85',om.accessActive);set('orgMedV81',v81Fmt(med));
+ if($('orgMetricsNoteV85'))$('orgMetricsNoteV85').textContent=`${organization(orgViewAs)?.name}: ${om.pairs} candidate × opportunity pairs across ${om.assignments} opportunities, computed live for Alex (live Passport) and the demo nurses; static comparison rows excluded. Median verification and reuse come from the event log. DEMO DATA.`;
+ renderOrgAttention(om);renderOrgActivity();
  set('orgReuseV81',am?fmtPct(am.reuseRate):'—');
  set('orgFeaturedTitleV82',`${featured.name} · ${jurisdictionName(featured.jurisdiction)} · ${featured.start} → ${featured.end}`);
  renderOrgAccess();
@@ -141,4 +143,25 @@ function renderCustomAssignments(){
  if(!$('abCustomV84'))return;const list=getAssignments().filter(a=>a.custom);
  $('abCustomV84').innerHTML=list.length?`<div style="font-weight:800;margin-bottom:6px">Published in this browser</div>`+list.map(a=>`<div class="row-v81"><div><b>${ec(a.name)}</b><div class="small">${ec(organization(a.orgId)?.name||'')} · ${ec(a.templateName)} · ${ec(a.jurisdiction)} · ${a.start} → ${a.end}</div></div><button class="mini abRemove" data-id="${a.id}">Remove</button></div>`).join(''):'';
  document.querySelectorAll('.abRemove').forEach(b=>b.onclick=()=>{saveCustomAssignments(loadCustomAssignments().filter(x=>x.id!==b.dataset.id));v81RenderRoles()});
+}
+
+/* ---- Organization dashboard metrics + sections (handoff §40) ---- */
+function orgMetrics(orgId){
+ const as=getAssignments().filter(a=>a.orgId===orgId),pairs=[];
+ as.forEach(a=>DEMO_NURSES.forEach(n=>{const r=v81Assignment(a,n);if(r.eligible)pairs.push({a,n,r})}));
+ const expiring=[];DEMO_NURSES.forEach(n=>nurseCreds(n).forEach(c=>{const d=daysUntil(credExpiry(c));if(isVerifiedActive(c)&&d!=null&&d>=0&&d<=90)expiring.push({n,c,d})}));
+ return{assignments:as.length,pairs:pairs.length,pairList:pairs,ready:pairs.filter(p=>p.r.ready).length,missingOne:pairs.filter(p=>p.r.total-p.r.ok===1).length,expiring:expiring.length,expiringList:expiring,accessActive:orgShares(orgId).filter(x=>shareStatus(x)==='ACTIVE').length};
+}
+function renderOrgAttention(om){
+ if(!$('orgAttnV85'))return;const out=[];
+ om.pairList.filter(p=>!p.r.ready).sort((x,y)=>(x.r.total-x.r.ok)-(y.r.total-y.r.ok)).forEach(p=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">${p.r.total-p.r.ok===1?'◔':'○'}</span><div><b>${ec(p.n.name)} · ${ec(p.a.name)}</b>${p.n.live?'':' <span class="demo-tag-v81">DEMO NURSE</span>'}<div class="small">${p.r.ok}/${p.r.total} · ${ec(p.r.missing.join(', '))}</div></div></div>`));
+ om.expiringList.forEach(x=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⏰</span><div><b>${ec(x.n.name)}: ${ec(x.c.name)}</b><div class="small">expires in ${x.d} days (${fd(credExpiry(x.c))})</div></div></div>`));
+ loadShareRequests().filter(r=>r.orgId===orgViewAs&&r.status==='PENDING').forEach(r=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⇆</span><div><b>Extension request pending</b><div class="small">${ec(r.assignmentName)} · through ${fd(r.requestedUntil)} · awaiting clinician</div></div></div>`));
+ orgShares(orgViewAs).filter(x=>shareStatus(x)==='EXPIRED').forEach(x=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⌛</span><div><b>Passport access expired · ${ec(x.assignmentName)}</b><div class="small">Request an extension from Shared Passports</div></div></div>`));
+ $('orgAttnV85').innerHTML=out.join('')||'<div class="small">Nothing needs attention for this organization.</div>';
+}
+function renderOrgActivity(){
+ if(!$('orgActivityV85'))return;const mine=new Set(getAssignments().filter(a=>a.orgId===orgViewAs).map(a=>a.id));
+ const ev=eventsSinceSeed().filter(e=>mine.has(e.assignment_id)&&/^(SHARE_|ASSIGNMENT_)/.test(e.event_type)).reverse().slice(0,8);
+ $('orgActivityV85').innerHTML=ev.map(e=>`<div class="activity-v83">${ec(activityText(e))}<div class="small">${ec(fmtDT(e.timestamp))} · ${ec(e.actor_type)}</div></div>`).join('')||'<div class="small">No activity for this organization yet.</div>';
 }

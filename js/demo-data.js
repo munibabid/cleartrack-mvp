@@ -6,7 +6,7 @@
    is not yet in effect, so the Arizona compact license is not honored there).
    Expiration dates are offsets (days) from the demo anchor, so they stay valid
    through every demo assignment. */
-const DEMO_SEED_VERSION='3';
+const DEMO_SEED_VERSION='4';
 const DEMO_SEED_VERSION_KEY='veridun_demo_seed_version';
 const DEMO_PROFILE={name:'Alex Morgan',credentials:'RN, BSN, CCRN',specialty:'ICU',homeState:'US-AZ'};
 /* [kind, jurisdiction, expiresInDays|null, requiredForOnboardingBaseline, extra]
@@ -14,7 +14,7 @@ const DEMO_PROFILE={name:'Alex Morgan',credentials:'RN, BSN, CCRN',specialty:'IC
 const DEMO_SEED=[
  ['RN_LICENSE_MULTISTATE','US-AZ',540,true],
  ['RN_LICENSE','US-CA',570,false],
- ['CERT_BLS','',400,true],['CERT_ACLS','',480,true],['CERT_NIHSS','',300,false],
+ ['CERT_BLS','',400,true],['CERT_ACLS','',480,true],['CERT_NIHSS','',75,false],['CERT_TNCC','',21,false],
  ['EMP_ICU_VERIFIED','',null,true,{name:'ICU Experience — 3 yrs, Employer Verified',years:3,lastWorkedDays:-21}],
  ['SKILLS_ICU','',365,true,{name:'ICU Skills Checklist — completed & attested'}],['REF_SPECIALTY','',365,true,{name:'ICU Specialty Reference Evaluation'}],
  ['COMP_CRRT','',365,false,{name:'CRRT Competency — employer validated'}],['COMP_VENTILATOR','',365,false,{name:'Ventilator Management Competency — employer validated'}],

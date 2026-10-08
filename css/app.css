@@ -115,3 +115,25 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 @media(max-width:620px){.layers-v84{grid-template-columns:1fr}.opp-nurse-v84 select{width:100%}}
 .proof-label-v84{font-size:11px;color:#94a3b8;font-weight:600;white-space:nowrap}
 .pass-badges-v84{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+
+/* PR 5: dashboards, task center, console */
+.dash-grid-v85{display:grid;grid-template-columns:1fr 1.2fr 1.4fr;gap:14px;margin:14px 0}
+.dash-grid-v85 .panel-v81{margin:0}
+.big-v85{font-size:44px;font-weight:900;line-height:1}.big-v85 span{font-size:20px;color:var(--m);font-weight:700}
+.kv-v85{list-style:none;padding:0;margin:10px 0 0;font-size:13px}.kv-v85 li{padding:4px 0;border-top:1px solid var(--b)}
+.home-assign-v85{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--b)}
+.attn-v85{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--b)}.attn-v85>div{flex:1;min-width:0}.attn-ic-v85{width:20px;text-align:center}
+.attn-v85:last-child,.home-assign-v85:last-of-type{border-bottom:0}
+.pass-summary-v85{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.pass-auth-v85{padding:0 16px 6px}
+.task-hint-v85{padding:0 16px 4px}.task-empty-v85{padding:6px 16px 12px}
+.metrics7-v85{grid-template-columns:repeat(7,minmax(0,1fr))}.metrics-note-v85{margin:-6px 0 12px}
+.alert-row-v85{padding:10px 0;border-bottom:1px solid var(--b)}.alert-row-v85:last-child{border-bottom:0}
+.sev-HIGH{background:#fee2e2;color:#991b1b}.sev-MEDIUM{background:#ffedd5;color:#9a3412}.sev-LOW{background:#eef2f7;color:#475569}
+@media(max-width:1100px){.dash-grid-v85{grid-template-columns:1fr 1fr}.metrics7-v85{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:620px){.dash-grid-v85{grid-template-columns:1fr}.metrics7-v85{grid-template-columns:1fr 1fr}}
+
+.exp-chip-v85{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;background:#fff4e0;color:#8a5a00;font-size:11px;font-weight:600}
+.metric-v81 small{display:block;color:var(--m);font-size:11px;margin-top:2px}
+.mini.pri{background:var(--p);color:#fff;border:1px solid var(--p)}
+.task-sec-v85 .task-item-v7{padding:12px 16px}.task-sec-v85 details>summary{padding:6px 16px 12px;cursor:pointer}
+@media(max-width:640px){.task-sec-v85 .task-item-v7{align-items:flex-start}.task-sec-v85 .task-item-v7 button{flex-shrink:0}}
