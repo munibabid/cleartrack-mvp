@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NurseCredX — Portable Healthcare Credentials</title>
+<title>NurseCredX v5 — Portable Healthcare Credentials</title>
 <script src="https://unpkg.com/xrpl/build/xrpl-latest-min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <style>
@@ -16,8 +16,10 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 @media(max-width:950px){.hero{grid-template-columns:1fr;gap:28px;padding:34px 22px}.hero h1{font-size:39px}.stats,.grid,.qrgrid,.onboard-summary{grid-template-columns:1fr 1fr}.cards,.business .cards{grid-template-columns:1fr 1fr}.app{grid-template-columns:1fr}.side{display:none}.main{padding:16px}.panel{overflow:auto}table{min-width:1050px}}
 @media(max-width:620px){.stats,.grid,.cards,.business .cards,.qrgrid,.onboard-summary{grid-template-columns:1fr}}
 </style>
+<meta name="robots" content="noindex">
 </head>
 <body>
+<div style="position:sticky;top:0;z-index:9999;background:#7c2d12;color:#fff;padding:9px 14px;font:600 13px/1.4 Arial,sans-serif;text-align:center">ARCHIVED PROTOTYPE (v5) — not the current app and not maintained. Data is stored under a separate archive key so it cannot overwrite the live demo. <a href="../" style="color:#fde68a">Open the current app →</a></div>
 
 <section id="public" class="public hidden"><div>
 <div class="brand" style="justify-content:center;margin-bottom:20px"><div class="mark">N</div>NurseCredX</div>
@@ -28,7 +30,7 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 
 <section id="landing">
 <div class="hero"><div>
-<div class="brand"><div class="mark">N</div>NurseCredX <span class="small">evolved from ClearTrack</span></div>
+<div class="brand"><div class="mark">N</div>NurseCredX <span class="small">v5 · evolved from ClearTrack</span></div>
 <h1>Upload once. Verify once. Reuse everywhere.</h1>
 <p>Portable, primary-source-verified professional credentials for instant healthcare onboarding. Nurses get one reusable professional identity; recruiters get current qualification data without chasing PDFs.</p>
 <span class="position">XRPL is the trust layer, not the user experience.</span>
@@ -36,7 +38,7 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 <div class="login"><h2 style="margin-top:0">Nurse login</h2><p class="small">No crypto workflow required. Wallet infrastructure stays in the background.</p><label>Email</label><input id="email" type="email" placeholder="you@example.com"><label>Password</label><input id="pw" type="password" placeholder="••••••••"><button id="loginBtn" class="pri" style="width:100%">Enter Demo</button><p class="small">Prototype login — any email/password works.</p></div></div>
 
 <div class="preview"><div class="center"><h2>One onboarding dashboard. Portable proof underneath.</h2><p class="small">Verification provenance tells an employer where a credential came from, when it was checked, how it was checked, who verified it, whether it is active, and when it was last monitored.</p></div>
-<div class="shell"><div class="bar"><span>NurseCredX — Example Dashboard</span><span>XRPL Devnet</span></div><div class="inside">
+<div class="shell"><div class="bar"><span>NurseCredX v5 — Example Dashboard</span><span>XRPL Devnet</span></div><div class="inside">
 <div class="top"><div><h2 style="margin:0">Travel RN Onboarding</h2><span class="small">Automatic newcomer requirements</span></div><span class="badge READY">ONBOARDING READY</span></div>
 <div class="stats"><div class="stat"><span>Requirements</span><b>12</b></div><div class="stat"><span>Primary Verified</span><b>10</b></div><div class="stat"><span>XRPL Accepted</span><b>5</b></div><div class="stat"><span>Passport Integrity</span><b>100%</b></div></div>
 <div class="grid"><div class="panel"><div class="ph">Licenses & Certifications</div><table><tr><td>California RN</td><td><span class="badge VERIFIED">VERIFIED</span></td><td><span class="badge ACCEPTED">XRPL ACCEPTED</span></td></tr><tr><td>BLS</td><td><span class="badge VERIFIED">VERIFIED</span></td><td><span class="badge ACCEPTED">XRPL ACCEPTED</span></td></tr><tr><td>ACLS</td><td><span class="badge VERIFIED">VERIFIED</span></td><td><span class="badge ACCEPTED">XRPL ACCEPTED</span></td></tr><tr><td>NIHSS</td><td><span class="badge VERIFIED">VERIFIED</span></td><td><span class="badge XRPLISSUED">XRPL ISSUED</span></td></tr></table></div>
@@ -47,7 +49,7 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Architected for license/certification status refreshes instead of static PDF snapshots.</p></div><div class="card"><h3>AI-ready verification</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">N</div>NurseCredX</div><nav><button class="active">▦ Dashboard</button><button id="sideOnboard">☑ Onboarding</button><button id="sidePass">▣ Passport</button><button>✓ Verification</button><button>⛓ XRPL Proofs</button><button>⚙ Settings</button></nav><div class="net"><b>XRPL Devnet</b><div id="walletInfo">Disposable demo wallets created only when issuing.</div></div></aside>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">N</div>NurseCredX <span class="small" style="color:#cbd5e1">v5</span></div><nav><button class="active">▦ Dashboard</button><button id="sideOnboard">☑ Onboarding</button><button id="sidePass">▣ Passport</button><button>✓ Verification</button><button>⛓ XRPL Proofs</button><button>⚙ Settings</button></nav><div class="net"><b>XRPL Devnet</b><div id="walletInfo">Disposable demo wallets created only when issuing.</div></div></aside>
 <main class="main"><div class="top"><div><h1>Your NurseCredX Dashboard</h1><p class="small">Primary-source verification and XRPL proof remain separate trust states.</p></div><div class="actions"><button id="onboardBtn" class="sec">☑ Onboarding</button><button id="passBtn" class="sec">▣ Passport</button><button id="logout" class="sec">Log out</button><button id="addBtn" class="pri">+ Add Credential</button></div></div>
 <div class="demo"><span><b>Demo flow:</b> automatic onboarding list → verify RN → issue XRPL credential → accept → open Passport → onboarding QR.</span><button id="resetDemo" class="sec">Reset Newcomer</button></div>
 <div class="stats"><div class="stat"><span>Onboarding Progress</span><b id="onboardPct">0%</b></div><div class="stat"><span>Primary Verified</span><b id="vcount">0</b></div><div class="stat"><span>XRPL Accepted</span><b id="acount">0</b></div><div class="stat"><span>Needs Action</span><b id="ncount">0</b></div></div>
@@ -68,7 +70,7 @@ dialog{border:0;border-radius:14px;padding:0;width:min(760px,94vw);box-shadow:0 
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
-const $=x=>document.getElementById(x),WS='wss://s.devnet.rippletest.net:51233/',EX='https://devnet.xrpl.org',SK='nursecredx_v2',WK='nursecredx_wallets_v2',AF=65536;
+const $=x=>document.getElementById(x),WS='wss://s.devnet.rippletest.net:51233/',EX='https://devnet.xrpl.org',SK='nursecredx_archive_v5',WK='nursecredx_archive_v5_wallets',AF=65536;
 let creds=[],filter='all',verifyId=null;
 const requirements=[
 ['California RN License','RN_CA_ACTIVE','Licenses & Certifications',true,false,'California BRN / Nursys','2028-04-30'],['BLS','CERT_BLS','Licenses & Certifications',true,false,'AHA / certification issuer','2027-11-12'],['ACLS','CERT_ACLS','Licenses & Certifications',true,false,'AHA / certification issuer','2027-02-18'],['NIHSS','CERT_NIHSS','Licenses & Certifications',true,false,'Certification issuer','2027-06-01'],['TB Screening','HEALTH_TB_CURRENT','Health & Immunizations',true,true,'Occupational health / lab','2027-09-01'],['Influenza Vaccine','HEALTH_FLU_CURRENT','Health & Immunizations',true,true,'Occupational health / provider','2027-09-30'],['Physical Exam','HEALTH_PHYSICAL_CURRENT','Health & Immunizations',true,true,'Occupational health provider','2027-08-15'],['N95 Fit Test','HEALTH_FIT_TEST','Health & Immunizations',true,true,'Occupational health / employer','2027-01-05'],['Drug Screen','SCREEN_DRUG_CURRENT','Screening & Employment',true,true,'Background screening vendor','2027-10-01'],['Background Check','SCREEN_BACKGROUND_CURRENT','Screening & Employment',true,true,'Background screening vendor','2027-10-01'],['ICU Experience','EMP_ICU_VERIFIED','Screening & Employment',true,false,'Employer / HR verification',''],['Clinical Hours','CLINICAL_HOURS_VERIFIED','Clinical Requirements',true,false,'School / employer verification',''],['Education Verification','EDU_BSN','Clinical Requirements',false,false,'School / registrar','']
