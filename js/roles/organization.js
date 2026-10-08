@@ -7,9 +7,9 @@ function v81RoleContext(){
  return{assignments,featured,b,ev,pending,med,exp};
 }
 function readinessItemHtml(i){
- const icon={MET:'✓',PENDING_VERIFICATION:'⏳',EXPIRES_BEFORE_END:'⚠',MISSING:'○'}[i.status];
+ const icon={MET:'✓',PENDING_VERIFICATION:'⏳',EXPIRES_BEFORE_END:'⚠',NOT_RECENT:'⚠',MISSING:'○'}[i.status];
  const sub=i.status==='MET'?i.basis:(i.note||'Missing');
- return`<li><b>${icon}</b> ${ec(i.label)} <span class="small">· ${ec(sub)}</span></li>`;
+ return`<li><b>${icon}</b> ${ec(i.label)}${i.layer?` <span class="layer-tag-v84 layer-${i.layer}">${LAYERS[i.layer]}</span>`:''} <span class="small">· ${ec(sub)}</span>${i.authority?`<div class="small auth-v84">Required by: ${ec(i.authority)}</div>`:''}</li>`;
 }
 function v81RenderOrganization(x){
  const{assignments,featured,b,ev,pending,med,exp}=x;
@@ -25,8 +25,8 @@ function v81RenderOrganization(x){
  if($('orgSummaryV81'))$('orgSummaryV81').innerHTML=rows.map(r=>`<div class="row-v81"><div><b>${ec(r.name)}</b><div class="small">${ec(r.specialty)} · ${ec(featured.name)}${r.live?'':' · <span class="demo-tag-v81">STATIC DEMO</span>'}</div>${r.live?`<div class="small">${passportAccessLine(orgViewAs)}</div>`:''}</div><div><b>${r.ok}/${r.total} Ready</b><div class="small">${r.live?(b.ready?'Assignment Ready':'Missing: '+ec(b.missing.join(', '))):ec(r.status)}</div></div></div>`).join('');
  if($('orgBostonV81'))$('orgBostonV81').innerHTML=`<div class="${b.ready?'good-v81':'alert-v81'}"><b>${b.ok}/${b.total} Requirements Satisfied${b.ready?' — ASSIGNMENT READY':''}</b><div style="margin-top:4px">${b.ready?'All mandatory requirements satisfied and current through the assignment end date.':'Missing: '+ec(b.missing.join(', '))}</div></div><ul class="req-list">${b.items.map(readinessItemHtml).join('')}</ul>`;
  if($('orgCandidatesBodyV81'))$('orgCandidatesBodyV81').innerHTML=`<table class="v81-table"><tr><th>Candidate</th><th>Specialty</th><th>${ec(featured.name)}</th><th>Status</th><th>Passport Access</th></tr>${rows.map(r=>`<tr><td>${ec(r.name)}</td><td>${ec(r.specialty)}</td><td>${r.ok}/${r.total}</td><td>${ec(r.status)}</td><td>${r.live?passportAccessLine(orgViewAs):'— (static demo)'}</td></tr>`).join('')}</table>`;
- if($('orgAssignmentsBodyV81'))$('orgAssignmentsBodyV81').innerHTML=assignments.map(a=>{const r=v81Assignment(a);return`<div class="row-v81" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${ec(a.name)}</b><div class="small">${ec(a.templateName)} · ${ec(jurisdictionName(a.jurisdiction))} (${ec(a.jurisdiction)}) · ${ec(nlcStatusLabel(a.jurisdiction))} · ${a.start} → ${a.end}</div></div><div><b>${r.ok}/${r.total}</b><div class="small">${r.ready?'Assignment Ready':r.missing.length+' missing'}</div></div></div><details><summary class="small">${ec(DEMO_PROFILE.name)} — requirement detail</summary><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul></details></div>`}).join('');
- if($('orgRequirementsBodyV81'))$('orgRequirementsBodyV81').innerHTML=REQUIREMENT_TEMPLATES.map(t=>`<div class="row-v81" style="display:block"><details><summary><b>${ec(t.name)}</b> <span class="small">· ${t.kinds.length+1} requirements · demo template</span></summary><ul class="req-list"><li>RN License authorizing practice in the assignment's state (single-state license there, or an NLC multistate license where the compact is in effect)</li>${t.kinds.map(k=>`<li>${ec(catalogKind(k)?.label||k)}${catalogPrivacy(k)==='PRIVATE'?' <span class="small">· private (status only)</span>':''}</li>`).join('')}</ul></details></div>`).join('');
+ if($('orgAssignmentsBodyV81'))$('orgAssignmentsBodyV81').innerHTML=assignments.map(orgAssignmentHtml).join('');
+ renderRequirementSets();
  const rt=am?.readinessMs;
  if($('orgAnalyticsBodyV81'))$('orgAnalyticsBodyV81').innerHTML=`<table class="v81-table">
 <tr><td>Credential reuse (${ec(featured.name)})</td><td><b>${am?`${fmtPct(am.reuseRate)} (${am.reused}/${am.total} from existing Passport)`:'—'}</b></td></tr>
@@ -76,3 +76,69 @@ function orgOpenShare(id){
 let extReqShareId=null;
 function orgOpenExtReq(id){const s=loadShares().find(x=>x.id===id);if(!s)return;extReqShareId=id;const a=getAssignment(s.assignmentId);$('extReqInfoV83').innerHTML=`${ec(s.orgName)} → ${ec(DEMO_PROFILE.name)} · ${ec(s.assignmentName)}<br>Current access expires ${ec(expiryText(s))}`;$('extReqDateV83').value=a?isoDay(addDays(endOfDay(a.end),28)):'';$('extReqReasonV83').value='';$('extReqDlgV83').showModal()}
 function orgSendExtReq(){const d=$('extReqDateV83').value;if(!d||endOfDay(d)<=new Date()){alert('Choose a future date.');return}requestShareExtension(extReqShareId,d,$('extReqReasonV83').value.trim());$('extReqDlgV83').close();v81RenderRoles()}
+
+/* ---- Layered requirement sets (org) ---- */
+function layerSummaryHtml(a,reqs){const c=layerCounts(reqs),w=(a.overrides?.waive||[]).length;return`<span class="layer-tag-v84 layer-STATE">State ${c.STATE}</span> <span class="layer-tag-v84 layer-WORK_TYPE">Work type ${c.WORK_TYPE}</span> <span class="layer-tag-v84 layer-SPECIALTY">Specialty ${c.SPECIALTY}</span> <span class="layer-tag-v84 layer-FACILITY">Facility +${c.FACILITY}${w?' / waived '+w:''}</span>`}
+function assignmentMetaHtml(a){const org=organization(a.orgId);return`<div class="small">${org?ec(org.name)+' · ':''}${ec(a.facility||'')}</div><div class="small">${ec(a.workTypeName)} · accepts <b>${ec(a.specialtyText)}</b> · ${ec(jurisdictionName(a.jurisdiction))} (${ec(a.jurisdiction)}) · ${ec(nlcStatusLabel(a.jurisdiction))} · ${a.start} → ${a.end}</div>${a.overrides?.note?`<div class="small">Facility override: ${ec(a.overrides.note)}</div>`:''}`}
+function nurseReadinessHtml(a,n){
+ const r=v81Assignment(a,n),who=`<b>${ec(n.name)}</b> <span class="small">· ${ec(specialtyShort(n.specialty))}${n.live?' · live Passport':''}</span>${n.live?'':' <span class="demo-tag-v81">DEMO NURSE</span>'}`;
+ if(!r.eligible)return`<div class="nurse-row-v84">${who} <span class="small">— specialty not accepted for this opportunity</span></div>`;
+ return`<details class="nurse-row-v84"><summary>${who} · ${ec(specialtyShort(n.specialty))} module · <b>${r.ok}/${r.total}</b> ${r.ready?'<span class="badge READY">READY</span>':'<span class="small">'+r.missing.length+' missing</span>'}</summary><div style="margin:6px 0">${layerSummaryHtml(a,r.reqs)}</div><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul></details>`;
+}
+function orgAssignmentHtml(a){return`<div class="row-v81" style="display:block"><div><b>${ec(a.name)}</b>${a.custom?' <span class="demo-tag-v81">BUILT IN THIS BROWSER</span>':''}${assignmentMetaHtml(a)}</div><div style="margin-top:8px">${DEMO_NURSES.map(n=>nurseReadinessHtml(a,n)).join('')}</div></div>`}
+function kindItem(k){return`<li>${ec(catalogKind(k)?.label||k)}${catalogPrivacy(k)==='PRIVATE'?' <span class="small">· private (status only)</span>':''}</li>`}
+function renderRequirementSets(){
+ if(!$('orgRequirementsBodyV81'))return;
+ const all=getAssignments(),ovr=all.filter(a=>(a.overrides?.add||[]).length||(a.overrides?.waive||[]).length);
+ $('orgRequirementsBodyV81').innerHTML=`<div class="layers-v84">
+<div class="layer-step-v84"><span class="layer-tag-v84 layer-STATE">1 · State</span><div class="small">RN authorization where the nurse will practice: a single-state license there, or an NLC multistate license where the compact is in effect. Authority: that state's board of nursing (${US_JURISDICTIONS.length} US jurisdictions).</div></div>
+<div class="layer-step-v84"><span class="layer-tag-v84 layer-WORK_TYPE">2 · Work type</span><div class="small">Base set for the kind of work (Travel, Strike, Rapid Response, Per-Diem).</div></div>
+<div class="layer-step-v84"><span class="layer-tag-v84 layer-SPECIALTY">3 · Specialty</span><div class="small">Module for the <b>nurse's own profile specialty</b>, applied only if the opportunity accepts it. The same opportunity can ask an ICU, ED and L&D nurse for different items.</div></div>
+<div class="layer-step-v84"><span class="layer-tag-v84 layer-FACILITY">4 · Facility</span><div class="small">Assignment or facility overrides that add or waive items.</div></div>
+<div class="layer-step-v84"><span class="layer-tag-v84">Dates</span><div class="small">Every item must stay current through the assignment end date.</div></div></div>
+<h4 class="sec-h-v84">Work-type base sets</h4>${WORK_TYPE_BASES.map(w=>`<div class="row-v81" style="display:block"><details><summary><b>${ec(w.name)}</b> <span class="small">· ${ec(w.summary)} · ${w.kinds.length} items · demo template</span></summary><ul class="req-list">${w.kinds.map(kindItem).join('')}</ul></details></div>`).join('')}
+<h4 class="sec-h-v84">Specialty modules</h4>${SPECIALTIES.map(sp=>`<div class="row-v81" style="display:block"><details><summary><b>${ec(sp.name)}</b> <span class="small">· ${(SPECIALTY_MODULES[sp.id]||[]).length} items · demo template · nurses: ${DEMO_NURSES.filter(n=>n.specialty===sp.id).map(n=>ec(n.name)).join(', ')||'—'}</span></summary><ul class="req-list">${(SPECIALTY_MODULES[sp.id]||[]).map(kindItem).join('')}</ul></details></div>`).join('')}
+<h4 class="sec-h-v84">Facility overrides</h4>${ovr.map(a=>`<div class="row-v81" style="display:block"><b>${ec(a.facility||a.name)}</b> <span class="small">· ${ec(a.name)}</span><ul class="req-list">${(a.overrides.add||[]).map(k=>`<li>+ ${ec(catalogKind(k)?.label||k)}</li>`).join('')}${(a.overrides.waive||[]).map(k=>`<li>− waived: ${ec(catalogKind(k)?.label||k)}</li>`).join('')}</ul>${a.overrides.note?`<div class="small">${ec(a.overrides.note)}</div>`:''}</div>`).join('')||'<div class="small">None.</div>'}`;
+ abInit();abPreview();renderCustomAssignments();
+}
+/* ---- Assignment builder ---- */
+const AB_EXCLUDE=new Set(['RN_LICENSE','RN_LICENSE_MULTISTATE','OTHER','EDU_ADN']);
+function chipHtml(cls,val,label,checked){return`<label class="chip-v84"><input type="checkbox" class="${cls}" value="${ec(val)}"${checked?' checked':''}> ${ec(label)}</label>`}
+function abInit(){
+ if(!$('abWorkTypeV84')||$('abWorkTypeV84').options.length)return;
+ $('abWorkTypeV84').innerHTML=WORK_TYPE_BASES.map(w=>`<option value="${w.id}">${ec(w.name)}</option>`).join('');$('abWorkTypeV84').value='STRIKE_RN';
+ $('abStateV84').innerHTML=US_JURISDICTIONS.map(j=>`<option value="${j.code}">${ec(j.name)} (${j.code}) · ${ec(nlcStatusLabel(j.code))}</option>`).join('');$('abStateV84').value='US-CA';
+ $('abStartV84').value=isoDay(addDays(demoAnchor(),30));
+ $('abSpecV84').innerHTML=SPECIALTIES.map(sp=>chipHtml('abSpec',sp.id,sp.name,sp.id!=='MEDSURG')).join('');
+ $('abAddV84').innerHTML=CREDENTIAL_CATALOG.filter(k=>!AB_EXCLUDE.has(k.kind)&&!k.kind.startsWith('QUAL_')).map(k=>chipHtml('abAdd',k.kind,k.short||k.label,false)).join('');
+ abFillWaive();
+ ['abNameV84','abFacilityV84','abStartV84','abWeeksV84','abNoteV84'].forEach(id=>$(id).oninput=abPreview);
+ $('abStateV84').onchange=abPreview;$('abWorkTypeV84').onchange=()=>{abFillWaive();abPreview()};
+ $('abSpecV84').onchange=abPreview;$('abAddV84').onchange=abPreview;$('abWaiveV84').onchange=abPreview;
+ $('abPublishV84').onclick=abPublish;
+}
+function abFillWaive(){const w=workTypeBase($('abWorkTypeV84').value);$('abWaiveV84').innerHTML=w.kinds.map(k=>chipHtml('abWaive',k,catalogKind(k)?.short||k,false)).join('')}
+const abChecked=cls=>[...document.querySelectorAll('.'+cls+':checked')].map(c=>c.value);
+function abDraft(){
+ const start=$('abStartV84').value,weeks=Math.max(1,Math.min(52,+$('abWeeksV84').value||13)),name=$('abNameV84').value.trim(),fac=$('abFacilityV84').value.trim();
+ const end=start?isoDay(addDays(new Date(start+'T12:00:00'),weeks*7)):'';
+ return{id:'custom-'+Date.now(),orgId:orgViewAs,name:name||'Untitled assignment',city:'',jurisdiction:$('abStateV84').value,workType:$('abWorkTypeV84').value,specialties:abChecked('abSpec'),facility:(fac||'Unnamed facility')+' (demo facility)',overrides:{add:abChecked('abAdd'),waive:abChecked('abWaive'),note:$('abNoteV84').value.trim()},start,end,weeks,custom:true};
+}
+function abPreview(){
+ if(!$('abPreviewV84'))return;const d=abDraft();
+ if(!d.specialties.length){$('abPreviewV84').innerHTML='<div class="alert-v81">Select at least one accepted specialty.</div>';return}
+ const a=finishAssignment(d,d.start,d.end);
+ $('abPreviewV84').innerHTML=`<div style="font-weight:800;margin-bottom:6px">Preview · ${ec(a.workTypeName)} · ${ec(jurisdictionName(a.jurisdiction))} · ${a.start||'—'} → ${a.end||'—'}</div>`+d.specialties.map(sp=>{const reqs=layeredRequirements(a,sp),ns=DEMO_NURSES.filter(n=>n.specialty===sp);
+  return`<details class="row-v81" style="display:block" open><summary><b>${ec(specialtyName(sp))} nurse</b> · ${reqs.length} requirements ${ns.map(n=>{const r=v81Assignment(a,n);return` · ${ec(n.name)} <b>${r.ok}/${r.total}</b>`}).join('')}</summary><div style="margin:6px 0">${layerSummaryHtml(a,reqs)}</div><ul class="req-list">${reqs.map(r=>`<li>${ec(requirementLabel(r))} <span class="layer-tag-v84 layer-${r.layer}">${LAYERS[r.layer]}</span><div class="small auth-v84">Required by: ${ec(r.authority)}</div></li>`).join('')}</ul></details>`}).join('');
+}
+function abPublish(){
+ const d=abDraft();if(!$('abNameV84').value.trim()){alert('Enter an assignment name.');return}if(!d.start){alert('Choose a start date.');return}if(!d.specialties.length){alert('Select at least one accepted specialty.');return}
+ const list=loadCustomAssignments();list.push(d);saveCustomAssignments(list);
+ v81Log('ASSIGNMENT_PUBLISHED',null,{assignment_id:d.id,actor_type:'ORGANIZATION',result:d.specialties.join('/'),detail:{name:d.name,org:organization(d.orgId)?.name,workType:d.workType,jurisdiction:d.jurisdiction,specialties:d.specialties,overrides:d.overrides}});
+ $('abNameV84').value='';v81RenderRoles();
+}
+function renderCustomAssignments(){
+ if(!$('abCustomV84'))return;const list=getAssignments().filter(a=>a.custom);
+ $('abCustomV84').innerHTML=list.length?`<div style="font-weight:800;margin-bottom:6px">Published in this browser</div>`+list.map(a=>`<div class="row-v81"><div><b>${ec(a.name)}</b><div class="small">${ec(organization(a.orgId)?.name||'')} · ${ec(a.templateName)} · ${ec(a.jurisdiction)} · ${a.start} → ${a.end}</div></div><button class="mini abRemove" data-id="${a.id}">Remove</button></div>`).join(''):'';
+ document.querySelectorAll('.abRemove').forEach(b=>b.onclick=()=>{saveCustomAssignments(loadCustomAssignments().filter(x=>x.id!==b.dataset.id));v81RenderRoles()});
+}

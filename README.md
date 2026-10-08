@@ -1,4 +1,4 @@
-# Veridun (NurseCredX demo): RN credential portability + assignment readiness
+# Veridun demo: RN credential portability + assignment readiness
 
 **Live demo:** https://munibabid.github.io/cleartrack-mvp/ (fork) · upstream: https://couragewolf666.github.io/cleartrack-mvp/
 
@@ -26,9 +26,21 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 - Clinician: Home (onboarding progress), Credential Requirements table, **Passport**, **Tasks**, **Opportunities** (readiness matching), **Share & Access**, Menu
 - **RN credential catalog** (`js/credential-catalog.js`): credential kinds, all US states, DC and territories (codes like `US-MA`), the board of nursing for each, NLC compact status, and per-kind privacy policy. Everything below reads from it; nothing is hardcoded to one state.
 - **Add Credential**: searchable dropdowns for credential type and jurisdiction. Classification, section and privacy are set automatically from the catalog (the old "required" and "off-chain" checkboxes are gone). The source document is always private. A new credential enters *Pending Verification* and appears in the Verification Console queue.
-- **Assignment readiness** (Clinician → Opportunities; Organization → Dashboard / Assignments): each assignment is a requirement template plus a jurisdiction. The engine checks every requirement against verified credentials that stay current through the assignment end date, and shows only the missing items as work. XRPL proof is not required.
+- **Layered requirement sets** (`js/requirements.js`): a nurse's requirements for an opportunity are built in layers, the way staffing agencies build them:
+  1. **State**: RN authorization where the nurse will practice. The authority is that state's board of nursing.
+  2. **Work type**: a base set for Travel RN, Strike RN, Rapid Response RN or Per-Diem RN.
+  3. **Specialty**: a module for the **nurse's own profile specialty** (ICU, ED, L&D or Med-Surg). It applies only if the opportunity accepts that specialty.
+  4. **Facility**: assignment or facility overrides that **add** or **waive** items.
+  5. **Dates**: every item has to stay current through the assignment end date.
+  Each requirement shows its layer and the authority that requires it ("Required by: …"). All templates are illustrative **demo templates**. They are not any real agency's or facility's requirements.
+- **Opportunities** = work type + state + dates + facility, plus the specialties accepted. The engine checks each requirement against verified credentials that stay current through the assignment end, and against experience recency (employer-verified specialty experience within 24 months of the start date). Only missing items show up as work. XRPL proof is not required.
+- **Demo nurses by specialty**: Opportunities has a "Viewing opportunities as" selector. **Alex Morgan (ICU)** is the live, editable Passport. **Jordan Rivera (ED)** and **Sam Okafor (L&D)** are read-only demo nurses, evaluated by the same engine. The same **Oakland Strike RN** opportunity asks each of them for a different specialty module: ICU gets ACLS, ICU experience, ICU skills checklist and specialty reference; ED gets ACLS, PALS, TNCC, ED experience, ED skills checklist and reference; L&D gets NRP, fetal monitoring, L&D experience, L&D skills checklist and reference. Opportunities that don't accept the nurse's specialty are listed as not shown.
+- **Clinical Qualifications** for experienced RNs: specialty skills checklists (completed and attested), competencies (CRRT, ventilator management), employer-verified specialty experience (for example "ICU Experience — 3 yrs, Employer Verified", with a last-worked date), and a specialty reference evaluation (private, so it's shared only as *Requirement Satisfied*). School clinical hours are not seeded or required. *Clinical education verification* is only an optional catalog item under Education.
+- **Organization → Requirement Sets** explains the layers and lists the work-type base sets, specialty modules and facility overrides. It also has an **Assignment Builder**: work type, state (all 56 US jurisdictions), dates, facility, accepted specialties, and add/waive overrides. A live preview shows the merged requirements per specialty with authority, plus each demo nurse's readiness. **Publish demo assignment** saves the assignment in this browser. It then appears in Organization → Assignments and in clinician Opportunities, and logs `ASSIGNMENT_PUBLISHED`.
+- **Organization → Assignments** shows every opportunity with per-nurse readiness. Each nurse is evaluated with their own specialty module, or marked "specialty not accepted".
+- **Verification first** (handoff §50): Passport and Home rows show verification status as the primary badge (*VERIFIED · DEMO*, *PENDING VERIFICATION*). The optional XRPL proof appears only as a quiet secondary label (*Proof: optional*, *Proof: on XRPL Devnet ✓*).
 - **NLC compact privilege**: an RN authorization requirement is met by a single-state license in that state, or by a multistate license from an NLC home state when that state honors the compact. In the demo, Alex's Arizona multistate license covers Texas but not Massachusetts, where the NLC is enacted but not yet in effect.
-- **Golden path**: Opportunities → Boston Travel ICU **11/12** → **COMPLETE MISSING REQUIREMENT** opens the form pre-filled with *RN License — single-state · Massachusetts (US-MA)* → Pending Verification → Verification Console simulated check → Boston **12/12 · ASSIGNMENT READY**.
+- **Golden path**: Opportunities → Boston Travel ICU **11/12** (Travel RN base 7 + ICU module 4 + Massachusetts license) → **COMPLETE MISSING REQUIREMENT** opens the form pre-filled with *RN License — single-state · Massachusetts (US-MA)* → Pending Verification → Verification Console simulated check → Boston **12/12 · ASSIGNMENT READY**.
 - **Assignment-scoped Passport sharing** (`js/sharing.js`): **SHARE PROFESSIONAL PASSPORT** picks an organization and one of its assignments, pre-selects only the assertions that assignment needs (health and screening items go out as *Requirement Satisfied* with no results, dates or documents), and shows a review before the nurse approves. Source documents are never shared. A share is a **live grant**: each time it's viewed, it shows the current state of the Passport, not a snapshot.
 - **Access durations**: One Time (single view), 24 Hours, 7 Days, 30 Days, Until Assignment Start, **Through Assignment End** (the recommended default, ending 11:59 PM local on the end date), Custom Date, and Until I Revoke Access. Every view is checked in one place (`accessShare`). Expired, used one-time, and revoked shares are refused, and a refused view is logged.
 - **Share & Access** page (clinician): Active, Pending Requests, Expired, Revoked and Activity, with View Details, Modify Access, Extend and Revoke Access. Before revoking, the nurse sees a confirmation that access ends immediately and that information the organization already viewed or saved is not erased.
@@ -45,8 +57,9 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 - Verification durations are real elapsed times within the demo (seconds), not real-world turnaround.
 
 ### Demo data
-- Alex Morgan (ICU RN, home state Arizona): 15 seed credentials pre-marked verified as `DEMO SEED (not a real verification)`, logged as a `DEMO_SEEDED` event. Expiration and assignment dates are offsets from the day the demo was seeded, so the demo never goes stale. Data saved by an older demo seed is replaced automatically.
-- Three assignments: Boston Travel ICU (US-MA), Houston Rapid Response ICU (US-TX, NLC) and California Strike ICU (US-CA). Four requirement templates.
+- Alex Morgan (ICU RN, home state Arizona): 18 seed credentials (seed version 3) pre-marked verified as `DEMO SEED (not a real verification)`, logged as a `DEMO_SEEDED` event. Expiration and assignment dates are offsets from the day the demo was seeded, so the demo never goes stale. Data saved by an older demo seed is replaced automatically.
+- Five opportunities across four fictional agencies (Northstar, Lone Star, Pacific Strike, Summit Per Diem) and fictional demo facilities: Boston Travel ICU (US-MA, ICU), Houston Rapid Response ICU (US-TX, NLC, ICU; facility adds a ventilator competency), Oakland Strike RN (US-CA; accepts ICU, ED and L&D), Phoenix Travel ED (US-AZ; facility waives the physical) and Denver Per-Diem L&D (US-CO; facility adds Hepatitis B).
+- Demo nurses Jordan Rivera (ED, Colorado multistate + California) and Sam Okafor (L&D, California only) have static, read-only credentials.
 - Comparison candidates Jamie Smith and Taylor Reed are static rows, labeled STATIC DEMO.
 - NLC status and board names are reference data as of 2026-10-08 (NCSBN NLC map, Nursys). They are not an authoritative licensure source.
 - The landing-page dashboard preview is an illustrative static example.
@@ -56,9 +69,10 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 - Cross-device sharing. **Demo limitation:** shares and extension requests live in the clinician's browser (`localStorage`), so a share link only opens in the browser that created it, and the organization view is the same browser in a different role. Production needs a backend that serves shares and enforces access on the server.
 - Older `?sharev7=` links are retired because they had no expiration or revocation. They now show a "no longer supported" notice.
 - Real authentication, back end, primary-source integrations, continuous monitoring and notifications
+- A profile editor (specialty is set per demo nurse) and editing the work-type base sets and specialty modules in the UI. The Assignment Builder composes the existing layers.
 
 ## Privacy notes (demo)
-- Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`, `veridun_shares`, `veridun_share_requests`, plus `veridun_demo_anchor` / `veridun_demo_seed_version`). Reset Demo clears shares and requests. on this site's origin.
+- Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`, `veridun_shares`, `veridun_share_requests`, `veridun_custom_assignments`, plus `veridun_demo_anchor` / `veridun_demo_seed_version`). Reset Demo clears shares, requests and published assignments. Storage keys keep their old `nursecredx_*` names so existing demo data still loads. on this site's origin.
 - XRPL **Devnet** wallet seeds are stored in `sessionStorage` (`nursecredx_wallets_v2`). They are disposable test-network wallets and are not suitable for production.
 - Private items (health, screening) are never sent to XRPL. Only minimal credential-type proofs are.
 - Passport QR links carry a readable (unsigned) base64 summary, including Devnet wallet addresses.
@@ -70,9 +84,9 @@ index.html                 markup only; loads css/ and js/ with plain <script> t
 css/app.css                all styles
 js/credential-model.js     shared state (creds), persistence, status/format helpers (load first)
 js/credential-catalog.js   RN credential catalog: kinds, US jurisdictions, issuers, NLC, privacy
-js/demo-data.js            demo profile, seed credentials, static candidates, seeding
-js/requirements.js         requirement templates + newcomer onboarding baseline
-js/assignments.js          assignment definitions (template + jurisdiction + dates)
+js/demo-data.js            demo profile, seed credentials, demo nurses (ED, L&D), static candidates, seeding
+js/requirements.js         layered requirement sets: work-type bases, specialty modules, layer merge + onboarding baseline
+js/assignments.js          organizations + opportunities (work type + state + dates + facility + accepted specialties), builder storage
 js/readiness-engine.js     assignment readiness (NLC-aware, full assignment duration)
 js/analytics.js            event log + event-derived metrics
 js/verification.js         simulated verification + provenance/proof dialog
