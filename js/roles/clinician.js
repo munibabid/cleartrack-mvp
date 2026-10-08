@@ -58,7 +58,7 @@ function openAddForm(pre={}){
  $('addContextV82').innerHTML=pre.context||'';$('addContextV82').classList.toggle('hidden',!pre.context);
  v81SyncAddForm();$('add').showModal();
 }
-function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','tp','dt','fl'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
+function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','dt','fl'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
 function v81SyncAddForm(){
  const k=resolveCatalogKind($('kindSearchV82').value);
  const needsJur=!!k?.jurisdiction,list=k?.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;
@@ -77,7 +77,7 @@ function addCredentialFromForm(){
  let jur='';
  if(k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS,j=resolveJurisdiction($('jurSearchV82').value,list);if(!j){alert(k.jurisdiction==='NLC_HOME'?'Choose your NLC home state from the list (only states that issue multistate licenses).':'Choose the license jurisdiction from the list (any US state or territory).');return}jur=j.code}
  const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur);if(!name){alert('Enter a credential name.');return}
- const type=k.kind==='OTHER'?($('tp').value.trim()||'OTHER'):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
+ const type=k.kind==='OTHER'?('CUSTOM_'+(($('nm').value||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL')):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
  const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:$('dt').value,file:f?f.name:'',prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
  const old=renewalTargetV85!=null?creds.find(x=>x.id===renewalTargetV85&&x.kind===c.kind&&(x.jurisdiction||'')===(jur||'')):null;if(old)c.renews=old.id;renewalTargetV85=null;
  creds.push(c);save();
