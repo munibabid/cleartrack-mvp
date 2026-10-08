@@ -255,3 +255,8 @@ select optgroup{font-weight:700}
 @media(max-width:620px){
  #profSpecV11,#acctSpecV10,#acctHomeV10,#acctKindV10,#acctJurV10,#acctReadyStateV11,#acctReadyWorkV11,#acctShareDurV10,#shareV7Duration,#prefLeadV11{font-size:16px;padding:12px;min-height:48px;width:100%}
 }
+
+.acct-verify-pick-v12{width:100%;text-align:left;background:#fff;border:1px solid var(--b);margin:0 0 8px;cursor:pointer}
+#acctMfaQrV12{display:block;background:#fff;border:1px solid var(--b);border-radius:12px;margin:8px 0}
+#acctMfaCodeV12,#acctMfaFirstV12{font-size:28px;letter-spacing:.2em;text-align:center}
+#acctMfaPromptV12{max-width:520px}

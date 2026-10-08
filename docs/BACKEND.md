@@ -6,7 +6,7 @@
 
 | Path | What it is |
 |---|---|
-| `backend/supabase/migrations/*.sql` | Postgres schema, row-level security (RLS), share-access functions, private storage bucket + policies. **5 migrations, all applied to staging** |
+| `backend/supabase/migrations/*.sql` | Postgres schema, row-level security (RLS), share-access functions, private storage bucket + policies. **6 migrations (PR 12 adds MFA step-up, issuer checks, and XRPL anchors), applied to staging** |
 | `backend/supabase/migrations/20261008000004_accounts_sync.sql` | PR 10: self-serve organizations (`create_organization`), assignment context on grants, `PENDING_VERIFICATION` in share assertions, append-only tables that still allow account deletion |
 | `backend/supabase/migrations/20261008000005_specialties_experience.sql` | PR 11: `specialties` reference table (64 RN specialties, read-only to clients), specialty ids validated by trigger, `clinicians.secondary_specialties` (max 5) + `preferences`, `requirements.min_months` / `is_preferred`, `kind` returned by share-assertion functions (for compact-license coverage) |
 | `backend/supabase/seed/01_reference.sql` | Jurisdictions (56), issuers, the RN credential catalog (36 kinds), verification sources, platform requirement templates. **Generated from `js/`.** Applied to staging |
@@ -126,7 +126,7 @@ node backend/tests/store-test.js
 node backend/scripts/generate-seed.js
 ```
 
-`db-test.js` creates and drops a database named `veridun_rls_test`. It loads the test shim, the 5 migrations and both seeds, and also checks that the seeds can be re-run.
+`db-test.js` creates and drops a database named `veridun_rls_test`. It loads the test shim, the migrations and both seeds, and also checks that the seeds can be re-run.
 
 ## Staging setup: done and left to do
 
@@ -164,10 +164,91 @@ Still to do:
 
 The magic-link email round trip can't be automated here (it needs a real inbox). `p10` checks the request (`/auth/v1/otp` with the right `redirect_to`, intercepted so no email is sent) and signs the test users in with passwords through the same adapter.
 
+
+## PR 12 — authenticator two-factor and XRPL anchors
+
+### Two-factor sign-in (TOTP)
+
+Supabase Auth MFA (`auth.mfa`: enroll, challenge, verify, listFactors, unenroll, getAuthenticatorAssuranceLevel). The user scans a QR code with Google Authenticator, Authy, or 1Password and confirms the first 6-digit code. After each email link, an enrolled user stays at AAL1 until they enter a code. The account does not load credentials, shares, or documents before that.
+
+The database enforces the same rule. `private.mfa_satisfied()` is true when the user has no verified TOTP factor, or the JWT claim `aal` is `aal2`. Restrictive RLS policies require it for:
+
+- reading, adding, changing, or deleting `credentials`
+- creating or extending `share_grants` (and inserting assertions)
+- reading or writing objects in the private `source-documents` bucket (this is what a 60-second signed URL checks)
+
+Users who have not enrolled keep working. Verifiers must have a verified factor **and** `aal2` before `record_verification()` or any verification-status change. Organization owners and admins need the same before they insert, update, or delete `organization_members` (the first membership, from `create_organization()`, is unchanged).
+
+TOTP is enabled in Supabase by default. No dashboard toggle was required for this project. If a future project has it off: Authentication → Multi-Factor → enable TOTP.
+
+**Recovery:** there are no backup codes and no SMS fallback. If the phone is lost, that person cannot finish sign-in. An admin removes the factor, then they sign in with the email link and enroll again. Do this only after you know it is the account owner.
+
+Dashboard: Authentication → Users → select the user → remove the authenticator factor.
+
+SQL (SQL editor or service role, never the browser key):
+
+```sql
+delete from auth.mfa_factors
+where user_id = (select id from auth.users where email = 'person@example.com')
+  and factor_type = 'totp';
+```
+
+### Issuer check
+
+`record_verification(credential, result, source name, reference, date)` is the only supported way to mark an account credential Verified or Failed. `FAILED` is stored as status `REJECTED`. The reference number stays in `credential_verifications.reference_code` and is never part of the ledger commitment. A clinician cannot call it, and a verifier cannot verify a credential on their own clinician profile. Both are enforced in the function and in `credentials_status_guard()`.
+
+The verifier opens the official lookup first. Confirmed public pages (October 2026), also stored on `verification_sources.lookup_url`:
+
+| Source | URL |
+|---|---|
+| Nursys QuickConfirm (RN licenses) | https://www.nursys.com/LQC/LQCTerms.aspx |
+| AHA eCard (BLS, ACLS, PALS). Letter codes: https://www.heart.org/RQIverify | https://ecards.heart.org/student/myecards?pid=ahaecard.employerStudentSearch |
+| American Red Cross digital certificate. hStream IDs: https://redcross.healthstream.com/ | https://www.redcross.org/take-a-class/digital-certificate |
+| AACN (CCRN, PCCN, CMC, CSC) | https://www.aacn.org/certification/verify-certification |
+| BCEN (CEN, CPEN, TCRN, CFRN, CTRN). The nurse requests the verification; there is no open search box. | https://bcen.org/verify-certification/ |
+| NCC (RNC-OB, RNC-MNN, RNC-NIC, RNC-LRN, C-EFM) | https://www.nccwebsite.org/verifications/request |
+
+Kinds without one of these pages do not get a made-up URL.
+
+Readiness uses the credential status only. An XRPL anchor never makes a requirement met.
+
+### XRPL anchor
+
+When a check is recorded, the database generates a 32-byte salt and SHA-256s a canonical text of credential id, kind, holder id, result, source name, check date, expiration, and salt. The salt stays in `verification_anchors`. The client anchors **only the 64-character hash**, in an `AccountSet` memo labeled `veridun.verification-anchor.v1`, on XRPL Testnet (Devnet if Testnet's faucet fails). `attach_verification_anchor` stores the transaction hash and ledger index.
+
+**Keys, staging:** each verifier's browser asks the Testnet faucet for a disposable wallet. The seed is kept in that tab's memory and dropped on sign-out. It is not in the repo, not in `js/config.js`, and not in the database.
+
+**Keys, production (not deployed here):** `backend/supabase/functions/anchor-verification` reads `XRPL_SEED` from a function secret and submits the same memo. Mainnet would be the same shape with a key in a KMS or HSM. Each anchor is one transaction; the fee is a fraction of one XRP. This function was not deployed: there is no Supabase access token in this environment.
+
+What Munib would run, from a machine logged into the Supabase CLI:
+
+```bash
+supabase login
+supabase link --project-ref kiwbasfbiarscalzhopy
+supabase secrets set XRPL_SEED='s...'   # a funded account seed, never commit it
+supabase functions deploy anchor-verification --project-ref kiwbasfbiarscalzhopy
+```
+
+Until that is deployed, the staging site keeps using the in-browser Testnet wallet.
+
+**Check on XRPL:** an organization with a live share calls `share_anchor_disclosure(grant)`. It returns the canonical fields plus the salt for SHAREABLE assertions only, and only while the grant is live. The browser recomputes the hash and reads the transaction from the public Testnet or Devnet endpoint. "Matches ledger" means the memo equals that hash. "Mismatch / altered" means a covered field changed after anchoring. Reference codes, names, and documents are not in the payload or the memo. The proof shows the record has not changed and which address anchored it. It does not prove the issuer check was true.
+
+**Activity log:** `prepare_activity_anchor`, `attach_activity_anchor`, and `check_activity_anchor` fingerprint the account's audit rows through a high-water id. The Activity tab has "Anchor activity log" and "Check log integrity". Newer events are reported as not yet included. The memo type is `veridun.activity-anchor.v1`.
+
+### Setting a verifier
+
+Roles are still server-side only. In the SQL editor:
+
+```sql
+update public.users set role = 'verifier' where email = 'person@example.com';
+```
+
+Then that person enrolls an authenticator (Security tab) before the Verify tab will record a check.
+
 ## Known limits
 
 - Account readiness: the demo's assignment-readiness engine, opportunities and dashboards still run on demo data only. Account credentials aren't scored against assignments yet.
-- No verifier workflow for accounts, so account credentials stay *Submitted · not verified*. That's correct for staging: nothing is presented as primary-source verified.
+- Account credentials stay *Submitted, not verified* until a user with the verifier role records an issuer lookup (PR 12). The staging site does not call issuer APIs; the verifier does the lookup and types the result.
 - Changes appear on another open device after **Refresh** (no Realtime yet).
 - Built-in Supabase email is rate-limited and only delivers to team addresses (see above).
 - Share links/codes are shown once and kept only in memory on the creating device. If one is lost, revoke it and create a new share.

@@ -19,7 +19,7 @@ async function acctDo(fn,okText){if(acctBusy)return;acctBusy=true;document.body.
 function acctRenderCard(){
  const a=acct(),card=$('acctCardV10');if(!card)return;card.classList.toggle('hidden',!a);if(!a)return;
  $('acctSignedOutV10').classList.toggle('hidden',a.signedIn);$('acctSignedInV10').classList.toggle('hidden',!a.signedIn);
- if(a.signedIn)$('acctEmailShownV10').textContent=a.email;
+ if(a.signedIn){$('acctEmailShownV10').textContent=a.email;if($('acctOpenV10'))$('acctOpenV10').textContent=a.needsMfaChallenge()?'Enter authenticator code':'Open my account'}
  if($('backendStatusTextV88'))$('backendStatusTextV88').textContent=store.backend.description+(store.backend.warning?' · config ignored: '+store.backend.warning:'');
 }
 function acctHideOthers(){['landing','app','public'].forEach(id=>$(id)&&$(id).classList.add('hidden'));['organizationWorkspace','verificationWorkspace'].forEach(id=>$(id)&&$(id).classList.remove('active'));document.body.classList.remove('role-clinician')}
@@ -27,14 +27,20 @@ function acctShow(tab){
  const a=acct();if(!a||!a.signedIn){v81RolePicker();acctMsg('Sign in first.','err');return}
  acctHideOthers();$('accountWorkspace').classList.add('active');if(tab)acctTab=tab;acctRenderAll();window.scrollTo(0,0);
 }
-function acctLeave(){$('accountWorkspace').classList.remove('active');v81RolePicker()}
+function acctLeave(){$('accountWorkspace').classList.remove('active');acctClearSensitive();v81RolePicker()}
+function acctClearSensitive(){['acctPassportV10','acctSharesV10','acctOrgV10','acctActivityV10','acctSecurityV12','acctVerifyV12'].forEach(id=>{const el=$(id);if(el)el.innerHTML=''})}
 function acctRenderAll(){
  acctRenderCard();const a=acct();if(!a||!$('accountWorkspace').classList.contains('active'))return;
  if(!a.signedIn){acctLeave();return}
  $('acctWsEmailV10').textContent=a.email;
+ const gate=$('acctMfaGateV12');
+ if(a.needsMfaChallenge()){acctMsg('');acctClearSensitive();document.querySelectorAll('.acctTab').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.acctPanel').forEach(p=>p.classList.add('hidden'));if(gate){gate.classList.remove('hidden');acctRenderMfaGate()}return}
+ if(gate)gate.classList.add('hidden');
+ const verifyTab=document.querySelector('.acctTab[data-target="acctVerifyV12"]');if(verifyTab)verifyTab.classList.toggle('hidden',a.cache.accountRole!=='verifier'&&a.cache.accountRole!=='admin');
+ if(acctTab==='acctVerifyV12'&&a.cache.accountRole!=='verifier'&&a.cache.accountRole!=='admin')acctTab='acctPassportV10';
  document.querySelectorAll('.acctTab').forEach(b=>b.classList.toggle('active',b.dataset.target===acctTab));
  document.querySelectorAll('.acctPanel').forEach(p=>p.classList.toggle('hidden',p.id!==acctTab));
- ({acctPassportV10:acctRenderPassport,acctSharesV10:acctRenderShares,acctOrgV10:acctRenderOrg,acctActivityV10:acctRenderActivity})[acctTab]();
+ ({acctPassportV10:acctRenderPassport,acctSharesV10:acctRenderShares,acctOrgV10:acctRenderOrg,acctActivityV10:acctRenderActivity,acctSecurityV12:acctRenderSecurity,acctVerifyV12:acctRenderVerify})[acctTab]?.();
 }
 
 /* ---------- Passport: profile + credentials ---------- */
@@ -57,7 +63,9 @@ function acctCredStatus(c){
  const text=ACCT_STATUS_TEXT[c.status]||c.status;
  const cls=c.status==='VERIFIED'?'VERIFIED':(c.status==='VERIFYING'||c.status==='UNVERIFIED')?'PENDING':'REVOKED';
  const lic=c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE';
- const sub=(c.status==='VERIFYING'||c.status==='UNVERIFIED')?(lic?`Not verified yet. A real check would use ${licensePrimarySource(c.kind,c.jurisdiction_code)}. No verifier is connected in staging.`:'Not checked with the issuer. No verifier is connected in staging.'):c.status==='VERIFIED'?'Verified by a Veridun verifier'+(c.verified_at?' on '+fd(c.verified_at.slice(0,10)):''):'';
+ const v=(acct().cache.verifications||[]).find(x=>x.credential_id===c.id);
+ const an=(acct().cache.anchors||[]).find(x=>x.credential_id===c.id);
+ const sub=(c.status==='VERIFYING'||c.status==='UNVERIFIED')?(lic?`Not verified yet. A real check uses ${licensePrimarySource(c.kind,c.jurisdiction_code)}.`:'Not checked with the issuer yet.'):c.status==='VERIFIED'?('Verified'+(v?.source_name?' via '+v.source_name:'')+(v?.checked_on?' on '+fd(v.checked_on):'')+(an?.tx_hash?' · XRPL anchor recorded (does not replace the issuer check)':' · issuer check recorded, ledger anchor pending')):c.status==='REJECTED'?'Issuer check did not confirm this credential':'';
  return{cls,text,sub};
 }
 function acctKindOptions(){
@@ -74,7 +82,7 @@ function acctRenderPassport(){
  <div class="panel-v81"><div class="ph"><span>My credentials (${creds.length})</span><button class="mini pri" type="button" data-act="toggle-add">+ Add credential</button></div><div class="pb">
  <div id="acctAddWrapV10" class="hidden">${acctAddForm()}</div>
  ${creds.length?`<div class="acct-list-v10">${creds.map(acctCredRow).join('')}</div>`:'<div class="empty"><b>No credentials yet.</b><div class="small">Add your RN license, certifications, skills checklists and employer verifications. They start as “Submitted · not verified”.</div></div>'}
- </div></div>${acctReadinessPanel(p)}`;
+ </div></div>${acctMfaNudge()}${acctReadinessPanel(p)}`;
  acctSyncAddForm();
 }
 /* Readiness check (PR 11): what an assignment in a given state would ask of
@@ -303,7 +311,8 @@ function acctOrgResultHtml(r){
  const s=r.share,who=s.clinicians?s.clinicians.full_name+(s.clinicians.post_nominals?', '+s.clinicians.post_nominals:''):'Clinician';
  return`<div class="acct-result-v10"><div class="notice"><b>${ec(who)}</b> shared with ${ec(s.organizations?.name||'your organization')}${s.assignment_label?' for '+ec(s.assignment_label):''}<div class="small">${ec(durationLabel(s.duration))} · ${s.expires_at?'expires '+ec(fmtDT(s.expires_at)):'until the clinician revokes'} · this view was logged · source documents: not shared</div></div>
  ${r.assertions.length?r.assertions.map(x=>{const[c,t]=ACCT_ASSERT_TEXT[x.status]||['PENDING',x.status];const det=x.mode==='REQUIREMENT_SATISFIED'?'Details private (health / screening / reference record)':[x.issuer,x.jurisdiction_code,x.expires_on?'expires '+fd(x.expires_on):'',(x.kind==='RN_LICENSE'||x.kind==='RN_LICENSE_MULTISTATE')&&x.jurisdiction_code?licenseCoverage(x.kind,x.jurisdiction_code).text+(x.status==='VERIFIED'?'':' (once verified)'):''].filter(Boolean).join(' · ');return`<div class="passrow"><div><b>${ec(x.label||x.requirement_label||'')}</b><div class="small">${ec(det)}${x.status==='PENDING_VERIFICATION'?' · submitted by the clinician, not yet checked with the issuer':''}</div></div><span class="badge ${c}">${ec(t)}</span></div>`}).join(''):'<div class="small">No items in this share.</div>'}
- <div class="small acct-note-v10">Staging: Veridun isn't connected to boards or issuers yet. Only items marked VERIFIED were checked by a Veridun verifier.</div></div>`;
+ <div class="small acct-note-v10">An item counts as verified only after a Veridun verifier records an issuer lookup. The XRPL anchor only shows that record has not changed since it was written. It does not make an unchecked credential real, and readiness does not use the ledger.</div>
+ ${r.assertions.some(x=>x.status==='VERIFIED')?`<div class="acct-row-v10"><button class="sec" type="button" data-act="xrpl-check" data-id="${s.id}" id="acctXrplCheckV12">Check on XRPL</button></div><div id="acctXrplResultV12" class="small"></div>`:''}</div>`;
 }
 async function acctOpenShare(input){acctOrgResult=await acct().openShare(input);acctOrgShares=null}
 
@@ -312,7 +321,10 @@ const ACCT_EVENT_TEXT={PROFILE_CREATED:'Profile created',PROFILE_UPDATED:'Profil
 function acctRenderActivity(){
  const a=acct(),ev=a.cache.events,el=$('acctActivityV10');
  el.innerHTML=`<div class="panel-v81"><div class="ph">Activity on my account (${ev.length})</div><div class="pb">${ev.length?ev.map(e=>`<div class="acct-event-v10"><span class="small mono">${ec(fmtDT(e.occurred_at))}</span> <b>${ec(acctEventText(e))}</b></div>`).join(''):'<div class="small">Nothing yet.</div>'}
- <div class="small acct-note-v10">Append-only log stored with your account. Organization views of your shares are recorded by the database, not by the organization's browser.</div></div></div>`;
+ <div class="acct-row-v10" style="margin-top:10px"><button class="sec" type="button" data-act="log-anchor" id="acctLogAnchorV12">Anchor activity log</button><button class="sec" type="button" data-act="log-check" id="acctLogCheckV12">Check log integrity</button></div>
+ <div id="acctLogResultV12" class="small"></div>
+ <div class="small acct-note-v10">Append-only log stored with your account. Anchoring writes only a fingerprint of the log to XRPL Testnet. It does not put names or credentials on the ledger. Organization views of your shares are recorded by the database, not by the organization's browser.</div></div></div>`;
+ if(typeof acctLogNoteV12==='string'&&acctLogNoteV12){const box=$('acctLogResultV12');if(box)box.textContent=acctLogNoteV12}
 }
 /* Plain words for the activity log: no raw codes like D7 or PENDING_VERIFICATION. */
 function acctPlain(v){return plainCode(v)}
@@ -340,7 +352,7 @@ function acctShareLinkView(token){
 function acctWire(){
  $('acctSignInFormV10').onsubmit=e=>{e.preventDefault();acctDo(async()=>{await acct().sendMagicLink($('acctEmailV10').value,acctRedirectUrl())},'Check your email for a sign-in link from Supabase, then open it on this device. You can request a link on each device you use.')};
  $('acctOpenV10').onclick=()=>acctShow();
- $('acctSignOutV10').onclick=$('acctWsSignOutV10').onclick=()=>acctDo(async()=>{await acct().signOut();acctOrgList=acctOrgShares=acctOrgResult=acctLastCreated=null;acctLeave()},'Signed out. Your account data was cleared from this device\'s memory.');
+ $('acctSignOutV10').onclick=$('acctWsSignOutV10').onclick=()=>acctDo(async()=>{await acct().signOut();if(typeof anchorClearWallet==='function')anchorClearWallet();acctOrgList=acctOrgShares=acctOrgResult=acctLastCreated=null;acctLanded=false;acctLeave()},'Signed out. Your account data was cleared from this device\'s memory.');
  $('acctBackV10').onclick=acctLeave;
  $('acctRefreshV10').onclick=()=>acctDo(async()=>{await acct().hydrate();acctOrgShares=null},'Up to date.');
  document.querySelectorAll('.acctTab').forEach(b=>b.onclick=()=>{acctTab=b.dataset.target;acctMsg('');if(acctTab==='acctOrgV10')acctOrgShares=null;acctRenderAll()});
@@ -388,7 +400,7 @@ function acctWire(){
 }
 async function acctBoot(){
  const a=acct();acctRenderCard();if(!a)return;acctWire();
- a.onChange(type=>{if(type==='signedOut'){acctOrgList=acctOrgShares=acctOrgResult=acctLastCreated=null}acctRenderAll();if(type==='signedIn')acctAfterSignIn()});
+ a.onChange(type=>{if(type==='signedOut'){acctOrgList=acctOrgShares=acctOrgResult=acctLastCreated=null;acctLanded=false;if(typeof anchorClearWallet==='function')anchorClearWallet()}acctRenderAll();if(type==='signedIn'||type==='mfaRequired')acctAfterSignIn()});
  const hash=new URLSearchParams(location.hash.slice(1)),cb=SupabaseAdapter.urlHasAuthCallback(location);acctCallbackLanding=cb&&!hash.get('error_description');
  if(hash.get('error_description')){acctMsg('Sign-in link problem: '+hash.get('error_description')+'. Request a new link.','err');history.replaceState(null,'',location.pathname+location.search)}
  if(!a.hasStoredSession()&&!(cb&&!hash.get('error_description')))return;
@@ -397,7 +409,9 @@ async function acctBoot(){
 }
 let acctLanded=false,acctCallbackLanding=false;
 function acctAfterSignIn(fromLink){
- const a=acct();acctRenderCard();if(acctLanded)return;acctLanded=true;
+ const a=acct();acctRenderCard();
+ if(a.needsMfaChallenge()){acctShow();return}
+ if(acctLanded)return;acctLanded=true;
  const pending=a.takePendingShare(),params=new URLSearchParams(location.search);
  if(params.get('share'))return;/* the share page is already open and will show the result */
  if(pending){$('landing').classList.add('hidden');$('public').classList.remove('hidden');acctShareLinkView(pending);return}
