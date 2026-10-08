@@ -184,3 +184,44 @@ dialog select,dialog input:not([type=checkbox]):not([type=radio]){max-width:100%
 .grid2-v83 label{display:block;margin-bottom:4px}.grid2-v83 select{width:100%;min-width:0}
 .grid2-v83>div{min-width:0}
 @media(max-width:620px){#tbl td.td-prov{display:block;text-align:left}#tbl td.td-prov::before{display:block;margin-bottom:2px}}
+
+/* ---- PR 10: your account (real sign-in, Supabase staging) ---- */
+.sr-only-v10{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.acct-card-v10{max-width:760px;margin:22px auto 0;background:#fff;border:2px solid #0f766e;border-radius:16px;padding:18px 20px;text-align:left;box-shadow:0 8px 24px rgba(15,118,110,.08)}
+.acct-card-head-v10 h3{margin:6px 0 4px;font-size:20px}
+.acct-tag-v10{display:inline-flex;align-items:center;border:1px solid #99f6e4;background:#f0fdfa;color:#115e59;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:850;letter-spacing:.04em;white-space:nowrap}
+.acct-tag-v10.subtle{padding:2px 6px}
+.acct-signin-v10{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.acct-signin-v10 input{flex:1 1 220px;min-width:0;padding:11px 12px;border:1px solid var(--b);border-radius:10px;font-size:16px}
+.acct-signin-v10 button{flex:0 0 auto}
+.acct-who-v10{margin:8px 0}
+.acct-actions-v10,.acct-row-v10{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.acct-msg-v10{min-height:1px;margin:6px 0}.acct-msg-v10:empty{margin:0}
+.acct-msg-v10.ok{color:#166534;font-weight:700}.acct-msg-v10.err{color:#b91c1c;font-weight:700}
+.phi-notice-v10{margin-top:12px;border:1px solid #fde68a;background:#fffbeb;color:#78350f;border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.45}
+.acct-ws-v10 .role-shell-v81{border-top:5px solid #0f766e}
+.acct-ws-actions-v10{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.acct-form-v10{display:grid;gap:10px;max-width:560px}
+.acct-form-v10 label{display:grid;gap:4px;font-weight:700;font-size:13px}
+.acct-form-v10 input,.acct-form-v10 select{padding:10px 11px;border:1px solid var(--b);border-radius:9px;font-size:16px;min-width:0;width:100%;font-weight:400;background:#fff}
+.acct-form-v10 .grid2-v83{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acct-fieldset-v10{border:1px solid var(--b);border-radius:10px;padding:8px 10px;margin:0;min-width:0}
+.acct-fieldset-v10 legend{font-weight:800;font-size:13px;padding:0 4px}
+.acct-note-v10{margin-top:8px;color:var(--m)}
+.acct-list-v10{display:grid;gap:0}
+.acct-item-v10{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--b)}
+.acct-item-v10:last-child{border-bottom:0}
+.acct-item-main-v10{min-width:0;flex:1}.acct-item-main-v10 .small{margin-top:3px;overflow-wrap:anywhere}
+.acct-item-side-v10{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:0 0 auto}
+.linkbtn-v10{background:none;border:0;padding:0;color:#0f766e;font-weight:800;text-decoration:underline;cursor:pointer;font-size:inherit}
+.acct-extend-v10{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.acct-extend-v10 select,.acct-extend-v10 input{padding:7px 8px;border:1px solid var(--b);border-radius:8px;min-width:0;font-size:16px}
+.acct-copy-v10{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.acct-copy-v10 code{flex:1 1 240px;min-width:0;overflow-wrap:anywhere;background:#f8fafc;border:1px solid var(--b);border-radius:8px;padding:8px;font-size:12px}
+.acct-created-v10{border-color:#0f766e}
+.acct-attn-v10{border-color:#f59e0b}
+.danger-v10{color:#b91c1c!important;border-color:#fecaca!important}
+.acct-result-v10{margin-top:12px}
+.acct-event-v10{padding:7px 0;border-bottom:1px solid var(--b)}
+body.acct-busy-v10 #accountWorkspace button,body.acct-busy-v10 #acctCardV10 button{opacity:.6;pointer-events:none}
+@media(max-width:620px){.acct-card-v10{margin:16px 12px 0;padding:14px}.acct-item-v10{flex-direction:column}.acct-item-side-v10{flex-direction:row;align-items:center;flex-wrap:wrap}.acct-form-v10 .grid2-v83{grid-template-columns:1fr}.acct-ws-actions-v10{justify-content:flex-start}}

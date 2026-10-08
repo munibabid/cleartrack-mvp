@@ -36,6 +36,17 @@
 </div>
 <div class="tour-cta-v86"><button class="sec startTourV86" id="startTourLandingV86">▶ Start Demo Tour</button><span class="small">Optional · about 75 seconds · walks the Boston golden path on fresh demo data</span></div>
 <div class="entry-demo-note" id="roleDemoNote"><b>Demo only:</b> this role picker is not real authentication. No account, password, or access control is involved. All data is demo data stored only in this browser, and credential verification is simulated.</div>
+<div class="acct-card-v10 hidden" id="acctCardV10" aria-labelledby="acctCardTitleV10">
+<div class="acct-card-head-v10"><span class="acct-tag-v10">YOUR ACCOUNT · STAGING</span><h3 id="acctCardTitleV10">Your own Passport, on every device</h3></div>
+<div id="acctSignedOutV10">
+<p class="small">Sign in to keep your real profile, credentials and live shares in your account and open them on your phone and laptop. This is separate from the demo above: demo data stays in this browser.</p>
+<form id="acctSignInFormV10" class="acct-signin-v10" novalidate><label class="sr-only-v10" for="acctEmailV10">Email address</label><input type="email" id="acctEmailV10" placeholder="you@example.com" autocomplete="email" inputmode="email" required><button class="pri" id="acctSendLinkV10" type="submit">Email me a sign-in link</button></form>
+</div>
+<div id="acctSignedInV10" class="hidden"><p class="acct-who-v10">Signed in as <b id="acctEmailShownV10"></b></p><div class="acct-actions-v10"><button class="pri" id="acctOpenV10" type="button">Open my account</button><button class="sec" id="acctSignOutV10" type="button">Sign out</button></div></div>
+<div class="small acct-msg-v10" id="acctMsgV10" role="status" aria-live="polite"></div>
+<div class="phi-notice-v10"><b>Staging backend, not for real PHI.</b> This is a pre-compliance test environment. Don't upload real health records, real license numbers, SSNs or other protected health information yet. Verification in Veridun is not connected to any board or issuer: account credentials show as <i>Submitted, not verified</i>.</div>
+</div>
+
 </div>
 <div class="preview"><div class="center"><h2>One onboarding dashboard. Portable proof underneath.</h2><p class="small">Verification provenance tells an employer where a credential came from, when it was checked, how it was checked, who verified it, whether it is active, and when it was last monitored. In this demo, verification is simulated.</p></div>
 <div class="shell"><div class="bar"><span>Illustrative example · static sample data</span><span>Credential Trust Layer</span></div><div class="inside">
@@ -49,7 +60,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v8.8 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v10.0 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -134,6 +145,19 @@
 </nav>
 
 
+<section id="accountWorkspace" class="role-workspace acct-ws-v10" aria-label="Your account">
+<div class="role-shell-v81">
+<div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Your account</span></div><h1>My account</h1><p>Signed in as <b id="acctWsEmailV10"></b>. Stored in your Veridun account (Supabase staging). Not demo data.</p></div>
+<div class="acct-ws-actions-v10"><span class="acct-tag-v10">YOUR ACCOUNT · STAGING</span> <button class="sec mini" id="acctRefreshV10" type="button">Refresh</button> <button class="sec mini" id="acctBackV10" type="button">Back to start</button> <button class="sec mini" id="acctWsSignOutV10" type="button">Sign out</button></div></div>
+<div class="phi-notice-v10" id="acctWsNoticeV10"><b>Pre-compliance staging backend: do not store real PHI yet.</b> Real health records need a HIPAA-eligible plan with a signed BAA, which this project doesn't have yet. Account data is kept in memory on this device and in the staging database, never in this browser's localStorage. Documents go to a private bucket and open only through 60-second signed links.</div>
+<div class="small acct-msg-v10" id="acctWsMsgV10" role="status" aria-live="polite"></div>
+<div class="role-tabs-v81"><button class="acctTab active" data-target="acctPassportV10" type="button">Passport</button><button class="acctTab" data-target="acctSharesV10" type="button">Shares</button><button class="acctTab" data-target="acctOrgV10" type="button">Organization</button><button class="acctTab" data-target="acctActivityV10" type="button">Activity</button></div>
+<div id="acctPassportV10" class="acctPanel"></div>
+<div id="acctSharesV10" class="acctPanel hidden"></div>
+<div id="acctOrgV10" class="acctPanel hidden"></div>
+<div id="acctActivityV10" class="acctPanel hidden"></div>
+</div>
+</section>
 <section id="organizationWorkspace" class="role-workspace">
 <div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Organization Demo</span></div><h1>Organization Dashboard</h1><p>Know who is ready before onboarding begins.</p><label class="small" for="orgViewAsV83" style="display:inline-block;margin-top:6px">Viewing as (demo): </label> <select id="orgViewAsV83" class="filter"></select></div><div><span class="demo-tag-v81">DEMO DATA</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
 <div class="role-tabs-v81"><button class="orgTab active" data-target="orgOverview">Dashboard</button><button class="orgTab" data-target="orgCandidates">Candidates</button><button class="orgTab" data-target="orgAssignments">Assignments</button><button class="orgTab" data-target="orgShares">Shared Passports</button><button class="orgTab" data-target="orgRequirements">Requirement Sets</button><button class="orgTab" data-target="orgAnalytics">Analytics</button></div>
@@ -257,5 +281,6 @@
 <script src="js/roles/verifier.js"></script>
 <script src="js/app.js"></script>
 <script src="js/tour.js"></script>
+<script src="js/account.js"></script>
 </body>
 </html>

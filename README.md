@@ -8,7 +8,7 @@ Veridun (formerly NurseCredX, which grew out of ClearTrack) is a **portable, con
 
 It is aimed at travel, rapid-response, strike, per-diem/agency and local-contract RNs. APRN, NP, CRNA, physician and PA credentialing are out of scope.
 
-> ⚠️ **This is a demo.** Verification is **simulated**, all data is demo data stored only in your browser, and the role picker is **not** real authentication. Nothing here is real primary-source verification.
+> ⚠️ **This is a demo plus a staging account backend.** In the demo, verification is **simulated**, all data is demo data stored only in your browser, and the role picker is **not** real authentication. **Your account** (email sign-in, since PR 10) stores your own data in a **pre-compliance Supabase staging project**: don't put real PHI or real health records in it yet. Nothing here is real primary-source verification.
 
 ## Run it
 
@@ -20,6 +20,19 @@ It is aimed at travel, rapid-response, strike, per-diem/agency and local-contrac
 **New here?** Click **▶ Start Demo Tour** on the entry screen (or Clinician → Home). It's optional and takes about 75 seconds: 11 steps through the Boston golden path on fresh demo data. Use **Next ▸** or **Auto-play** (7 s per step), and **✕** to exit at any time. The tour resets demo data first, and asks before doing so.
 
 Pick a workspace on the entry screen (Clinician, Organization, or Verification Console). **Switch Role** in each workspace returns you to the picker. **Reset Demo Data** (Clinician → Home) restores the starting demo state.
+
+## Your account (staging, PR 10)
+
+The entry screen has a **Your account · staging** card under the three demo workspaces.
+
+- **Sign in** with your email: Veridun emails a one-time sign-in link (Supabase Auth magic link). Open it on the device you requested it from. There's no password. Request a link on each device you use (phone, laptop).
+- **My Passport**: set up your clinician profile (name, credentials after your name, specialty, home state), then add credentials from the same RN catalog the demo uses. Optionally attach a source document (PDF/PNG/JPEG/DOC/DOCX, 10 MB max). It goes to a **private** storage bucket and opens only through a 60-second signed link. Everything you add starts as **Submitted · not verified**. No verifier or issuer is connected in staging, so nothing in an account is ever shown as verified unless a real Veridun verifier marks it server-side (the browser can't).
+- **Shares**: share chosen items with an organization for an assignment or purpose, with the same eight access lengths as the demo. You get a link and a code **once** (Veridun stores only a SHA-256 fingerprint). The share is live: the organization sees the current status, only while it's active. You see views and refused attempts, approve or decline extension requests, extend, or revoke. **Revoking is final** and takes effect on every device at once.
+- **Organization**: any signed-in user can create an organization (staging limit: 3) and becomes its owner. Members open a share by link or code, see only the items that clinician shared (private health/screening/reference items show only *Requirement satisfied*), and can **request** more time. They can't extend their own access, see documents, or read the credentials table.
+- **Activity**: an append-only log stored with your account. Organization views are recorded by the database itself.
+- **Sync**: data entered on one device shows up on another after sign-in (use **Refresh** on a device that's already open). Account data is held in memory on the device and in the database, **never in localStorage**. Only Supabase's sign-in session token is kept in the browser. Signing out clears it.
+- **Demo vs account**: the demo (Alex Morgan, the Boston tour, simulated verification) is unchanged and never leaves the browser, signed in or not. Account screens are labeled **YOUR ACCOUNT · STAGING**. Demo screens keep their DEMO labels.
+- **Not for real PHI yet.** Supabase supports HIPAA only on a paid plan with a signed BAA. Until then, use test data. Details are in [docs/BACKEND.md](docs/BACKEND.md).
 
 ## What is real, what is simulated
 
@@ -78,9 +91,9 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 
 ### Not built yet (future)
 - International jurisdictions
-- Cross-device sharing. **Demo limitation:** shares and extension requests live in the clinician's browser (`localStorage`), so a share link only opens in the browser that created it, and the organization view is the same browser in a different role. The server-side design (hashed share tokens, live-grant RLS, logged access RPCs) is in `backend/` and docs/BACKEND.md; it is not connected yet.
+- Cross-device sharing **in the demo**: demo shares live in the clinician's browser (`localStorage`), so a demo share link only opens in the browser that created it. **Account shares (PR 10) work across devices**: see *Your account* above.
 - Older `?sharev7=` links are retired because they had no expiration or revocation. They now show a "no longer supported" notice.
-- Real authentication, back end, primary-source integrations, continuous monitoring and notifications
+- Primary-source integrations, a real verifier workflow for accounts, continuous monitoring, notifications (email for extension requests and expirations), and moving the demo's readiness/opportunity views onto account data. Real sign-in and the staging back end shipped in PR 10.
 - A profile editor (specialty is set per demo nurse) and editing the work-type base sets and specialty modules in the UI. The Assignment Builder composes the existing layers.
 
 ## Acceptance checklist (handoff §52)
@@ -116,12 +129,19 @@ Each item is checked by the headless-Chrome suite `p6` (desktop 1280px + 390px; 
 | 25 | Existing features still work (Passport QR, provenance, optional XRPL proof, sharing) | ✅ | p2–p5 regressions |
 | 26 | Mobile usability (390px: no sideways scroll, card layouts, tap targets ≥28px, nav only in clinician) | ✅ | All workspaces |
 
-## Backend groundwork (not connected)
+## Backend (Supabase staging, connected in PR 10)
 
-`backend/` contains the Postgres/Supabase schema with row-level security, the share-access functions, a private source-document bucket, and seeds generated from the app's own data. The app reads and writes through `js/store.js`. The default `LocalStorageAdapter` keeps the demo browser-only, and the `SupabaseAdapter` stub is disabled unless `js/config.js` is configured. No live service is connected. See [docs/BACKEND.md](docs/BACKEND.md) for the architecture, security model, local test instructions and what's needed to go live.
+`backend/` contains the Postgres/Supabase schema with row-level security, the share-access functions, a private source-document bucket, and seeds generated from the app's own data. Migrations 1–4 and the reference seed are applied to Munib's staging project. The demo seed is not.
 
-## Privacy notes (demo)
+The app reads and writes through `js/store.js`:
+- `LocalStorageAdapter`: the demo, always browser-only.
+- `SupabaseAdapter`: your account. It uses only the publishable key plus your sign-in token, and RLS enforces access on every table.
+
+`supabase-js` 2.117.2 is vendored in `js/vendor/`, pinned with SRI. It's loaded only when you sign in or a saved session exists, so the signed-out demo sends nothing to Supabase. See [docs/BACKEND.md](docs/BACKEND.md) for the architecture, security model, tests, and what's left before real PHI.
+
+## Privacy notes
 - Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`, `veridun_shares`, `veridun_share_requests`, `veridun_custom_assignments`, plus `veridun_demo_anchor` / `veridun_demo_seed_version`). Reset Demo clears shares, requests and published assignments. Storage keys keep their old `nursecredx_*` names so existing demo data still loads. All of it stays on this site's origin.
+- **Account data (PR 10)** is never written to `localStorage`. It lives in memory and in the Supabase staging database. Source documents go straight to the private `source-documents` bucket under `<your user id>/…`. The only account item in browser storage is Supabase's session token (`sb-kiwbasfbiarscalzhopy-auth-token`). One more key, `veridun_pending_share_token`, holds a share token for the moment while you sign in from a share link, and is cleared right after.
 - XRPL **Devnet** wallet seeds are stored in `sessionStorage` (`nursecredx_wallets_v2`). They are disposable test-network wallets and are not suitable for production.
 - Private items (health, screening) are never sent to XRPL. Only minimal credential-type proofs are.
 - Passport QR links carry a readable (unsigned) base64 summary, including Devnet wallet addresses.
@@ -131,8 +151,8 @@ Each item is checked by the headless-Chrome suite `p6` (desktop 1280px + 390px; 
 ```
 index.html                 markup only; loads css/ and js/ with plain <script> tags
 css/app.css                all styles
-js/config.js               backend config (default: browser-only; see docs/BACKEND.md)
-js/store.js                data-access layer: LocalStorageAdapter (default) + SupabaseAdapter stub
+js/config.js               config: demo stays browser-only; accounts = Supabase staging URL + publishable key (public by design)
+js/store.js                data-access layer: LocalStorageAdapter (demo) + SupabaseAdapter (your account: auth, sync, shares, storage)
 js/credential-model.js     shared state (creds), persistence, status/format helpers (load first)
 js/credential-catalog.js   RN credential catalog: kinds, US jurisdictions, issuers, NLC, privacy
 js/demo-data.js            demo profile, seed credentials, demo nurses (ED, L&D), static candidates, seeding
@@ -149,12 +169,14 @@ js/roles/organization.js   organization workspace
 js/roles/verifier.js       Verification Console
 js/app.js                  role routing, event wiring, boot
 js/tour.js                 optional golden-demo guided tour (loads after app.js)
+js/account.js              Your account (PR 10): sign-in card, My Passport, Shares, Organization, Activity, ?share= links for account shares
+js/vendor/                 supabase-js 2.117.2 UMD build (MIT), pinned + SRI, loaded lazily
 archive/                   older single-file prototypes (see below)
-backend/                   Supabase groundwork: SQL migrations + RLS, generated seeds, DB/RLS + store tests (not connected)
+backend/                   Supabase: SQL migrations 1–4 + RLS, generated seeds, DB/RLS + store tests (applied to the staging project)
 docs/BACKEND.md            backend architecture, entity diagram, security model, go-live checklist
 ```
 
-The files are classic scripts that share the global scope, so load order matters (see `index.html`). Third-party libraries are pinned with Subresource Integrity: `xrpl@5.3.0` and `qrcode@1.5.1`.
+The files are classic scripts that share the global scope, so load order matters (see `index.html`). Third-party libraries are pinned with Subresource Integrity: `xrpl@5.3.0`, `qrcode@1.5.1`, and the vendored `@supabase/supabase-js@2.117.2`.
 
 ## Archive
 

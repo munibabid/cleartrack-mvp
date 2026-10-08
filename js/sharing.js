@@ -135,6 +135,7 @@ function refusalHtml(r){
 function publicShareView(token){
  $('landing').classList.add('hidden');$('app').classList.add('hidden');$('public').classList.remove('hidden');
  const r=accessShare(token,'ORGANIZATION');
+ if(!r.ok&&r.reason==='NOT_FOUND'&&store.account&&typeof acctShareLinkView==='function'){acctShareLinkView(token);return}
  if(!r.ok){$('pubStatus').innerHTML=refusalHtml(r);$('pubStatus').className='notice alert-v81';$('pubRows').innerHTML='';$('pubScore').textContent='—';$('pubOnboard').innerHTML='';return}
  const s=r.share;
  $('pubStatus').className='notice';$('pubStatus').innerHTML=`<b>Shared with ${ec(s.orgName)} for ${ec(s.assignmentName)}</b><div class="small" style="margin-top:4px">Access: ${ec(durationLabel(s.duration))} · expires ${ec(expiryText(s))} · this view is logged.</div>`;
