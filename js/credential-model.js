@@ -11,7 +11,7 @@ let creds=[],filter='all';
 const LEGACY_TYPE_KIND={RN_CA_ACTIVE:['RN_LICENSE','US-CA'],RN_MA_ACTIVE:['RN_LICENSE','US-MA'],RN_COMPACT_ACTIVE:['RN_LICENSE_MULTISTATE','']};
 function legacyKind(c){if(LEGACY_TYPE_KIND[c.type])return LEGACY_TYPE_KIND[c.type];if(c.type==='RN_LICENSE')return['RN_LICENSE',c.jurisdiction||''];if(catalogKind(c.type))return[c.type,''];const base=String(c.type||'').split(':')[0];if(catalogKind(base))return[base,String(c.type).split(':')[1]||''];return['OTHER','']}
 function v81Normalize(c){if(!c.kind){const[k,j]=legacyKind(c);c.kind=k;if(j&&!c.jurisdiction)c.jurisdiction=j}c.jurisdiction=normalizeJurisdictionCode(c.jurisdiction);if(c.jurisdiction==='NLC')c.jurisdiction='';c.privateOnly=catalogPrivacy(c.kind)==='PRIVATE';c.documentPrivacy='PRIVATE';c.uploaded=c.uploaded??!!c.file;c.official_expiration_date=c.official_expiration_date||c.expiration||'';c.recommended_refresh_date=c.recommended_refresh_date||'';c.verification_method=c.verification_method||c.prov?.method||'';c.last_verified_date=c.last_verified_date||(c.prov?.verifiedAt?c.prov.verifiedAt.slice(0,10):'');c.last_monitored_date=c.last_monitored_date||(c.prov?.lastMonitored?c.prov.lastMonitored.slice(0,10):'');return c}
-function save(){localStorage.setItem(SK,JSON.stringify(creds))}
+function save(){store.credentials.save(creds)}
 function ec(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function cls(s){return String(s).replaceAll(' ','')}
 function fd(d){return d?new Date(d+'T00:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'—'}

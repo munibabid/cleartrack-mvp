@@ -48,5 +48,6 @@ $('passBtn').onclick=openPass;
 $('toPass').onclick=()=>{$('proof').close();openPass()};
 $('onboardBtn').onclick=openOnboard;
 initAddForm();v81SyncAddForm();
+if($('backendStatusTextV88'))$('backendStatusTextV88').textContent=store.backend.description+(store.backend.warning?' · config ignored: '+store.backend.warning:'');
 initNewcomer();sweepExpiredShares();v81RenderRoles();let params=new URLSearchParams(location.search);if(params.get('share'))publicShareView(params.get('share'));else if(params.get('sharev7')&&location.hash){publicShareV7(location.hash.slice(1))}else if(params.get('passport'))publicView(params.get('passport'),false);else if(params.get('onboarding'))publicView(params.get('onboarding'),true);else render();
 });

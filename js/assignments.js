@@ -21,12 +21,12 @@ const ASSIGNMENT_DEFS=[
  {id:'denver-ld',orgId:'summit',name:'Denver Per-Diem L&D',city:'Denver',jurisdiction:'US-CO',workType:'PER_DIEM_RN',specialties:['LD'],facility:"Front Range Women's Hospital (demo facility)",overrides:{add:['HEALTH_HEPB'],note:'Facility policy: Hepatitis B immunity for all perinatal staff'},startInDays:14,weeks:12}
 ];
 const DEMO_ANCHOR_KEY='veridun_demo_anchor',CUSTOM_ASSIGNMENTS_KEY='veridun_custom_assignments';
-function demoAnchor(){const s=localStorage.getItem(DEMO_ANCHOR_KEY);return s?new Date(s+'T00:00:00'):new Date(new Date().toISOString().slice(0,10)+'T00:00:00')}
+function demoAnchor(){const s=store.meta.demoAnchor();return s?new Date(s+'T00:00:00'):new Date(new Date().toISOString().slice(0,10)+'T00:00:00')}
 function isoDay(d){return d.toISOString().slice(0,10)}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
 /* Assignments published from the org Assignment Builder (this browser only). */
-function loadCustomAssignments(){try{return JSON.parse(localStorage.getItem(CUSTOM_ASSIGNMENTS_KEY)||'[]')}catch{return[]}}
-function saveCustomAssignments(a){localStorage.setItem(CUSTOM_ASSIGNMENTS_KEY,JSON.stringify(a))}
+function loadCustomAssignments(){return store.customAssignments.load()}
+function saveCustomAssignments(a){store.customAssignments.save(a)}
 function finishAssignment(d,start,end){
  const wt=workTypeBase(d.workType),primary=assignmentAccepts(d,DEMO_PROFILE.specialty)?DEMO_PROFILE.specialty:(d.specialties||[])[0];
  return{...d,start,end,workTypeName:wt?.name||d.workType,specialtyText:(d.specialties||[]).map(specialtyShort).join(' · '),templateName:`${wt?.name||d.workType} · ${(d.specialties||[]).map(specialtyShort).join(' / ')}`,reqs:layeredRequirements(d,primary)};

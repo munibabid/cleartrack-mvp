@@ -32,10 +32,10 @@ const SHARE_DURATIONS=[
  {id:'UNTIL_REVOKED',label:'Until I Revoke Access'}
 ];
 function durationLabel(id){return SHARE_DURATIONS.find(d=>d.id===id)?.label.replace(' (recommended)','')||id}
-function loadShares(){try{return JSON.parse(localStorage.getItem(SHARES_KEY)||'[]')}catch{return[]}}
-function saveShares(a){localStorage.setItem(SHARES_KEY,JSON.stringify(a))}
-function loadShareRequests(){try{return JSON.parse(localStorage.getItem(SHARE_REQ_KEY)||'[]')}catch{return[]}}
-function saveShareRequests(a){localStorage.setItem(SHARE_REQ_KEY,JSON.stringify(a))}
+function loadShares(){return store.shares.load()}
+function saveShares(a){store.shares.save(a)}
+function loadShareRequests(){return store.shareRequests.load()}
+function saveShareRequests(a){store.shareRequests.save(a)}
 function endOfDay(iso){const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d,23,59,59)}
 function startOfDay(iso){const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d,0,0,0)}
 /* Expiration for a duration choice; null = no time limit (until revoked). */

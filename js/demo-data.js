@@ -54,11 +54,11 @@ function demoSeedCredentials(){
    the stored data predates the current demo seed version. Never called
    from rendering. */
 function initNewcomer(force=false){
- if(!force){try{creds=JSON.parse(localStorage.getItem(SK)||'[]')}catch{creds=[]}
-  if(creds.length&&localStorage.getItem(DEMO_SEED_VERSION_KEY)===DEMO_SEED_VERSION){creds=creds.map(v81Normalize);return}}
+ if(!force){creds=store.credentials.load();if(!Array.isArray(creds))creds=[];
+  if(creds.length&&store.meta.seedVersion()===DEMO_SEED_VERSION){creds=creds.map(v81Normalize);return}}
  const reason=force?'RESET':creds.length?'SEED_UPGRADE':'FIRST_RUN';
- localStorage.setItem(DEMO_ANCHOR_KEY,new Date().toISOString().slice(0,10));
- localStorage.removeItem('veridun_shares');localStorage.removeItem('veridun_share_requests');localStorage.removeItem('veridun_custom_assignments');
- creds=demoSeedCredentials();save();localStorage.setItem(DEMO_SEED_VERSION_KEY,DEMO_SEED_VERSION);
+ store.meta.setDemoAnchor(new Date().toISOString().slice(0,10));
+ store.clearDemoSharingAndBuilder();
+ creds=demoSeedCredentials();save();store.meta.setSeedVersion(DEMO_SEED_VERSION);
  v81Log('DEMO_SEEDED',null,{actor_type:'SYSTEM',result:`DEMO_SEED_${creds.length}_CREDENTIALS`,detail:{reason,version:DEMO_SEED_VERSION}});
 }

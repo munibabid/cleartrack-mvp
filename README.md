@@ -78,7 +78,7 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 
 ### Not built yet (future)
 - International jurisdictions
-- Cross-device sharing. **Demo limitation:** shares and extension requests live in the clinician's browser (`localStorage`), so a share link only opens in the browser that created it, and the organization view is the same browser in a different role. Production needs a backend that serves shares and enforces access on the server.
+- Cross-device sharing. **Demo limitation:** shares and extension requests live in the clinician's browser (`localStorage`), so a share link only opens in the browser that created it, and the organization view is the same browser in a different role. The server-side design (hashed share tokens, live-grant RLS, logged access RPCs) is in `backend/` and docs/BACKEND.md; it is not connected yet.
 - Older `?sharev7=` links are retired because they had no expiration or revocation. They now show a "no longer supported" notice.
 - Real authentication, back end, primary-source integrations, continuous monitoring and notifications
 - A profile editor (specialty is set per demo nurse) and editing the work-type base sets and specialty modules in the UI. The Assignment Builder composes the existing layers.
@@ -116,6 +116,10 @@ Each item is checked by the headless-Chrome suite `p6` (desktop 1280px + 390px; 
 | 25 | Existing features still work (Passport QR, provenance, optional XRPL proof, sharing) | ✅ | p2–p5 regressions |
 | 26 | Mobile usability (390px: no sideways scroll, card layouts, tap targets ≥28px, nav only in clinician) | ✅ | All workspaces |
 
+## Backend groundwork (not connected)
+
+`backend/` contains the Postgres/Supabase schema with row-level security, the share-access functions, a private source-document bucket, and seeds generated from the app's own data. The app reads and writes through `js/store.js`. The default `LocalStorageAdapter` keeps the demo browser-only, and the `SupabaseAdapter` stub is disabled unless `js/config.js` is configured. No live service is connected. See [docs/BACKEND.md](docs/BACKEND.md) for the architecture, security model, local test instructions and what's needed to go live.
+
 ## Privacy notes (demo)
 - Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`, `veridun_shares`, `veridun_share_requests`, `veridun_custom_assignments`, plus `veridun_demo_anchor` / `veridun_demo_seed_version`). Reset Demo clears shares, requests and published assignments. Storage keys keep their old `nursecredx_*` names so existing demo data still loads. All of it stays on this site's origin.
 - XRPL **Devnet** wallet seeds are stored in `sessionStorage` (`nursecredx_wallets_v2`). They are disposable test-network wallets and are not suitable for production.
@@ -127,6 +131,8 @@ Each item is checked by the headless-Chrome suite `p6` (desktop 1280px + 390px; 
 ```
 index.html                 markup only; loads css/ and js/ with plain <script> tags
 css/app.css                all styles
+js/config.js               backend config (default: browser-only; see docs/BACKEND.md)
+js/store.js                data-access layer: LocalStorageAdapter (default) + SupabaseAdapter stub
 js/credential-model.js     shared state (creds), persistence, status/format helpers (load first)
 js/credential-catalog.js   RN credential catalog: kinds, US jurisdictions, issuers, NLC, privacy
 js/demo-data.js            demo profile, seed credentials, demo nurses (ED, L&D), static candidates, seeding
@@ -144,6 +150,8 @@ js/roles/verifier.js       Verification Console
 js/app.js                  role routing, event wiring, boot
 js/tour.js                 optional golden-demo guided tour (loads after app.js)
 archive/                   older single-file prototypes (see below)
+backend/                   Supabase groundwork: SQL migrations + RLS, generated seeds, DB/RLS + store tests (not connected)
+docs/BACKEND.md            backend architecture, entity diagram, security model, go-live checklist
 ```
 
 The files are classic scripts that share the global scope, so load order matters (see `index.html`). Third-party libraries are pinned with Subresource Integrity: `xrpl@5.3.0` and `qrcode@1.5.1`.
