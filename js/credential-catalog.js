@@ -87,6 +87,84 @@ const US_JURISDICTIONS=[
    readiness:false — shown on the Passport as Additional Professional
                  Qualifications; never drives RN assignment readiness unless
                  an organization explicitly adds it to a requirement set. */
+/* Specialty certifications and courses (PR 11): real names and the bodies
+   that issue them, so specialty modules can require or prefer them.
+   Verification in the demo is always simulated; in accounts nothing is
+   verified until a real verifier checks it. */
+const SPECIALTY_CERT_KINDS=[
+ {kind:'CERT_ENPC',label:'ENPC — Emergency Nursing Pediatric Course',short:'ENPC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ENA',keywords:'pediatric emergency course'},
+ {kind:'CERT_STABLE',label:'S.T.A.B.L.E. Program (neonatal post-resuscitation / pre-transport)',short:'STABLE',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'The S.T.A.B.L.E. Program',keywords:'neonatal nicu stable'},
+ {kind:'CERT_ABLS',label:'ABLS — Advanced Burn Life Support',short:'ABLS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Burn Association',keywords:'burn'},
+ {kind:'CERT_ATCN',label:'ATCN — Advanced Trauma Care for Nurses',short:'ATCN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Society of Trauma Nurses',keywords:'trauma'},
+ {kind:'CERT_PCCN',label:'PCCN — Progressive Care Certified Nurse',short:'PCCN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AACN Certification Corporation',keywords:'progressive care step-down pcu'},
+ {kind:'CERT_CMC',label:'CMC — Cardiac Medicine Certification (specialty)',short:'CMC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AACN Certification Corporation',keywords:'cardiac medicine ccu'},
+ {kind:'CERT_CSC',label:'CSC — Cardiac Surgery Certification (specialty)',short:'CSC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AACN Certification Corporation',keywords:'cardiac surgery cvicu'},
+ {kind:'CERT_CPEN',label:'CPEN — Certified Pediatric Emergency Nurse',short:'CPEN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'BCEN',keywords:'pediatric emergency'},
+ {kind:'CERT_TCRN',label:'TCRN — Trauma Certified Registered Nurse',short:'TCRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'BCEN',keywords:'trauma'},
+ {kind:'CERT_CFRN',label:'CFRN — Certified Flight Registered Nurse',short:'CFRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'BCEN',keywords:'flight transport'},
+ {kind:'CERT_CTRN',label:'CTRN — Certified Transport Registered Nurse',short:'CTRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'BCEN',keywords:'ground transport'},
+ {kind:'CERT_CNRN',label:'CNRN — Certified Neuroscience Registered Nurse',short:'CNRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Board of Neuroscience Nursing (ABNN)',keywords:'neuro neuroscience'},
+ {kind:'CERT_SCRN',label:'SCRN — Stroke Certified Registered Nurse',short:'SCRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Board of Neuroscience Nursing (ABNN)',keywords:'stroke neuro'},
+ {kind:'CERT_CMSRN',label:'CMSRN — Certified Medical-Surgical Registered Nurse',short:'CMSRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Medical-Surgical Nursing Certification Board (MSNCB)',keywords:'med-surg medical surgical'},
+ {kind:'CERT_ONC_ORTHO',label:'ONC — Orthopaedic Nurse Certified',short:'ONC (Orthopaedic)',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Orthopaedic Nurses Certification Board (ONCB)',keywords:'orthopedic ortho'},
+ {kind:'CERT_CCTN',label:'CCTN — Certified Clinical Transplant Nurse',short:'CCTN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Board for Transplant Certification (ABTC)',keywords:'transplant'},
+ {kind:'CERT_CNOR',label:'CNOR — Certified Perioperative Nurse',short:'CNOR',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Competency & Credentialing Institute (CCI)',keywords:'operating room perioperative or'},
+ {kind:'CERT_CPAN',label:'CPAN — Certified Post Anesthesia Nurse',short:'CPAN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ABPANC',keywords:'pacu post anesthesia'},
+ {kind:'CERT_CAPA',label:'CAPA — Certified Ambulatory Perianesthesia Nurse',short:'CAPA',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ABPANC',keywords:'pre-op ambulatory perianesthesia'},
+ {kind:'CERT_RCIS',label:'RCIS — Registered Cardiovascular Invasive Specialist',short:'RCIS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Cardiovascular Credentialing International (CCI)',keywords:'cath lab invasive cardiology'},
+ {kind:'CERT_CEPS',label:'CEPS — Certified Electrophysiology Specialist',short:'CEPS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'International Board of Heart Rhythm Examiners (IBHRE)',keywords:'ep lab electrophysiology'},
+ {kind:'CERT_CRN_RAD',label:'CRN — Certified Radiology Nurse',short:'CRN (Radiology)',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Radiologic and Imaging Nursing Certification Board (RINCB)',keywords:'interventional radiology ir imaging'},
+ {kind:'CERT_CGRN',label:'CGRN — Certified Gastroenterology Registered Nurse',short:'CGRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Board of Certification for Gastroenterology Nurses (ABCGN)',keywords:'endoscopy gi'},
+ {kind:'CERT_RNC_OB',label:'RNC-OB — Inpatient Obstetric Nursing',short:'RNC-OB',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Certification Corporation (NCC)',keywords:'obstetric l&d labor'},
+ {kind:'CERT_C_EFM',label:'C-EFM — Electronic Fetal Monitoring',short:'C-EFM',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Certification Corporation (NCC)',keywords:'fetal monitoring efm'},
+ {kind:'CERT_RNC_MNN',label:'RNC-MNN — Maternal Newborn Nursing',short:'RNC-MNN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Certification Corporation (NCC)',keywords:'postpartum mother baby couplet'},
+ {kind:'CERT_RNC_NIC',label:'RNC-NIC — Neonatal Intensive Care Nursing',short:'RNC-NIC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Certification Corporation (NCC)',keywords:'nicu neonatal'},
+ {kind:'CERT_RNC_LRN',label:'RNC-LRN — Low Risk Neonatal Nursing',short:'RNC-LRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Certification Corporation (NCC)',keywords:'nursery neonatal low risk'},
+ {kind:'CERT_IBCLC',label:'IBCLC — International Board Certified Lactation Consultant',short:'IBCLC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'IBLCE',keywords:'lactation breastfeeding'},
+ {kind:'CERT_CPN',label:'CPN — Certified Pediatric Nurse',short:'CPN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Pediatric Nursing Certification Board (PNCB)',keywords:'pediatric peds'},
+ {kind:'CERT_CHEMO',label:'ONS/ONCC Chemotherapy Immunotherapy Certificate',short:'Chemo/Biotherapy',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Oncology Nursing Society (ONS)',keywords:'chemotherapy biotherapy immunotherapy chemo provider card oncology'},
+ {kind:'CERT_OCN',label:'OCN — Oncology Certified Nurse',short:'OCN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Oncology Nursing Certification Corporation (ONCC)',keywords:'oncology'},
+ {kind:'CERT_CPHON',label:'CPHON — Certified Pediatric Hematology Oncology Nurse',short:'CPHON',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Oncology Nursing Certification Corporation (ONCC)',keywords:'pediatric oncology hematology'},
+ {kind:'CERT_BMTCN',label:'BMTCN — Blood & Marrow Transplant Certified Nurse',short:'BMTCN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Oncology Nursing Certification Corporation (ONCC)',keywords:'bone marrow transplant bmt'},
+ {kind:'CERT_CRNI',label:'CRNI — Certified Registered Nurse Infusion',short:'CRNI',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Infusion Nurses Certification Corporation (INCC)',keywords:'infusion iv'},
+ {kind:'CERT_CNN',label:'CNN — Certified Nephrology Nurse',short:'CNN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Nephrology Nursing Certification Commission (NNCC)',keywords:'nephrology dialysis renal'},
+ {kind:'CERT_CDN',label:'CDN — Certified Dialysis Nurse',short:'CDN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Nephrology Nursing Certification Commission (NNCC)',keywords:'dialysis'},
+ {kind:'CERT_CRISIS_INTERVENTION',label:'Crisis intervention / de-escalation training (CPI Nonviolent Crisis Intervention, MAB or equivalent)',short:'CPI / MAB',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Crisis Prevention Institute (CPI) / MAB or equivalent provider',keywords:'cpi mab de-escalation behavioral psych crisis'},
+ {kind:'CERT_PMH_BC',label:'PMH-BC — Psychiatric-Mental Health Nursing board certification',short:'PMH-BC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ANCC',keywords:'psychiatric mental health psych'},
+ {kind:'CERT_CARN',label:'CARN — Certified Addictions Registered Nurse',short:'CARN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Addictions Nursing Certification Board (ANCB)',keywords:'addiction substance use detox'},
+ {kind:'CERT_COS_C',label:'COS-C — OASIS Specialist-Clinical',short:'COS-C',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'OASIS Certificate and Competency Board (OCCB)',keywords:'home health oasis'},
+ {kind:'CERT_CHPN',label:'CHPN — Certified Hospice and Palliative Nurse',short:'CHPN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Hospice and Palliative Credentialing Center (HPCC)',keywords:'hospice palliative'},
+ {kind:'CERT_GERO_BC',label:'GERO-BC — Gerontological Nursing board certification',short:'GERO-BC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ANCC',keywords:'gerontology geriatric long term care'},
+ {kind:'CERT_CRRN',label:'CRRN — Certified Rehabilitation Registered Nurse',short:'CRRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Rehabilitation Nursing Certification Board (RNCB)',keywords:'rehabilitation rehab'},
+ {kind:'CERT_AMB_BC',label:'AMB-BC — Ambulatory Care Nursing board certification',short:'AMB-BC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ANCC',keywords:'ambulatory clinic telehealth'},
+ {kind:'CERT_CCHP_RN',label:'CCHP-RN — Certified Correctional Health Professional, RN',short:'CCHP-RN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Commission on Correctional Health Care (NCCHC)',keywords:'correctional jail prison'},
+ {kind:'CERT_STATE_SCHOOL_NURSE',label:'State school nurse certificate (in states that require one)',short:'School Nurse Certificate',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'State department of education',keywords:'school nurse'},
+ {kind:'CERT_NCSN',label:'NCSN — Nationally Certified School Nurse',short:'NCSN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'National Board for Certification of School Nurses (NBCSN)',keywords:'school nurse'},
+ {kind:'CERT_COHN',label:'COHN — Certified Occupational Health Nurse',short:'COHN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Board for Occupational Health Nurses (ABOHN)',keywords:'occupational employee health'},
+ {kind:'CERT_CAOHC',label:'CAOHC Occupational Hearing Conservationist',short:'CAOHC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Council for Accreditation in Occupational Hearing Conservation (CAOHC)',keywords:'hearing audiometry occupational'},
+ {kind:'CERT_WOCN',label:'WOCNCB certification (CWOCN, CWCN, COCN or CCCN)',short:'Wound/Ostomy Certification',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Wound, Ostomy and Continence Nursing Certification Board (WOCNCB)',keywords:'wound ostomy continence cwocn cwcn'},
+ {kind:'CERT_VA_BC',label:'VA-BC — Vascular Access Board Certified',short:'VA-BC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Vascular Access Certification Corporation (VACC)',keywords:'vascular access picc iv team'},
+ {kind:'CERT_CDCES',label:'CDCES — Certified Diabetes Care and Education Specialist',short:'CDCES',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Certification Board for Diabetes Care and Education (CBDCE)',keywords:'diabetes educator cde'},
+ {kind:'CERT_SANE',label:'SANE-A / SANE-P — Sexual Assault Nurse Examiner',short:'SANE-A / SANE-P',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'International Association of Forensic Nurses (IAFN)',keywords:'forensic sexual assault'},
+ {kind:'CERT_CIC',label:'CIC — Certification in Infection Prevention and Control',short:'CIC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Certification Board of Infection Control and Epidemiology (CBIC)',keywords:'infection prevention control'},
+ {kind:'CERT_ACM_RN',label:'ACM-RN — Accredited Case Manager',short:'ACM-RN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'American Case Management Association (ACMA)',keywords:'case management utilization review'},
+ {kind:'CERT_CCM',label:'CCM — Certified Case Manager',short:'CCM',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Commission for Case Manager Certification (CCMC)',keywords:'case management'},
+ {kind:'CERT_NI_BC',label:'NI-BC — Informatics Nursing board certification',short:'NI-BC',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'ANCC',keywords:'informatics'}
+];
+/* Experience + skills-checklist kinds, generated for every specialty in
+   js/specialties.js. Plain wording (PR 11): "ICU experience: verified by an
+   employer, within the last 2 years". recencyMonths/minMonths are only the
+   defaults; each requirement (and each organization) can set its own. */
+function specialtyCredentialKinds(){
+ const w=SPECIALTY_EXPERIENCE_DEFAULT.windowMonths,m=SPECIALTY_EXPERIENCE_DEFAULT.minMonths;
+ return[
+  ...SPECIALTIES.map(s=>({kind:s.expKind,label:`${s.short} experience: verified by an employer, within the last ${monthsText(w)}`,short:`${s.short} Experience`,recencyMonths:w,minMonths:m,experience:true,specialty:s.id,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification',keywords:'experience employment verification '+s.keywords})),
+  ...SPECIALTIES.map(s=>({kind:s.skillsKind,label:`${s.short} Skills Checklist (completed, attested)`,short:`${s.short} Skills Checklist`,specialty:s.id,category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Clinician attestation · skills checklist',keywords:'skills checklist '+s.keywords}))
+ ];
+}
+/* Help text shown in Add Credential forms for experience kinds. */
+function experienceHelpText(kind){const k=catalogKind(kind);if(!k?.experience)return'';return`Recent means you worked in this specialty within the last ${k.recencyMonths} months. Verified means a current or past employer confirms your unit, role, and dates, through an HR employment verification letter, a manager reference, or a verification service.`}
+
 const CREDENTIAL_CATALOG=[
  {kind:'RN_LICENSE',label:'RN License — single-state',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'REQUIRED',source:'STATE_BOARD',keywords:'registered nurse license state board'},
  {kind:'RN_LICENSE_MULTISTATE',label:'RN License — multistate (NLC compact)',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'NLC_HOME',source:'STATE_BOARD',keywords:'compact nlc multistate home state'},
@@ -98,17 +176,13 @@ const CREDENTIAL_CATALOG=[
  {kind:'CERT_NRP',label:'NRP — Neonatal Resuscitation',short:'NRP',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AAP'},
  {kind:'CERT_CCRN',label:'CCRN — Critical Care RN certification',short:'CCRN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AACN Certification Corporation'},
  {kind:'CERT_CEN',label:'CEN — Certified Emergency Nurse',short:'CEN',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'BCEN'},
- {kind:'EMP_ICU_VERIFIED',label:'ICU Experience (employer verified, recent)',short:'ICU Experience',recencyMonths:24,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification'},
- {kind:'EMP_ED_VERIFIED',label:'ED Experience (employer verified, recent)',short:'ED Experience',recencyMonths:24,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification',keywords:'emergency department er'},
- {kind:'EMP_LD_VERIFIED',label:'Labor & Delivery Experience (employer verified, recent)',short:'L&D Experience',recencyMonths:24,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification',keywords:'l&d labor delivery ob obstetrics'},
- {kind:'EMP_MEDSURG_VERIFIED',label:'Med-Surg Experience (employer verified, recent)',short:'Med-Surg Experience',recencyMonths:24,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification',keywords:'medical surgical'},
- {kind:'CERT_FETAL_MONITORING',label:'Fetal Heart Monitoring certification',short:'Fetal Monitoring',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Fetal monitoring course provider',keywords:'efm fhm fetal heart monitoring l&d ob'},
- {kind:'SKILLS_ICU',label:'ICU Skills Checklist (completed, attested)',short:'ICU Skills Checklist',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Clinician attestation · skills checklist',keywords:'skills checklist critical care'},
- {kind:'SKILLS_ED',label:'ED Skills Checklist (completed, attested)',short:'ED Skills Checklist',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Clinician attestation · skills checklist',keywords:'skills checklist emergency er'},
- {kind:'SKILLS_LD',label:'L&D Skills Checklist (completed, attested)',short:'L&D Skills Checklist',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Clinician attestation · skills checklist',keywords:'skills checklist labor delivery ob'},
- {kind:'SKILLS_MEDSURG',label:'Med-Surg Skills Checklist (completed, attested)',short:'Med-Surg Skills Checklist',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Clinician attestation · skills checklist',keywords:'skills checklist medical surgical'},
+ {kind:'CERT_FETAL_MONITORING',label:'AWHONN Fetal Heart Monitoring course (Intermediate or Advanced)',short:'Fetal Monitoring',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AWHONN',keywords:'efm fhm fetal heart monitoring l&d ob awhonn'},
+ ...SPECIALTY_CERT_KINDS,
+ ...specialtyCredentialKinds(),
  {kind:'COMP_CRRT',label:'CRRT Competency (continuous renal replacement therapy)',short:'CRRT Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency dialysis renal'},
  {kind:'COMP_VENTILATOR',label:'Ventilator Management Competency',short:'Ventilator Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency vent mechanical ventilation'},
+ {kind:'COMP_DYSRHYTHMIA',label:'Dysrhythmia / EKG interpretation competency (employer validated)',short:'Dysrhythmia Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency ekg ecg rhythm telemetry'},
+ {kind:'COMP_MODERATE_SEDATION',label:'Moderate (procedural) sedation competency (employer validated)',short:'Moderate Sedation Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency conscious sedation procedural'},
  {kind:'REF_SPECIALTY',label:'Specialty Reference Evaluation (manager or charge nurse)',short:'Specialty Reference',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'PRIVATE',issuer:'Reference evaluation (specialty manager)',keywords:'reference evaluation manager charge nurse'},
  {kind:'EDU_BSN',label:'BSN — Bachelor of Science in Nursing',short:'BSN Education',category:'Education',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar'},
  {kind:'EDU_ADN',label:'ADN — Associate Degree in Nursing',short:'ADN Education',category:'Education',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar'},
@@ -120,6 +194,7 @@ const CREDENTIAL_CATALOG=[
  {kind:'HEALTH_FIT_TEST',label:'N95 Fit Test',short:'N95 Fit Test',category:'Employee Health',section:'Health & Immunizations',privacy:'PRIVATE',issuer:'Occupational health / employer'},
  {kind:'SCREEN_DRUG_CURRENT',label:'Drug Screen',short:'Drug Screen',category:'Background & Screening',section:'Screening & Employment',privacy:'PRIVATE',issuer:'Background screening vendor'},
  {kind:'SCREEN_BACKGROUND_CURRENT',label:'Background Check',short:'Background Check',category:'Background & Screening',section:'Screening & Employment',privacy:'PRIVATE',issuer:'Background screening vendor'},
+ {kind:'DOC_DRIVER_LICENSE_AUTO',label:"Driver's license and auto insurance (for home visits)",short:"Driver's License & Auto Insurance",category:'Background & Screening',section:'Screening & Employment',privacy:'PRIVATE',issuer:'State DMV / auto insurer',keywords:'driver license car insurance home visits'},
  {kind:'QUAL_MSN',label:'MSN — Master of Science in Nursing',short:'MSN',category:'Additional Professional Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar',readiness:false},
  {kind:'QUAL_DNP',label:'DNP — Doctor of Nursing Practice (education)',short:'DNP',category:'Additional Professional Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar',readiness:false},
  {kind:'QUAL_SPECIALTY_CERT',label:'Other specialty nursing certification',short:'Specialty Certification',category:'Additional Professional Qualifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'Certifying body',readiness:false},
@@ -149,6 +224,34 @@ function credentialDisplayName(kind,jur,fallback){const k=catalogKind(kind);if(k
 /* Machine-readable type (also used as the XRPL CredentialType). */
 function credentialTypeCode(kind,jur){return(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTATE')?`${kind}:${normalizeJurisdictionCode(jur)}`:kind}
 function issuerFor(kind,jur){if(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTATE')return jurisdiction(jur)?.issuer||'State board of nursing';return catalogKind(kind)?.issuer||'Issuer'}
+/* Home state + compact (NLC) helpers (PR 11). All derived from
+   US_JURISDICTIONS, never hardcoded per state. */
+function homeStateCompactText(code){
+ const j=jurisdiction(code);if(!j)return'Home state not set';
+ const others=US_JURISDICTIONS.filter(x=>x.code!==j.code&&nlcHonorsCompactIn(x.code)).length;
+ if(j.nlc==='IMPLEMENTED')return`${j.name} is a Nurse Licensure Compact state. An RN license issued here can be multistate: it lets you practice in ${j.name} and the ${others} other jurisdictions that honor compact licenses. Non-compact states (e.g. California, New York) still need their own license.`;
+ if(j.nlc==='PARTIAL')return`${j.name} honors compact licenses from other states but can't issue multistate licenses yet, so a license from ${j.name} covers ${j.name} only.`;
+ if(j.nlc==='PENDING')return`${j.name} has enacted the Nurse Licensure Compact but it isn't in effect yet: a license from ${j.name} covers ${j.name} only, and compact licenses from other states aren't honored there yet.`;
+ return`${j.name} isn't in the Nurse Licensure Compact: a license from ${j.name} covers ${j.name} only.`;
+}
+function homeStateIsCompact(code){return nlcCanIssueMultistate(code)}
+/* Primary source for verifying a license: Nursys + the issuing board. */
+function licensePrimarySource(kind,jur){const b=jurisdiction(jur)?.issuer||'the state board of nursing';return kind==='RN_LICENSE_MULTISTATE'?`Nursys / ${b} (home-state board)`:kind==='RN_LICENSE'?`${b} (or Nursys, where the board participates)`:issuerFor(kind,jur)}
+/* Inline hint about a license's state vs the nurse's home state. A multistate
+   license must be issued by the primary state of residence. */
+function licenseHomeStateHint(kind,jur,home){
+ const h=jurisdiction(home),j=jurisdiction(jur);if(!j)return'';
+ if(kind==='RN_LICENSE_MULTISTATE'&&h&&j.code!==h.code)return` · ⚠ A multistate license is issued only by your primary state of residence. Your home state is ${h.name}: check the state, or update your home state.`;
+ if(kind==='RN_LICENSE'&&h&&j.code===h.code&&nlcCanIssueMultistate(j.code))return` · ${j.name} is your home state and a compact state: if your license is multistate, choose “RN License — multistate (NLC compact)”.`;
+ return'';
+}
+/* Where a license authorizes practice, per the jurisdictions data. */
+function licenseCoverage(kind,jur){
+ const j=jurisdiction(jur);if(!j)return{codes:[],text:''};
+ if(kind==='RN_LICENSE_MULTISTATE'&&nlcCanIssueMultistate(j.code)){const codes=US_JURISDICTIONS.filter(x=>x.code===j.code||nlcHonorsCompactIn(x.code)).map(x=>x.code);return{codes,text:`Multistate (compact): ${j.name} + ${codes.length-1} other compact jurisdictions. Not valid in non-compact states.`}}
+ if(kind==='RN_LICENSE_MULTISTATE')return{codes:[j.code],text:`${j.name} can't issue multistate licenses (${nlcStatusLabel(j.code)}): covers ${j.name} only.`};
+ return{codes:[j.code],text:`Single-state: ${j.name} only.`};
+}
 function requirementLabel(r){if(r.kind===RN_AUTHORIZATION)return`${jurisdictionName(r.jurisdiction)} RN License`;return catalogKind(r.kind)?.short||catalogKind(r.kind)?.label||r.kind}
 /* Searchable-dropdown resolution: accepts the option label, the code, or a
    unique case-insensitive partial match. */

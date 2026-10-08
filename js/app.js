@@ -32,6 +32,7 @@ $('v7PassportShare2').onclick=()=>openShareDialog();
 $('v7PassportQR').onclick=openPass;
 document.querySelectorAll('.xsharev7').forEach(b=>b.onclick=()=>$('shareV7').close());
 $('generateV7Share').onclick=approveShare;
+$('shareQrDlV11').onclick=()=>downloadShareQr($('shareV7QR'),'veridun-share-qr.png');
 $('shareNewV83').onclick=()=>openShareDialog();
 $('shareOrgV83').onchange=()=>{fillShareAssignments();refreshShareOptions()};
 $('shareAssignV83').onchange=()=>refreshShareOptions();

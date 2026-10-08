@@ -50,6 +50,19 @@ function computeExpiry(duration,a,customDate,from=new Date()){
  }
  return null;
 }
+/* Warning text when access would end before the assignment does, else ''. */
+function shareCoverageGap(expires,assignmentEnd,duration){
+ if(!assignmentEnd||duration==='UNTIL_REVOKED'||expires==null)return'';
+ const exp=expires instanceof Date?expires:new Date(expires),end=endOfDay(assignmentEnd);
+ if(exp>=end)return'';const days=Math.ceil((end-exp)/864e5);
+ return`Access ends ${fmtDT(exp.toISOString())}, ${days} day${days===1?'':'s'} before the assignment ends (${fd(assignmentEnd)}). Choose “Through Assignment End” so the organization can see your Passport for the whole assignment.`;
+}
+/* QR code of a share link (vendored qrcode@1.5.1, no network). Encodes only the URL. */
+/* Plain words for stored codes in activity feeds (PR 11): D7 -> "7 days",
+   PENDING_VERIFICATION -> "Submitted, not verified". */
+function plainCode(v){const s=String(v??'');if(!s)return'';if(typeof SHARE_DURATIONS!=='undefined'&&SHARE_DURATIONS.some(d=>d.id===s))return durationLabel(s).toLowerCase();if(/^\d+\/\d+$/.test(s))return s+' requirements met';return({PENDING_VERIFICATION:'Submitted, not verified',PENDING:'Pending',VERIFIED:'Verified',VERIFYING:'Being verified',UNVERIFIED:'Not verified',NOT_CURRENT:'Not current',REQUIREMENT_SATISFIED:'Requirement satisfied',REVOKED:'Revoked',EXPIRED:'Expired',USED:'Already used',GRANTED:'Granted',ACTIVE:'Active',REFUSED_REVOKED:'Refused — revoked',REFUSED_EXPIRED:'Refused — expired',REFUSED_USED:'Refused — already used',SUCCEEDED:'Succeeded',FAILED:'Failed',CLINICIAN:'You',ORGANIZATION:'Organization',SYSTEM:'Veridun (system)',VERIFIER:'Verifier',ISSUER:'Issuer',DEMO:'Demo'})[s]||s.replace(/_/g,' ').toLowerCase().replace(/^./,c=>c.toUpperCase())}
+function drawShareQr(canvas,url){if(canvas&&window.QRCode&&url)QRCode.toCanvas(canvas,url,{width:220,margin:2,errorCorrectionLevel:'M'},()=>{})}
+function downloadShareQr(canvas,name){if(!canvas)return;const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download=name||'share-qr.png';document.body.appendChild(a);a.click();a.remove()}
 function fmtDT(iso){return iso?new Date(iso).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'—'}
 function expiryText(s){if(!s.expiresAt)return s.duration==='UNTIL_REVOKED'?'Until revoked':'—';return fmtDT(s.expiresAt)+(s.duration==='ONE_TIME'?' (single view)':'')}
 /* Status as of now — pure (no writes). */
@@ -68,7 +81,8 @@ function liveAssertion(x,s){
  const exp=credExpiry(c),cur=isVerifiedActive(c)&&(!exp||new Date(exp+'T23:59:59')>=new Date());
  const through=cur&&(!exp||!a||new Date(exp)>=new Date(a.end));
  if(x.mode==='REQUIREMENT_SATISFIED')return{...x,current:cur,status:cur?'REQUIREMENT SATISFIED':'NOT CURRENT',detail:`${x.requirement||c.name} · details private${a?' · current through assignment end: '+(through?'yes':'no'):''}`};
- return{...x,current:cur,status:cur?'VERIFIED':'NOT CURRENT',detail:`${c.prov?.source||'Verified source'} · last verified ${c.prov?.verifiedAt?new Date(c.prov.verifiedAt).toLocaleDateString():'—'}${exp?' · expires '+fd(exp):''}`};
+ const lic=isRnLicense(c)?` · ${licenseCoverage(c.kind,c.jurisdiction).text}${a?(()=>{const b=satisfactionBasis({kind:RN_AUTHORIZATION,jurisdiction:a.jurisdiction},c);return` · ${jurisdictionName(a.jurisdiction)} (assignment state): ${b?'covered — '+b:'not covered by this license'}`})():''}`:'';
+ return{...x,current:cur,status:cur?'VERIFIED':'NOT CURRENT',detail:`${c.prov?.source||'Verified source'} · last verified ${c.prov?.verifiedAt?new Date(c.prov.verifiedAt).toLocaleDateString():'—'}${exp?' · expires '+fd(exp):''}${lic}`};
 }
 function shareSummaryDetail(s){return{share_id:s.id,org:s.orgName,assignment:s.assignmentName}}
 /* Persist + log expiry for shares whose time ran out (called on access

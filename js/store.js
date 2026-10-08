@@ -17,7 +17,7 @@
      Service-role / secret keys are refused.
 
    Staging only: this is a pre-compliance backend. Do not store real PHI. */
-const STORE_KEYS={credentials:'nursecredx_v2',events:'nursecredx_v81_events',shares:'veridun_shares',shareRequests:'veridun_share_requests',customAssignments:'veridun_custom_assignments',demoAnchor:'veridun_demo_anchor',seedVersion:'veridun_demo_seed_version',xrplWallets:'nursecredx_wallets_v2',pendingShare:'veridun_pending_share_token'};
+const STORE_KEYS={credentials:'nursecredx_v2',events:'nursecredx_v81_events',shares:'veridun_shares',shareRequests:'veridun_share_requests',customAssignments:'veridun_custom_assignments',demoAnchor:'veridun_demo_anchor',seedVersion:'veridun_demo_seed_version',xrplWallets:'nursecredx_wallets_v2',pendingShare:'veridun_pending_share_token',prefs:'veridun_preferences'};
 const SUPABASE_JS={src:'js/vendor/supabase-js-2.117.2.umd.js',integrity:'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok',version:'2.117.2'};
 
 class LocalStorageAdapter{
@@ -41,13 +41,13 @@ const SupabaseMapping={
  /* Never sends document contents or file names: only a private storage path, set by the upload flow. */
  credentialToRow(c,clinicianId,privacyOf){
   const priv=(privacyOf?privacyOf(c.kind):'PRIVATE')==='PRIVATE';
-  const meta=priv?{}:Object.fromEntries(Object.entries({years:c.years,last_worked_on:c.lastWorked}).filter(([,v])=>v!=null&&v!==''));
+  const meta=priv?{}:Object.fromEntries(Object.entries({years:c.years,recent_months:c.recentMonths,last_worked_on:c.lastWorked}).filter(([,v])=>v!=null&&v!==''));
   return{id:c.remote_id||SupabaseMapping.uuid(),clinician_id:clinicianId,kind:c.kind,type_code:c.type,display_name:c.name,
    jurisdiction_code:c.jurisdiction||null,status:SupabaseMapping.STATUS_TO_DB[c.primary]||'VERIFYING',expires_on:c.expiration||null,metadata:meta,
    source_document_path:c.source_document_path||null};
  },
  rowToCredential(r){return{id:r.id,remote_id:r.id,kind:r.kind,type:r.type_code,name:r.display_name,jurisdiction:r.jurisdiction_code||'',primary:r.status,expiration:r.expires_on||'',
-  years:r.metadata?.years,lastWorked:r.metadata?.last_worked_on,file:'',chain:'NOT ISSUED',prov:{source:'',method:'',verifier:'',verifiedAt:r.verified_at||'',active:r.status==='VERIFIED',lastMonitored:r.last_monitored_at||''}}},
+  years:r.metadata?.years,recentMonths:r.metadata?.recent_months,lastWorked:r.metadata?.last_worked_on,file:'',chain:'NOT ISSUED',prov:{source:'',method:'',verifier:'',verifiedAt:r.verified_at||'',active:r.status==='VERIFIED',lastMonitored:r.last_monitored_at||''}}},
  async sha256Hex(text){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('')},
  /* The share token never leaves the browser in clear: only sha256(token) is stored server-side. */
  async shareToRow(s,ids){return{id:s.remote_id||SupabaseMapping.uuid(),clinician_id:ids.clinicianId,org_id:ids.orgId,assignment_id:ids.assignmentId||null,
@@ -165,13 +165,23 @@ class SupabaseAdapter{
   if(error)console.warn('[Veridun] audit log failed:',error.message);
  }
  /* ---- profile ---- */
- async saveProfile({full_name,post_nominals,specialty,home_jurisdiction}){
-  const c=this.need();const row={full_name:String(full_name||'').trim(),post_nominals:String(post_nominals||'').trim()||null,specialty,home_jurisdiction:home_jurisdiction||null};
+ async saveProfile({full_name,post_nominals,specialty,secondary_specialties,home_jurisdiction}){
+  const c=this.need();const sec=[...new Set((secondary_specialties||[]).filter(x=>x&&x!==specialty))];
+  const row={full_name:String(full_name||'').trim(),post_nominals:String(post_nominals||'').trim()||null,specialty,home_jurisdiction:home_jurisdiction||null};
+  if(secondary_specialties!==undefined)row.secondary_specialties=sec;
   if(!row.full_name)throw new Error('Enter your name.');
+  if(!specialty)throw new Error('Select your primary specialty.');
+  if(sec.length>5)throw new Error('Choose up to 5 secondary specialties.');
   const p=this.cache.profile?await this.run(c.from('clinicians').update(row).eq('id',this.cache.profile.id).select().single(),'Save profile')
    :await this.run(c.from('clinicians').insert({...row,user_id:this.user.id}).select().single(),'Create profile');
-  const first=!this.cache.profile;this.cache.profile=p;await this.log(first?'PROFILE_CREATED':'PROFILE_UPDATED',{detail:{specialty:p.specialty,home_jurisdiction:p.home_jurisdiction}});
+  const first=!this.cache.profile;this.cache.profile=p;await this.log(first?'PROFILE_CREATED':'PROFILE_UPDATED',{detail:{specialty:p.specialty,secondary_specialties:p.secondary_specialties||[],home_jurisdiction:p.home_jurisdiction}});
   if(first)await this.hydrate();return p;
+ }
+ /* Notification / reminder preferences, stored on the clinician row (RLS: owner only). */
+ async savePreferences(prefs){
+  const c=this.need();if(!this.cache.profile)throw new Error('Set up your profile first.');
+  const p=await this.run(c.from('clinicians').update({preferences:prefs}).eq('id',this.cache.profile.id).select().single(),'Save preferences');
+  this.cache.profile=p;return p.preferences;
  }
  /* ---- credentials (always start VERIFYING; only a verifier can change that) ---- */
  checkFile(file){if(!file)return;if(file.size>DOC_MAX_BYTES)throw new Error('Documents must be 10 MB or smaller.');if(file.type&&!DOC_TYPES.includes(file.type))throw new Error('Upload a PDF, PNG, JPEG, DOC or DOCX file.')}
@@ -297,6 +307,9 @@ function createStore(cfg,deps={}){
   shares:{load:list(K.shares),save:put(K.shares)},
   shareRequests:{load:list(K.shareRequests),save:put(K.shareRequests)},
   customAssignments:{load:list(K.customAssignments),save:put(K.customAssignments)},
+  /* Demo reminder / notification preferences (this browser). Signed-in
+     preferences are saved to the account instead (account.savePreferences). */
+  prefs:{load:()=>adapter.readJSON(K.prefs,null),save:v=>adapter.writeJSON(K.prefs,v)},
   meta:{
    demoAnchor:()=>adapter.readText(K.demoAnchor),setDemoAnchor:v=>adapter.writeText(K.demoAnchor,v),
    seedVersion:()=>adapter.readText(K.seedVersion),setSeedVersion:v=>adapter.writeText(K.seedVersion,v)

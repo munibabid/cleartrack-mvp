@@ -28,7 +28,7 @@ function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
 function loadCustomAssignments(){return store.customAssignments.load()}
 function saveCustomAssignments(a){store.customAssignments.save(a)}
 function finishAssignment(d,start,end){
- const wt=workTypeBase(d.workType),primary=assignmentAccepts(d,DEMO_PROFILE.specialty)?DEMO_PROFILE.specialty:(d.specialties||[])[0];
+ const wt=workTypeBase(d.workType),primary=matchedSpecialty(d,DEMO_PROFILE)||(d.specialties||[])[0];
  return{...d,start,end,workTypeName:wt?.name||d.workType,specialtyText:(d.specialties||[]).map(specialtyShort).join(' · '),templateName:`${wt?.name||d.workType} · ${(d.specialties||[]).map(specialtyShort).join(' / ')}`,reqs:layeredRequirements(d,primary)};
 }
 function getAssignments(){

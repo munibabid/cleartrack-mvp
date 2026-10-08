@@ -14,7 +14,7 @@ function practiceAuthorization(list=creds){
  });
  return set;
 }
-function eligibleAssignments(n=DEMO_NURSES[0]){return getAssignments().filter(a=>assignmentAccepts(a,n.specialty))}
+function eligibleAssignments(n=DEMO_NURSES[0]){return getAssignments().filter(a=>matchedSpecialty(a,n))}
 /* Assignments the clinician is actively pursuing: started completing one, or
    shared the Passport for it. */
 function pursuedAssignmentIds(ev=eventsSinceSeed()){const s=new Set(ev.filter(e=>e.event_type==='ASSIGNMENT_INTEREST').map(e=>e.assignment_id));loadShares().forEach(x=>s.add(x.assignmentId));return s}

@@ -88,7 +88,9 @@ function nurseReadinessHtml(a,n){
  return`<details class="nurse-row-v84"><summary>${who} · ${ec(specialtyShort(n.specialty))} module · <b>${r.ok}/${r.total}</b> ${r.ready?'<span class="badge READY">READY</span>':'<span class="small">'+r.missing.length+' missing</span>'}</summary><div style="margin:6px 0">${layerSummaryHtml(a,r.reqs)}</div><ul class="req-list">${r.items.map(readinessItemHtml).join('')}</ul></details>`;
 }
 function orgAssignmentHtml(a){return`<div class="row-v81" style="display:block"><div><b>${ec(a.name)}</b>${a.custom?' <span class="demo-tag-v81">BUILT IN THIS BROWSER</span>':''}${assignmentMetaHtml(a)}</div><div style="margin-top:8px">${DEMO_NURSES.map(n=>nurseReadinessHtml(a,n)).join('')}</div></div>`}
-function kindItem(k){return`<li>${ec(catalogKind(k)?.label||k)}${catalogPrivacy(k)==='PRIVATE'?' <span class="small">· private (status only)</span>':''}</li>`}
+function specialtyModuleHtml(sp){const req=SPECIALTY_MODULES[sp.id]||[],pref=specialtyPreferred(sp.id),ns=DEMO_NURSES.filter(n=>n.specialty===sp.id);
+ return`<details class="spec-mod-v11" data-spec="${sp.id}"><summary><b>${ec(sp.name)}</b> <span class="small">· ${req.length} required${pref.length?' · '+pref.length+' preferred':''} · demo template${ns.length?' · nurses: '+ns.map(n=>ec(n.name)).join(', '):''}</span></summary><div class="small" style="margin-top:6px"><b>Required</b></div><ul class="req-list">${req.map(kindItem).join('')}</ul>${pref.length?`<div class="small"><b>Preferred</b> (doesn't block readiness)</div><ul class="req-list pref-v11">${pref.map(kindItem).join('')}</ul>`:''}</details>`}
+function kindItem(k){const c=catalogKind(k);return`<li>${ec(c?.label||k)}${c?.experience?` <span class="small">· at least ${c.minMonths} months of work in the last ${c.recencyMonths} (default)</span>`:''}${catalogPrivacy(k)==='PRIVATE'?' <span class="small">· private (status only)</span>':''}</li>`}
 function renderRequirementSets(){
  if(!$('orgRequirementsBodyV81'))return;
  const all=getAssignments(),ovr=all.filter(a=>(a.overrides?.add||[]).length||(a.overrides?.waive||[]).length);
@@ -99,22 +101,25 @@ function renderRequirementSets(){
 <div class="layer-step-v84"><span class="layer-tag-v84 layer-FACILITY">4 · Facility</span><div class="small">Assignment or facility overrides that add or waive items.</div></div>
 <div class="layer-step-v84"><span class="layer-tag-v84">Dates</span><div class="small">Every item must stay current through the assignment end date.</div></div></div>
 <h4 class="sec-h-v84">Work-type base sets</h4>${WORK_TYPE_BASES.map(w=>`<div class="row-v81" style="display:block"><details><summary><b>${ec(w.name)}</b> <span class="small">· ${ec(w.summary)} · ${w.kinds.length} items · demo template</span></summary><ul class="req-list">${w.kinds.map(kindItem).join('')}</ul></details></div>`).join('')}
-<h4 class="sec-h-v84">Specialty modules</h4>${SPECIALTIES.map(sp=>`<div class="row-v81" style="display:block"><details><summary><b>${ec(sp.name)}</b> <span class="small">· ${(SPECIALTY_MODULES[sp.id]||[]).length} items · demo template · nurses: ${DEMO_NURSES.filter(n=>n.specialty===sp.id).map(n=>ec(n.name)).join(', ')||'—'}</span></summary><ul class="req-list">${(SPECIALTY_MODULES[sp.id]||[]).map(kindItem).join('')}</ul></details></div>`).join('')}
+<h4 class="sec-h-v84">Specialty modules <span class="small">· ${SPECIALTIES.length} RN specialties in ${SPECIALTY_GROUPS.length} groups</span></h4><div class="small" style="margin-bottom:6px">Each module requires recent specialty experience verified by an employer (default: ${SPECIALTY_EXPERIENCE_DEFAULT.minMonths} months of work in the last ${SPECIALTY_EXPERIENCE_DEFAULT.windowMonths}; set your own per assignment in the builder below), the specialty skills checklist and a specialty reference. Preferred items are shown to nurses but never block readiness.</div>${specialtiesByGroup().map(g=>`<details class="row-v81 spec-group-v11" style="display:block"><summary><b>${ec(g.label)}</b> <span class="small">· ${g.items.length} specialties</span></summary>${g.items.map(sp=>specialtyModuleHtml(sp)).join('')}</details>`).join('')}
 <h4 class="sec-h-v84">Facility overrides</h4>${ovr.map(a=>`<div class="row-v81" style="display:block"><b>${ec(a.facility||a.name)}</b> <span class="small">· ${ec(a.name)}</span><ul class="req-list">${(a.overrides.add||[]).map(k=>`<li>+ ${ec(catalogKind(k)?.label||k)}</li>`).join('')}${(a.overrides.waive||[]).map(k=>`<li>− waived: ${ec(catalogKind(k)?.label||k)}</li>`).join('')}</ul>${a.overrides.note?`<div class="small">${ec(a.overrides.note)}</div>`:''}</div>`).join('')||'<div class="small">None.</div>'}`;
  abInit();abPreview();renderCustomAssignments();
 }
 /* ---- Assignment builder ---- */
 const AB_EXCLUDE=new Set(['RN_LICENSE','RN_LICENSE_MULTISTATE','OTHER','EDU_ADN']);
+/* Pre-checked in the builder: the specialties of the demo nurses. */
+const AB_DEFAULT_SPECS=['ICU','ED','LD'];
 function chipHtml(cls,val,label,checked){return`<label class="chip-v84"><input type="checkbox" class="${cls}" value="${ec(val)}"${checked?' checked':''}> ${ec(label)}</label>`}
 function abInit(){
  if(!$('abWorkTypeV84')||$('abWorkTypeV84').options.length)return;
  $('abWorkTypeV84').innerHTML=WORK_TYPE_BASES.map(w=>`<option value="${w.id}">${ec(w.name)}</option>`).join('');$('abWorkTypeV84').value='STRIKE_RN';
  $('abStateV84').innerHTML=US_JURISDICTIONS.map(j=>`<option value="${j.code}">${ec(j.name)} (${j.code}) · ${ec(nlcStatusLabel(j.code))}</option>`).join('');$('abStateV84').value='US-CA';
  $('abStartV84').value=isoDay(addDays(demoAnchor(),30));
- $('abSpecV84').innerHTML=SPECIALTIES.map(sp=>chipHtml('abSpec',sp.id,sp.name,sp.id!=='MEDSURG')).join('');
- $('abAddV84').innerHTML=CREDENTIAL_CATALOG.filter(k=>!AB_EXCLUDE.has(k.kind)&&!k.kind.startsWith('QUAL_')).map(k=>chipHtml('abAdd',k.kind,k.short||k.label,false)).join('');
+ $('abSpecV84').innerHTML=specialtiesByGroup().map(g=>{const on=g.items.filter(sp=>AB_DEFAULT_SPECS.includes(sp.id)).length;return`<details class="ab-spec-group-v11"${on?' open':''}><summary>${ec(g.label)} <span class="small">(${g.items.length})</span></summary><div class="chips-v84">${g.items.map(sp=>chipHtml('abSpec',sp.id,sp.name,AB_DEFAULT_SPECS.includes(sp.id))).join('')}</div></details>`}).join('');
+ $('abAddV84').innerHTML=CREDENTIAL_CATALOG.filter(k=>!AB_EXCLUDE.has(k.kind)&&!k.kind.startsWith('QUAL_')&&!k.specialty).map(k=>chipHtml('abAdd',k.kind,k.short||k.label,false)).join('');
+ $('abExpMinV11').value=SPECIALTY_EXPERIENCE_DEFAULT.minMonths;$('abExpWinV11').value=SPECIALTY_EXPERIENCE_DEFAULT.windowMonths;
  abFillWaive();
- ['abNameV84','abFacilityV84','abStartV84','abWeeksV84','abNoteV84'].forEach(id=>$(id).oninput=abPreview);
+ ['abNameV84','abFacilityV84','abStartV84','abWeeksV84','abNoteV84','abExpMinV11','abExpWinV11'].forEach(id=>$(id).oninput=abPreview);
  $('abStateV84').onchange=abPreview;$('abWorkTypeV84').onchange=()=>{abFillWaive();abPreview()};
  $('abSpecV84').onchange=abPreview;$('abAddV84').onchange=abPreview;$('abWaiveV84').onchange=abPreview;
  $('abPublishV84').onclick=abPublish;
@@ -124,14 +129,18 @@ const abChecked=cls=>[...document.querySelectorAll('.'+cls+':checked')].map(c=>c
 function abDraft(){
  const start=$('abStartV84').value,weeks=Math.max(1,Math.min(52,+$('abWeeksV84').value||13)),name=$('abNameV84').value.trim(),fac=$('abFacilityV84').value.trim();
  const end=start?isoDay(addDays(new Date(start+'T12:00:00'),weeks*7)):'';
- return{id:'custom-'+Date.now(),orgId:orgViewAs,name:name||'Untitled assignment',city:'',jurisdiction:$('abStateV84').value,workType:$('abWorkTypeV84').value,specialties:abChecked('abSpec'),facility:(fac||'Unnamed facility')+' (demo facility)',overrides:{add:abChecked('abAdd'),waive:abChecked('abWaive'),note:$('abNoteV84').value.trim()},start,end,weeks,custom:true};
+ return{id:'custom-'+Date.now(),orgId:orgViewAs,name:name||'Untitled assignment',city:'',jurisdiction:$('abStateV84').value,workType:$('abWorkTypeV84').value,specialties:abChecked('abSpec'),facility:(fac||'Unnamed facility')+' (demo facility)',overrides:{add:abChecked('abAdd'),waive:abChecked('abWaive'),note:$('abNoteV84').value.trim(),...abExperience()},start,end,weeks,custom:true};
+}
+/* Organization-set recent-experience rule (only stored when it differs from the default). */
+function abExperience(){const w=Math.max(1,Math.min(120,Math.round(+$('abExpWinV11').value||SPECIALTY_EXPERIENCE_DEFAULT.windowMonths))),m=Math.max(1,Math.min(w,Math.round(+$('abExpMinV11').value||SPECIALTY_EXPERIENCE_DEFAULT.minMonths)));
+ return m===SPECIALTY_EXPERIENCE_DEFAULT.minMonths&&w===SPECIALTY_EXPERIENCE_DEFAULT.windowMonths?{}:{experience:{minMonths:m,windowMonths:w}};
 }
 function abPreview(){
  if(!$('abPreviewV84'))return;const d=abDraft();
  if(!d.specialties.length){$('abPreviewV84').innerHTML='<div class="alert-v81">Select at least one accepted specialty.</div>';return}
  const a=finishAssignment(d,d.start,d.end);
  $('abPreviewV84').innerHTML=`<div style="font-weight:800;margin-bottom:6px">Preview · ${ec(a.workTypeName)} · ${ec(jurisdictionName(a.jurisdiction))} · ${a.start||'—'} → ${a.end||'—'}</div>`+d.specialties.map(sp=>{const reqs=layeredRequirements(a,sp),ns=DEMO_NURSES.filter(n=>n.specialty===sp);
-  return`<details class="row-v81" style="display:block" open><summary><b>${ec(specialtyName(sp))} nurse</b> · ${reqs.length} requirements ${ns.map(n=>{const r=v81Assignment(a,n);return` · ${ec(n.name)} <b>${r.ok}/${r.total}</b>`}).join('')}</summary><div style="margin:6px 0">${layerSummaryHtml(a,reqs)}</div><ul class="req-list">${reqs.map(r=>`<li>${ec(requirementLabel(r))} <span class="layer-tag-v84 layer-${r.layer}">${LAYERS[r.layer]}</span><div class="small auth-v84">Required by: ${ec(r.authority)}</div></li>`).join('')}</ul></details>`}).join('');
+  return`<details class="row-v81" style="display:block" open><summary><b>${ec(specialtyName(sp))} nurse</b> · ${reqs.length} requirements ${ns.map(n=>{const r=v81Assignment(a,n);return` · ${ec(n.name)} <b>${r.ok}/${r.total}</b>`}).join('')}</summary><div style="margin:6px 0">${layerSummaryHtml(a,reqs)}</div><ul class="req-list">${reqs.map(r=>`<li>${ec(requirementLabel(r))} <span class="layer-tag-v84 layer-${r.layer}">${LAYERS[r.layer]}</span>${r.minMonths?` <span class="small">· at least ${r.minMonths} months of work in the last ${r.windowMonths}${r.experienceSetBy?' (set by this assignment)':''}</span>`:''}<div class="small auth-v84">Required by: ${ec(r.authority)}</div></li>`).join('')}</ul>${specialtyPreferred(sp).length?`<div class="small">Preferred, not required: ${specialtyPreferred(sp).map(k=>ec(catalogKind(k)?.short||k)).join(' · ')}</div>`:''}</details>`}).join('');
 }
 function abPublish(){
  const d=abDraft();if(!$('abNameV84').value.trim()){alert('Enter an assignment name.');return}if(!d.start){alert('Choose a start date.');return}if(!d.specialties.length){alert('Select at least one accepted specialty.');return}
