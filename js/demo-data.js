@@ -33,6 +33,7 @@ function initNewcomer(force=false){
   if(creds.length&&localStorage.getItem(DEMO_SEED_VERSION_KEY)===DEMO_SEED_VERSION){creds=creds.map(v81Normalize);return}}
  const reason=force?'RESET':creds.length?'SEED_UPGRADE':'FIRST_RUN';
  localStorage.setItem(DEMO_ANCHOR_KEY,new Date().toISOString().slice(0,10));
+ localStorage.removeItem('veridun_shares');localStorage.removeItem('veridun_share_requests');
  creds=demoSeedCredentials();save();localStorage.setItem(DEMO_SEED_VERSION_KEY,DEMO_SEED_VERSION);
  v81Log('DEMO_SEEDED',null,{actor_type:'SYSTEM',result:`DEMO_SEED_${creds.length}_CREDENTIALS`,detail:{reason,version:DEMO_SEED_VERSION}});
 }

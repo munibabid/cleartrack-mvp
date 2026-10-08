@@ -24,4 +24,5 @@ function fmtPct(x){return x==null?'—':Math.round(x*100)+'%'}
 /* Share of verified credentials monitored in the last 30 days (demo: the
    "last monitored" timestamp is set by the simulated check or demo seed). */
 function monitoringCoverage(){const v=creds.filter(c=>c.primary==='VERIFIED');if(!v.length)return null;const cut=Date.now()-30*86400000;return v.filter(c=>c.prov?.lastMonitored&&new Date(c.prov.lastMonitored).getTime()>=cut).length/v.length}
-function sharingActivity(ev=v81Events()){return ev.filter(e=>e.event_type==='SHARE_LINK_CREATED').length}
+function sharingActivity(ev=v81Events()){return ev.filter(e=>e.event_type==='SHARE_CREATED'||e.event_type==='SHARE_LINK_CREATED').length}
+function shareMetrics(ev=eventsSinceSeed()){const n=t=>ev.filter(e=>e.event_type===t).length,views=ev.filter(e=>e.event_type==='SHARE_VIEWED');return{created:n('SHARE_CREATED'),views:views.length,assertionsAccessed:views.reduce((s,e)=>s+(e.detail?.assertionsAccessed?.length||0),0),scopeChanges:n('SHARE_SCOPE_CHANGED'),extended:n('SHARE_EXTENDED'),requested:n('SHARE_EXTENSION_REQUESTED'),pending:(typeof loadShareRequests==='function'?loadShareRequests().filter(r=>r.status==='PENDING').length:0),revoked:n('SHARE_REVOKED'),expired:n('SHARE_EXPIRED')}}
