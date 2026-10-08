@@ -17,6 +17,8 @@ It is aimed at travel, rapid-response, strike, per-diem/agency and local-contrac
   - Optionally serve the folder instead: `python3 -m http.server 8000`, then open http://localhost:8000.
   - An internet connection is needed for the two CDN libraries (XRPL and QR code).
 
+**New here?** Click **▶ Start Demo Tour** on the entry screen (or Clinician → Home). It's optional and takes about 75 seconds: 11 steps through the Boston golden path on fresh demo data. Use **Next ▸** or **Auto-play** (7 s per step), and **✕** to exit at any time. The tour resets demo data first, and asks before doing so.
+
 Pick a workspace on the entry screen (Clinician, Organization, or Verification Console). **Switch Role** in each workspace returns you to the picker. **Reset Demo Data** (Clinician → Home) restores the starting demo state.
 
 ## What is real, what is simulated
@@ -56,6 +58,8 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 - **Provenance** record per credential (source, method, verifier, timestamps, status) in the Details / proof dialog
 - **XRPL proof (optional):** real `CredentialCreate` / `CredentialAccept` transactions on the **XRPL Devnet test network** using disposable, faucet-funded wallets, plus a live on-chain check when a Passport QR link is opened
 - **QR codes** for the Passport, onboarding completion and assignment share links (an opaque random token; no PII or wallet addresses)
+- **Mobile (390px)**: bottom navigation in the Clinician workspace. The Credential Requirements table becomes cards. Workspace tabs scroll horizontally, and the active tab stays in view. Dialog controls fit the screen. No view scrolls sideways.
+- **Demo tour** (`js/tour.js`): optional guided walkthrough of the golden path (about 75 seconds), with a highlighted target for each step. It logs `DEMO_TOUR_STARTED` / `DEMO_TOUR_COMPLETED`.
 - **Append-only event log** (localStorage) feeding the Verification Console audit log, the dashboards' activity feeds and every metric
 
 ### Simulated (looks real, isn't)
@@ -78,6 +82,41 @@ Pick a workspace on the entry screen (Clinician, Organization, or Verification C
 - Older `?sharev7=` links are retired because they had no expiration or revocation. They now show a "no longer supported" notice.
 - Real authentication, back end, primary-source integrations, continuous monitoring and notifications
 - A profile editor (specialty is set per demo nurse) and editing the work-type base sets and specialty modules in the UI. The Assignment Builder composes the existing layers.
+
+## Acceptance checklist (handoff §52)
+
+Each item is checked by the headless-Chrome suite `p6` (desktop 1280px + 390px; IDs `AC1`–`AC26`), with p2–p5 as regressions. ✅ = passing on the live site.
+
+> Note: in our copy of the handoff, the text of §52 items 1–6 was cut off. Items 1–6 below are inferred from §53–54 and the "immediate focus" list.
+
+| # | Criterion | Status | Where |
+|---|---|---|---|
+| 1 | RN-only scope (no APRN/NP/CRNA/physician/PA) | ✅ | Copy, catalog, README |
+| 2 | Three-role entry (Clinician / Organization / Verification Console), demo-only note | ✅ | Entry screen, Switch Role |
+| 3 | RN credential catalog with all 56 US jurisdictions, boards, NLC status | ✅ | `js/credential-catalog.js` |
+| 4 | Searchable dropdowns for credential type and jurisdiction | ✅ | Add Credential |
+| 5 | Privacy set automatically; manual required/private checkboxes removed | ✅ | Add Credential |
+| 6 | System decides what stays off-chain (private kinds never XRPL-eligible) | ✅ | `catalogPrivacy`, `eligible` |
+| 7 | Source documents private by default (file name only, never shared) | ✅ | Add Credential, shares (`documentsShared:false`) |
+| 8 | Catalog sets privacy and verification policy | ✅ | Add Credential classification panel |
+| 9 | Organizations use the same taxonomy | ✅ | Requirement sets / assignments use catalog kinds |
+| 10 | MA RN License added structurally (catalog kind + US-MA) | ✅ | Complete Missing Requirement |
+| 11 | New credential enters Pending Verification and the queue | ✅ | Task Center, Verification Console |
+| 12 | Clearly simulated source check (method/source say DEMO, real elapsed time) | ✅ | Verification Console, provenance |
+| 13 | Boston 11/12 → 12/12 computed by the engine | ✅ | Opportunities, Organization |
+| 14 | XRPL proof not required for readiness | ✅ | Readiness engine, onboarding |
+| 15 | Share only assignment-relevant assertions | ✅ | Share Professional Passport |
+| 16 | Through Assignment End (default, 11:59 PM local on end date) | ✅ | Share durations |
+| 17 | Until I Revoke Access | ✅ | Share durations |
+| 18 | Nurse can revoke (immediate; confirmation copy) | ✅ | Share & Access |
+| 19 | Organization sees revoked status with timestamp | ✅ | Org Passport Access / Candidates |
+| 20 | Organization can request an extension (cannot self-extend) | ✅ | Org Shared Passports |
+| 21 | Nurse approves or declines the extension | ✅ | Share & Access → Pending Requests |
+| 22 | Share views logged with assertions accessed | ✅ | Event log, Activity |
+| 23 | Analytics derived from events (no hardcoded metrics) | ✅ | `js/analytics.js`, `js/insights.js` |
+| 24 | Demo/simulated results labeled | ✅ | DEMO / SIMULATED / STATIC DEMO tags, landing "Illustrative example" |
+| 25 | Existing features still work (Passport QR, provenance, optional XRPL proof, sharing) | ✅ | p2–p5 regressions |
+| 26 | Mobile usability (390px: no sideways scroll, card layouts, tap targets ≥28px, nav only in clinician) | ✅ | All workspaces |
 
 ## Privacy notes (demo)
 - Credential metadata (names, types, expirations, file names, provenance) and the event log are stored unencrypted in `localStorage` (`nursecredx_v2`, `nursecredx_v81_events`, `veridun_shares`, `veridun_share_requests`, `veridun_custom_assignments`, plus `veridun_demo_anchor` / `veridun_demo_seed_version`). Reset Demo clears shares, requests and published assignments. Storage keys keep their old `nursecredx_*` names so existing demo data still loads. All of it stays on this site's origin.
@@ -104,7 +143,8 @@ js/sharing.js              Passport QR + assignment-scoped live shares (duration
 js/roles/clinician.js      clinician workspace views
 js/roles/organization.js   organization workspace
 js/roles/verifier.js       Verification Console
-js/app.js                  role routing, event wiring, boot (load last)
+js/app.js                  role routing, event wiring, boot
+js/tour.js                 optional golden-demo guided tour (loads after app.js)
 archive/                   older single-file prototypes (see below)
 ```
 
