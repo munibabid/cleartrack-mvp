@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* v14.1 cross-browser regression test for on-device document reading.
+/* v14.1/v14.2 cross-browser regression test for on-device document reading.
    Runs in Playwright with Chromium, WebKit (Safari's engine) and Firefox, each in a phone
    and a desktop viewport, and each twice: as the engine ships today, and with the newer
    APIs removed that older Safari/iOS lacks (ReadableStream async iteration,
@@ -34,7 +34,7 @@ const R = [], matrix = {};
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null && !c ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); return c; };
 const RAW = /TypeError|ReferenceError|undefined is not|is not a function|is not iterable|async iterable|iterator symbol|dynamically imported|SyntaxError|\bnull\b|\[object /;
 const b64 = f => fs.readFileSync(path.join(FIX, f)).toString('base64');
-const PDF = b64('xb-bls-card.pdf'), PNG = b64('xb-nihss.png');
+const PDF = b64('xb-bls-card.pdf'), PNG = b64('xb-nihss.png'), TCID = b64('xb-bls-tcid.png');
 
 function ctxOpts(engine, vp) {
   if (vp === 'desktop') return { viewport: { width: 1280, height: 800 } };
@@ -57,13 +57,16 @@ async function run(browser, engine, vp, mode) {
     await pg.goto(BASE, { waitUntil: 'networkidle' });
     if (mode === 'older-engine') t('older-engine emulation active (no ReadableStream async iterator, no Promise.withResolvers)', await pg.evaluate(() => typeof Promise.withResolvers !== 'function' || !!window.DocExtract));
     const read = (b, name, type, kind) => pg.evaluate(async ([b, name, type, kind]) => {
-      try { const f = new File([Uint8Array.from(atob(b), c => c.charCodeAt(0))], name, { type }); const r = await DocExtract.extractFromFile(f, { kind }); const v = k => r.fields[k] && r.fields[k].value; return { ok: true, method: r.method, id: v('credential_id'), renew: v('renew_by'), exp: v('expires_on') }; }
+      try { const f = new File([Uint8Array.from(atob(b), c => c.charCodeAt(0))], name, { type }); const r = await DocExtract.extractFromFile(f, { kind }); const v = k => r.fields[k] && r.fields[k].value; const c = k => r.fields[k] ? Math.round(r.fields[k].conf * 100) / 100 : null; return { ok: true, method: r.method, id: v('credential_id'), renew: v('renew_by'), exp: v('expires_on'), tc: v('training_center_id'), issued: v('issued_on'), ci: c('issued_on'), cr: c('renew_by'), cc: c('course') }; }
       catch (e) { return { ok: false, err: String(e && e.message || e) }; }
     }, [b, name, type, kind]);
     const p = await read(PDF, 'BLS card.pdf', 'application/pdf', 'CERT_BLS');
     t('PDF text layer read (eCard code + renew-by)', p.ok && p.method === 'PDF_TEXT' && p.id === '261100000017' && p.renew === '2028-06', JSON.stringify(p));
     const im = await read(PNG, 'nihss.png', 'image/png', 'CERT_NIHSS');
     t('image OCR read (NIHSS Test ID + expiration)', im.ok && im.method === 'IMAGE_OCR' && im.id === '99000123' && im.exp === '2028-03-14', JSON.stringify(im));
+    // v14.2: AHA card with "Training Center ID | Instructor ID | eCard Code" headers and values beneath
+    const tc = await read(TCID, 'bls-tcid.png', 'image/png', 'CERT_BLS');
+    t('v14.2 eCard code ≠ Training Center ID; clean OCR dates + course ≥90%', tc.ok && tc.id === '261100000025' && tc.tc === 'CA00001' && tc.issued === '2026-06-03' && tc.renew === '2028-06' && tc.ci >= 0.9 && tc.cr >= 0.9 && tc.cc >= 0.9, JSON.stringify(tc));
     // ---- account UI through the in-page fake backend ----
     await pg.evaluate(FAKE);
     const id = await pg.evaluate(async b => {
