@@ -34,7 +34,7 @@ const R = [], matrix = {};
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null && !c ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); return c; };
 const RAW = /TypeError|ReferenceError|undefined is not|is not a function|is not iterable|async iterable|iterator symbol|dynamically imported|SyntaxError|\bnull\b|\[object /;
 const b64 = f => fs.readFileSync(path.join(FIX, f)).toString('base64');
-const PDF = b64('xb-bls-card.pdf'), PNG = b64('xb-nihss.png'), TCID = b64('xb-bls-tcid.png'), TWOCOL = b64('xb-bls-2col.png'), MAFORM = b64('xb-ma-form.pdf'), MAFLAT = b64('xb-ma-flat.pdf'), NIHSS = b64('xb-nihss-aha.pdf'), CCRN = b64('xb-ccrn.pdf');
+const PDF = b64('xb-bls-card.pdf'), PNG = b64('xb-nihss.png'), TCID = b64('xb-bls-tcid.png'), TWOCOL = b64('xb-bls-2col.png'), MAFORM = b64('xb-ma-form.pdf'), MAFLAT = b64('xb-ma-flat.pdf'), NIHSS = b64('xb-nihss-aha.pdf'), CCRN = b64('xb-ccrn.pdf'), LMI = b64('xb-lic-mi.pdf'), LTX = b64('xb-lic-tx.pdf'), LNIH = b64('xb-lic-nih.pdf');
 
 function ctxOpts(engine, vp) {
   if (vp === 'desktop') return { viewport: { width: 1280, height: 800 } };
@@ -112,6 +112,22 @@ async function run(browser, engine, vp, mode) {
     const pf = await pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, box: $('acctScanBoxV14').innerText, id: acctScan.values.credential_id }));
     t('v14.4 add form: one expiration field pre-filled from the document ("from document, check it · NN%"); no duplicate prompt in the scan box', pf.exp === '2028-02-28' && /from document, check it · \d+%/.test(pf.src) && !/No expiration entered|Use the date from the document/.test(pf.box) && pf.id === '1234567890', JSON.stringify({ exp: pf.exp, src: pf.src, id: pf.id }));
     await pg.evaluate(() => { acctScan = null; acctRenderAll(); });
+    // v14.5: one RN License type + one license-scope field; no stale document date across files / types
+    const upl = async (b, n) => { await pg.setInputFiles('#acctFileV10', { name: n, mimeType: 'application/pdf', buffer: Buffer.from(b, 'base64') }); await pg.waitForTimeout(150); await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && b.dataset.state === 'done'; }); await pg.waitForTimeout(150); };
+    await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-ME'; document.querySelector('[data-act="toggle-add"]').click(); });
+    await pg.waitForSelector('#acctKindV10'); await pg.selectOption('#acctKindV10', 'RN_LICENSE'); await pg.selectOption('#acctJurV10', 'US-MI');
+    await upl(LMI, 'mi.pdf');
+    const l1 = await pg.evaluate(() => ({ opts: [...$('acctKindV10').options].filter(o => /^RN_LICENSE/.test(o.value)).map(o => o.textContent), fixed: !$('acctLicScopeFixedV145').classList.contains('hidden'), choice: !$('acctLicScopeChoiceV145').classList.contains('hidden'), note: $('acctLicenseNoteV10').innerText, exp: $('acctExpV10').value }));
+    t('v14.5 one "RN License" type; Michigan → single-state automatically (no choice); text about Michigan, residence only for multistate', l1.opts.join() === 'RN License' && l1.fixed && !l1.choice && /This license is from Michigan, so it covers Michigan only/.test(l1.note) && !/Maine is a compact state/.test(l1.note) && l1.exp === '2029-03-31', JSON.stringify(l1));
+    await pg.selectOption('#acctJurV10', 'US-TX'); await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-TX'; acctLicenseNote(); });
+    await upl(LTX, 'tx.pdf');
+    const l2 = await pg.evaluate(() => ({ choice: !$('acctLicScopeChoiceV145').classList.contains('hidden'), checked: (document.querySelector('input[name=acctLicTypeV10]:checked') || {}).value, src: $('acctLicScopeSrcV145').innerText, exp: $('acctExpV10').value, scanMulti: [...document.querySelectorAll('#acctScanBoxV14 .scan-row-v14[data-field="multistate"]')].every(x => x.classList.contains('hidden')) }));
+    t('v14.5 Texas with printed multistate: one choice pre-filled "from document"; no scan-box select; new file replaced the date', l2.choice && l2.checked === 'MULTI' && /from document, check it/.test(l2.src) && l2.scanMulti && l2.exp === '2029-01-31', JSON.stringify(l2));
+    await pg.selectOption('#acctKindV10', 'CERT_NIHSS'); await pg.waitForTimeout(200); await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && b.dataset.state === 'done'; });
+    await upl(LNIH, 'nihss.pdf');
+    const l3 = await pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, sug: !!$('acctScanSuggestV144') }));
+    t('v14.5 switching to NIHSS + a file with no printed expiration clears the old document date ("not printed"), suggested renewal shown separately', l3.exp === '' && /not printed/.test(l3.src) && l3.sug, JSON.stringify(l3));
+    await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-CA'; acctScan = null; acctRenderAll(); });
     await pg.evaluate(() => document.querySelector('.acctTab[data-target="acctVerifyV12"]').click());
     await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), id, { timeout: 30000 });
     await pg.evaluate(id => document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`).click(), id);

@@ -13,8 +13,9 @@ function isRnLicense(c){return c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTI
 function satisfactionBasis(req,c){
  if(req.kind===RN_AUTHORIZATION){
   const t=normalizeJurisdictionCode(req.jurisdiction);
-  if(c.kind==='RN_LICENSE'&&c.jurisdiction===t)return'Single-state license';
-  if(c.kind==='RN_LICENSE_MULTISTATE'&&nlcCanIssueMultistate(c.jurisdiction)){
+  const multi=licenseRuleKind(c)==='RN_LICENSE_MULTISTATE';
+  if(isRnLicense(c)&&!multi&&c.jurisdiction===t)return'Single-state license';
+  if(multi&&nlcCanIssueMultistate(c.jurisdiction)){
    if(c.jurisdiction===t)return'Multistate license (primary state of residence)';
    if(nlcHonorsCompactIn(t))return`NLC multistate privilege (primary state of residence ${c.jurisdiction})`;
   }
@@ -142,7 +143,7 @@ function evaluateRequirement(req,a,list=creds){
  else if(matches.some(x=>['VERIFYING','UNVERIFIED'].includes(x.c.primary)))out={req,label,status:'PENDING_VERIFICATION',note:'Added — pending verification'};
  else{
   let note='';
-  if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>c.kind==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Multistate license (home ${ms.jurisdiction}) not honored here: ${nlcStatusLabel(req.jurisdiction)}`}
+  if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>licenseRuleKind(c)==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Multistate license (home ${ms.jurisdiction}) not honored here: ${nlcStatusLabel(req.jurisdiction)}`}
   out={req,label,status:'MISSING',note};
  }
  out.decision=REQUIREMENT_DECISIONS[out.status]||out.status;

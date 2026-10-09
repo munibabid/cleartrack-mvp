@@ -166,8 +166,10 @@ function specialtyCredentialKinds(){
 function experienceHelpText(kind){const k=catalogKind(kind);if(!k?.experience)return'';return`Recent means you worked in this specialty within the last ${k.recencyMonths} months. Verified means a current or past employer confirms your unit, role, and dates, through an HR employment verification letter, a manager reference, or a verification service.`}
 
 const CREDENTIAL_CATALOG=[
- {kind:'RN_LICENSE',label:'RN License — single-state',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'REQUIRED',source:'STATE_BOARD',keywords:'registered nurse license state board'},
- {kind:'RN_LICENSE_MULTISTATE',label:'RN License — multistate (NLC compact)',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'NLC_HOME',source:'STATE_BOARD',keywords:'compact nlc multistate home state primary state of residence'},
+ {kind:'RN_LICENSE',label:'RN License',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'REQUIRED',source:'STATE_BOARD',keywords:'registered nurse license state board single-state multistate compact nlc primary state of residence'},
+ /* v14.5: legacy kind. New licenses are RN_LICENSE + compact_privilege_type (MULTISTATE | SINGLE_STATE);
+    old RN_LICENSE_MULTISTATE entries are still read (as RN_LICENSE, multistate) but never offered in a picker. */
+ {kind:'RN_LICENSE_MULTISTATE',legacy:true,label:'RN License (multistate, older entry)',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'NLC_HOME',source:'STATE_BOARD',keywords:'compact nlc multistate home state primary state of residence'},
  {kind:'CERT_BLS',label:'BLS — Basic Life Support',short:'BLS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AHA / approved certification issuer'},
  {kind:'CERT_ACLS',label:'ACLS — Advanced Cardiovascular Life Support',short:'ACLS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AHA / approved certification issuer'},
  {kind:'CERT_PALS',label:'PALS — Pediatric Advanced Life Support',short:'PALS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AHA / approved certification issuer'},
@@ -220,7 +222,35 @@ function nlcStatusLabel(code){return({IMPLEMENTED:'NLC member',PARTIAL:'NLC — 
 function multistateHomeJurisdictions(){return US_JURISDICTIONS.filter(j=>j.nlc==='IMPLEMENTED')}
 function catalogPrivacy(kind){return catalogKind(kind)?.privacy||'PRIVATE'}
 function countsForReadiness(kind){return catalogKind(kind)?.readiness!==false}
-function credentialDisplayName(kind,jur,fallback){const k=catalogKind(kind);if(kind==='RN_LICENSE')return`${jurisdictionName(jur)} RN License`;if(kind==='RN_LICENSE_MULTISTATE')return`Multistate RN License (NLC · home: ${jurisdictionName(jur)})`;if(kind==='OTHER'||!k)return fallback||'Credential';return k.short||k.label}
+/* v14.5: one RN License type. The license scope (multistate vs single-state) is compact_privilege_type,
+   stored with the license; RN_LICENSE_MULTISTATE is only read for older entries. */
+const COMPACT_PRIVILEGE_TYPES=['MULTISTATE','SINGLE_STATE'];
+function pickerCatalog(){return CREDENTIAL_CATALOG.filter(k=>!k.legacy)}
+function licenseScopeOf(c){
+ if(!c)return null;if(c.kind==='RN_LICENSE_MULTISTATE')return'MULTISTATE';if(c.kind!=='RN_LICENSE')return null;
+ const v=c.compact_privilege_type||c.metadata?.compact_privilege_type;return v==='MULTISTATE'?'MULTISTATE':'SINGLE_STATE';
+}
+/* the kind the compact rules use: multistate licenses (either storage) → RN_LICENSE_MULTISTATE */
+function licenseRuleKind(c){return licenseScopeOf(c)==='MULTISTATE'?'RN_LICENSE_MULTISTATE':c?.kind}
+/* a shared assertion has kind + label only (no metadata): a multistate RN_LICENSE is named "Multistate RN License …" */
+function assertionLicenseRuleKind(x){return x.kind==='RN_LICENSE'&&/^Multistate RN License/.test(x.label||'')?'RN_LICENSE_MULTISTATE':x.kind}
+/* The one license-scope explanation (v14.5). It talks about the LICENSE's state; the primary state of
+   residence is mentioned only to explain that multistate licenses come from it. */
+function licenseScopeInfo(jur,home,scope){
+ const j=jurisdiction(jur),h=jurisdiction(home);if(!j)return{choice:false,scope:null,lines:[]};
+ const lines=[];
+ if(!nlcCanIssueMultistate(j.code)){
+  const why=j.nlc==='PARTIAL'?`${j.name} honors compact licenses from other states but can't issue multistate licenses yet`:j.nlc==='PENDING'?`${j.name} has enacted the Nurse Licensure Compact, but it can't issue multistate licenses yet`:`${j.name} isn't in the Nurse Licensure Compact`;
+  lines.push(`Single-state: ${why}, so a ${j.name} license covers ${j.name} only.`);
+  if(h&&h.code!==j.code)lines.push(`Multistate licenses are issued by your primary state of residence (${h.name}). This license is from ${j.name}, so it covers ${j.name} only.`);
+  return{choice:false,scope:'SINGLE_STATE',lines};
+ }
+ if(h&&h.code!==j.code)lines.push(`Multistate licenses are issued by your primary state of residence (${h.name}). This license is from ${j.name}, so it is usually single-state (${j.name} only). Choose multistate only if the license says so, or update your primary state of residence.`);
+ else if(!h)lines.push(`${j.name} is a compact state: its licenses can be multistate or single-state. Multistate licenses are issued by your primary state of residence; set it in your profile.`);
+ else lines.push(`${j.name} is a compact state and your primary state of residence: a license from ${j.name} can be multistate or single-state.`);
+ return{choice:true,scope:scope||(h&&h.code===j.code?'MULTISTATE':'SINGLE_STATE'),defaultScope:h&&h.code===j.code?'MULTISTATE':'SINGLE_STATE',lines};
+}
+function credentialDisplayName(kind,jur,fallback,scope){const k=catalogKind(kind);if(kind==='RN_LICENSE'&&scope==='MULTISTATE')return`Multistate RN License (NLC · home: ${jurisdictionName(jur)})`;if(kind==='RN_LICENSE')return`${jurisdictionName(jur)} RN License`;if(kind==='RN_LICENSE_MULTISTATE')return`Multistate RN License (NLC · home: ${jurisdictionName(jur)})`;if(kind==='OTHER'||!k)return fallback||'Credential';return k.short||k.label}
 /* Machine-readable type (also used as the XRPL CredentialType). */
 function credentialTypeCode(kind,jur){return(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTATE')?`${kind}:${normalizeJurisdictionCode(jur)}`:kind}
 function issuerFor(kind,jur){if(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTATE')return jurisdiction(jur)?.issuer||'State board of nursing';return catalogKind(kind)?.issuer||'Issuer'}
@@ -241,8 +271,8 @@ function licensePrimarySource(kind,jur){const b=jurisdiction(jur)?.issuer||'the 
    license must be issued by the primary state of residence. */
 function licenseHomeStateHint(kind,jur,home){
  const h=jurisdiction(home),j=jurisdiction(jur);if(!j)return'';
- if(kind==='RN_LICENSE_MULTISTATE'&&h&&j.code!==h.code)return` · ⚠ A multistate license is issued only by your primary state of residence. Your primary state of residence is ${h.name}: check the state, or update your primary state of residence.`;
- if(kind==='RN_LICENSE'&&h&&j.code===h.code&&nlcCanIssueMultistate(j.code))return` · ${j.name} is your primary state of residence and a compact state: if your license is multistate, choose “RN License — multistate (NLC compact)”.`;
+ if(kind==='RN_LICENSE_MULTISTATE'&&h&&j.code!==h.code)return` · ⚠ Multistate licenses are issued by your primary state of residence (${h.name}). This license is from ${j.name}: check the state, or update your primary state of residence.`;
+ if(kind==='RN_LICENSE'&&h&&j.code===h.code&&nlcCanIssueMultistate(j.code))return` · ${j.name} is a compact state and your primary state of residence: if this license is multistate, set its scope to multistate.`;
  return'';
 }
 /* Where a license authorizes practice, per the jurisdictions data. */

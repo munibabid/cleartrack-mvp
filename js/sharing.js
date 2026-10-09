@@ -81,7 +81,7 @@ function liveAssertion(x,s){
  const exp=credExpiry(c),cur=isVerifiedActive(c)&&(!exp||new Date(exp+'T23:59:59')>=new Date());
  const through=cur&&(!exp||!a||new Date(exp)>=new Date(a.end));
  if(x.mode==='REQUIREMENT_SATISFIED')return{...x,current:cur,status:cur?'REQUIREMENT SATISFIED':'NOT CURRENT',detail:`${x.requirement||c.name} · details private${a?' · current through assignment end: '+(through?'yes':'no'):''}`};
- const lic=isRnLicense(c)?` · ${licenseCoverage(c.kind,c.jurisdiction).text}${a?(()=>{const b=satisfactionBasis({kind:RN_AUTHORIZATION,jurisdiction:a.jurisdiction},c);return` · ${jurisdictionName(a.jurisdiction)} (assignment state): ${b?'covered — '+b:'not covered by this license'}`})():''}`:'';
+ const lic=isRnLicense(c)?` · ${licenseCoverage(licenseRuleKind(c),c.jurisdiction).text}${a?(()=>{const b=satisfactionBasis({kind:RN_AUTHORIZATION,jurisdiction:a.jurisdiction},c);return` · ${jurisdictionName(a.jurisdiction)} (assignment state): ${b?'covered — '+b:'not covered by this license'}`})():''}`:'';
  return{...x,current:cur,status:cur?'VERIFIED':'NOT CURRENT',detail:`${c.prov?.source||'Verified source'} · last verified ${c.prov?.verifiedAt?new Date(c.prov.verifiedAt).toLocaleDateString():'—'}${exp?' · expires '+fd(exp):''}${lic}`};
 }
 function shareSummaryDetail(s){return{share_id:s.id,org:s.orgName,assignment:s.assignmentName}}
