@@ -297,6 +297,56 @@ function ahaLabelValues(lines){
  }
  return out;
 }
+/* ---- v14.3: label → value by position (two-column AHA cards) ----
+   AHA's current eCard prints two columns of centred labels with the value
+   underneath ("Training Center ID / CA…" on the left, "Instructor ID / …" and
+   "eCard Code / …" on the right). OCR reads those as merged or reordered lines,
+   so for each label we look at the words' boxes: the value is the nearest row of
+   words just below the label (or right after it on the same row) that overlaps
+   the label horizontally and is not itself a label. Columns are kept apart by
+   the gap between word clusters. `geo` = [{t,x0,x1,y0,y1,c,li}], y grows downward. */
+function geoLabelValues(geo){
+ const out={};Object.defineProperty(out,'boxes',{value:[],enumerable:false});if(!geo||geo.length<4)return out;
+ /* OCR noise ("i.", "_.", stray marks from artwork) would break a label apart: drop near-zero-confidence words and pure punctuation */
+ const W=geo.filter(w=>w&&/[A-Za-z0-9]/.test(String(w.t||''))&&(w.c==null||w.c>=0.3)&&w.x1>w.x0&&w.y1>w.y0);
+ const hs=W.map(w=>w.y1-w.y0).sort((a,b)=>a-b),H=hs[hs.length>>1]||10;
+ /* rows: words whose vertical centres are within half a line */
+ const rows=[];W.slice().sort((a,b)=>(a.y0+a.y1)-(b.y0+b.y1)).forEach(w=>{const cy=(w.y0+w.y1)/2;let r=rows.find(r=>Math.abs(r.cy-cy)<H*0.5);if(!r){r={cy,ws:[]};rows.push(r)}r.ws.push(w)});
+ /* clusters: words in a row separated by less than ~1.6 line heights */
+ const clusters=[];
+ for(const r of rows){r.ws.sort((a,b)=>a.x0-b.x0);let cur=null;for(const w of r.ws){if(cur&&w.x0-cur.x1<H*1.6){cur.ws.push(w);cur.x1=Math.max(cur.x1,w.x1);cur.y0=Math.min(cur.y0,w.y0);cur.y1=Math.max(cur.y1,w.y1)}else{cur={ws:[w],x0:w.x0,x1:w.x1,y0:w.y0,y1:w.y1};clusters.push(cur)}}}
+ const labels=[],labelWords=new Set();
+ for(const cl of clusters){
+  let s='';const pos=[];cl.ws.forEach((w,i)=>{if(i)s+=' ';pos.push([s.length,s.length+String(w.t).length,w]);s+=String(w.t)});
+  for(const h of labelHits(s)){const ws=pos.filter(([a,b])=>a<h.end&&b>h.start).map(p=>p[2]);if(!ws.length)continue;ws.forEach(w=>labelWords.add(w));labels.push({kind:h.kind,x0:Math.min(...ws.map(w=>w.x0)),x1:Math.max(...ws.map(w=>w.x1)),y0:Math.min(...ws.map(w=>w.y0)),y1:Math.max(...ws.map(w=>w.y1)),cl,ws})}
+ }
+ /* a two-line label ("Training Center Phone / Number"): swallow the continuation word */
+ const isLabelish=w=>labelWords.has(w)||/^(number|name|state)$/i.test(String(w.t).replace(/[^A-Za-z]/g,''));
+ const val=(ws,how,lab)=>{const t=ws.map(w=>w.t).join(' ');const cs=ws.map(w=>w.c==null?1:w.c);return{value:t,how,li:ws[0].li,wc:0.5*cs.reduce((a,b)=>a+b,0)/cs.length+0.5*Math.min(...cs),geo:true,s:0}};
+ for(const L of labels)out.boxes.push({kind:L.kind,x0:L.x0,x1:L.x1,y0:L.y0,y1:L.y1,H});
+ for(const L of labels){
+  const lw=L.x1-L.x0,cx=(L.x0+L.x1)/2;
+  /* same row, right after the label (table layout "Label   value") */
+  const after=L.cl.ws.filter(w=>w.x0>=L.x1-1&&!labelWords.has(w));
+  const nextLab=labels.filter(o=>o!==L&&o.cl===L.cl&&o.x0>=L.x1).sort((a,b)=>a.x0-b.x0)[0];
+  const inline=after.filter(w=>!nextLab||w.x1<=nextLab.x0);
+  if(inline.length){(out[L.kind]=out[L.kind]||[]).push(val(inline,'label',L));continue}
+  /* table layout: the nearest cluster to the right on the same row, if it is not a label */
+  const right=clusters.filter(c=>c!==L.cl&&Math.abs((c.y0+c.y1)/2-(L.y0+L.y1)/2)<H*0.35&&c.x0>L.x1&&c.x0-L.x1<H*14).sort((a,b)=>a.x0-b.x0)[0];
+  if(right&&!right.ws.some(w=>labelWords.has(w))&&right.ws.length<=8){(out[L.kind]=out[L.kind]||[]).push(val(right.ws,'label',L));continue}
+  /* below: nearest cluster under the label that overlaps it horizontally (a value, not a sentence) */
+  let found=false;
+  const below=clusters.filter(c=>c.y0>=L.y1-H*0.3&&c.y0-L.y1<H*2.6&&Math.min(c.x1,L.x1+lw*0.15)-Math.max(c.x0,L.x0-lw*0.15)>0)
+   .map(c=>({c,ws:c.ws.filter(w=>!isLabelish(w)&&Math.min(w.x1,Math.max(L.x1,cx+lw))-Math.max(w.x0,Math.min(L.x0,cx-lw))>-H)}))
+   .sort((a,b)=>a.c.y0-b.c.y0);
+  for(const b of below){
+   if(b.c.ws.some(w=>labelWords.has(w))&&!b.ws.length)break; /* next label reached: no value */
+   if(b.ws.length>8)break;
+   if(b.ws.length){(out[L.kind]=out[L.kind]||[]).push(val(b.ws,'value under the label',L));found=true;break}
+  }
+ }
+ return out;
+}
 const TC_ID_SHAPE=/^[A-Z]{2}\d{5}$/;
 function tcIdFrom(v){
  for(const t of String(v||'').split(/\s+/)){
@@ -312,10 +362,10 @@ function ahaCode(lines,flat,labels,{exclude=new Set(),issueYY=null,redCross=fals
  const cands=[];
  for(const v of labels.ecard||[]){
   const whole=normCode(v.value);
-  if(whole&&!bad(whole)&&(whole.type==='AHA'&&!whole.odd||!/\s/.test(v.value.trim())))cands.push({...whole,raw:v.value,li:v.li,how:v.how});
-  else for(const t of v.value.split(/\s+/)){const n=normCode(t);if(n&&!bad(n)){cands.push({...n,raw:t,li:v.li,how:v.how});break}}
+  if(whole&&!bad(whole)&&(whole.type==='AHA'&&!whole.odd||!/\s/.test(v.value.trim())))cands.push({...whole,raw:v.value,li:v.li,how:v.how,wc:v.geo?v.wc:null,geo:!!v.geo});
+  else for(const t of v.value.split(/\s+/)){const n=normCode(t);if(n&&!bad(n)){cands.push({...n,raw:t,li:v.li,how:v.how,wc:v.geo?v.wc:null,geo:!!v.geo});break}}
  }
- const score=c=>(c.type==='AHA'&&!c.odd?3:c.type==='ALNUM'&&c.code.length>=8?2:1)+(c.how==='label'?0.5:0)+(issueYY&&c.type==='AHA'&&c.code.slice(0,2)===issueYY?0.5:0);
+ const score=c=>(c.type==='AHA'&&!c.odd?3:c.type==='ALNUM'&&c.code.length>=8?2:1)+(c.how==='label'||c.geo?0.5:0)+(c.geo?0.25:0)+(issueYY&&c.type==='AHA'&&c.code.slice(0,2)===issueYY?0.25:0);
  cands.sort((a,b)=>score(b)-score(a));
  if(cands.length)return cands[0];
  /* No label: a bare 12-digit AHA code (YY + course + 7 digits) not printed as a TC/Instructor ID. */
@@ -351,7 +401,7 @@ function buildOcr(ocrLines){
 }
 /* The parser. OCR input: `ocrLines` (per line: [{t,c,x0,x1,h}], c = 0..1) or the
    older `words` map (token → confidence). */
-function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=null,words=null,ocrLines=null,profileName='',catalog=null,sources=null,jurisdictions=null}={}){
+function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=null,words=null,ocrLines=null,geo=null,profileName='',catalog=null,sources=null,jurisdictions=null}={}){
  const built=method!=='PDF_TEXT'&&ocrLines&&ocrLines.length?buildOcr(ocrLines):null;
  const lines=built?built.lines:toLines(text),flat=lines.join('\n'),profile=profileFor(kind,catalog);
  const spans=built?built.spans:null;
@@ -379,9 +429,9 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   return 0.5*cs.reduce((a,b)=>a+b,0)/cs.length+0.5*Math.min(...cs);
  };
  /* field confidence: words (or text layer) × label match × field factors */
- const C=(raw,li,{label=true,factor=1}={})=>{
+ const C=(raw,li,{label=true,factor=1,wc:given=null}={})=>{
   if(method==='PDF_TEXT')return clamp(base*(label?1:NO_LABEL)*factor);
-  const wc=wordConf(raw,li);const w=wc==null?tokConf(raw):wc;
+  const wc=given!=null?given:wordConf(raw,li);const w=wc==null?tokConf(raw):wc;
   return clamp(Math.min(OCR_CAP,w+(label?LABEL_BONUS:0))*(label?1:NO_LABEL)*factor,0,OCR_CAP);
  };
  const lineOf=s=>{const t=nz(s);if(!t)return null;const i=lines.findIndex(l=>nz(l).includes(t));return i<0?null:i};
@@ -426,10 +476,21 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
  else if(renewMy&&profile==='cert')f.expires_on={value:renewToExpiry(renewMy.ym),conf:C(renewMy.raw,renewMy.li,{factor:0.9}),how:'month/year → end of month',monthOnly:renewMy.ym};
  if(f.issued_on&&f.expires_on&&f.expires_on.value<=f.issued_on.value){warnings.push('The expiration date is not after the issue date.');f.expires_on.conf*=0.7}
  // ---- AHA labels: Training Center ID, Instructor ID, eCard code ----
- const labels=profile==='aha_resus'?ahaLabelValues(lines):{};
+ let labels={},ecardBox=null;
+ if(profile==='aha_resus'){
+  labels=ahaLabelValues(lines);
+  /* v14.3: word positions (OCR boxes, or PDF text positions) win where they find a label */
+  let g=geo;if(!g&&built&&ocrLines){g=[];let li=0;for(const ws of ocrLines){const words=(ws||[]).filter(w=>w&&String(w.t||'').trim());if(!words.length)continue;words.forEach(w=>{if(w.y0!=null&&w.y1!=null&&w.x0!=null&&w.x1!=null)g.push({t:String(w.t).replace(/\s+/g,''),c:w.c,x0:w.x0,x1:w.x1,y0:w.y0,y1:w.y1,li})});li++}}
+  const gl=geoLabelValues(g);ecardBox=(gl.boxes||[]).find(b=>b.kind==='ecard')||null;
+  /* When positions explain the card, trust them alone: line-order guesses on a two-column
+     card can pair a label with the other column's value (that is how an Instructor ID once
+     became the "Training Center ID" and the eCard code got excluded). */
+  if(Object.keys(gl).length>=2){const text=labels;labels={...gl};for(const k of ['ecard','tc_id','tc_name'])if(!gl[k]&&text[k])labels[k]=text[k]}
+  else for(const k of Object.keys(gl))labels[k]=gl[k].concat(labels[k]||[]);
+ }
  const exclude=new Set();
  if(profile==='aha_resus'){
-  for(const v of labels.tc_id||[]){const t=tcIdFrom(v.value);if(t){exclude.add(t.code);if(!f.training_center_id)f.training_center_id={value:t.code,conf:C(t.raw,v.li,{factor:v.how==='label'||v.aligned?1:0.9}),how:'Training Center ID label',info:true}}}
+  for(const v of labels.tc_id||[]){const t=tcIdFrom(v.value);if(t){exclude.add(t.code);if(!f.training_center_id)f.training_center_id={value:t.code,conf:C(t.raw,v.li,{factor:v.how==='label'||v.aligned||v.geo?1:0.9,wc:v.geo?v.wc:null}),how:'Training Center ID label',info:true}}}
   for(const v of labels.instructor_id||[])for(const t of v.value.split(/\s+/)){const u=t.toUpperCase().replace(/[^A-Z0-9]/g,'');if(u.length>=4){exclude.add(u);exclude.add(fixDigits(u))}}
   for(const v of labels.tc_info||[])for(const t of v.value.split(/\s+/)){const u=t.replace(/\D/g,'');if(u.length>=7)exclude.add(u)}
  }
@@ -445,14 +506,14 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   }
   let q=codeFromQr(qr);if(q&&profile==='aha_resus'&&(exclude.has(q.code)||(issuer!=='RED_CROSS'&&TC_ID_SHAPE.test(q.code))))q=null;
   if(code||q){
-   let conf=code?C(code.raw||code.code,code.li!=null?code.li:lineOf(code.raw||code.code),{label:code.how!=='pattern',factor:code.how==='pattern'?0.94:1}):0.97;let how=code?code.how:'qr';
+   let conf=code?C(code.raw||code.code,code.li!=null?code.li:lineOf(code.raw||code.code),{label:code.how!=='pattern',factor:code.how==='pattern'?0.94:1,wc:code.wc!=null?code.wc:null}):0.97;let how=code?code.how:'qr';
    if(code&&code.odd&&profile==='aha_resus'){conf*=0.6;warnings.push(`The eCard code read as ${code.code.length} digits; AHA codes have 12.`)}
    if(code&&q){if(q.code===code.code)conf=0.995;else if(profile==='aha_resus'){warnings.push('The code printed on the card and the code in its QR code differ. The QR code was used.');code=q;conf=0.9;how='qr'}}
    else if(!code){code=q}
-   if(profile==='aha_resus'&&code.type==='AHA'&&code.code.length===12&&f.issued_on){if(code.code.slice(0,2)===f.issued_on.value.slice(2,4))conf=clamp(conf+0.02,0,how==='qr'||method==='PDF_TEXT'?0.995:OCR_CAP);else{conf*=0.85;warnings.push(`The eCard code starts with ${code.code.slice(0,2)}, but AHA codes start with the last two digits of the issue year (${f.issued_on.value.slice(2,4)}).`)}}
+   if(profile==='aha_resus'&&code.type==='AHA'&&code.code.length===12&&f.issued_on){if(code.code.slice(0,2)===f.issued_on.value.slice(2,4))conf=clamp(conf+0.02,0,how==='qr'||method==='PDF_TEXT'?0.995:OCR_CAP);/* v14.3: no penalty otherwise — real 2026 cards print codes starting with 27 */}
    if(profile==='aha_resus'&&code.type==='ALNUM'&&issuer==='AHA')issuer='AHA_RQI';
    f.credential_id={value:code.code,conf:clamp(conf),how};
-  }else if(profile==='aha_resus'&&issuer!=='RED_CROSS')notes.credential_id=ECARD_NOT_FOUND;
+  }else if(profile==='aha_resus'&&issuer!=='RED_CROSS'){notes.credential_id=ECARD_NOT_FOUND;if(ecardBox)notes._ecardBox=ecardBox}
  }
  // ---- license specifics ----
  if(profile==='license'){
@@ -465,7 +526,7 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
  if(want.includes('holder_name')){const n=findName(lines,flat,{profileName});if(n)f.holder_name={value:n.name,conf:C(n.name,lineOf(n.name),{label:n.how==='label'||n.how.startsWith('before')}),how:n.how}}
  // ---- training center (AHA): its own label, never the TC ID / city / site ----
  if(want.includes('training_center')){
-  const okName=v=>v&&v.length>=3&&/[A-Za-z]{3,}/.test(v)&&!/^(TC|ID|Instructor|Course|Name|Info)\b/i.test(v)&&!labelHits(v).length;
+  const okName=v=>v&&v.length>=3&&v.replace(/[^A-Za-z]/g,'').length>=4&&!/^\W*T?C\W*I[DO0]\b/i.test(v)&&/[A-Za-z]{3,}/.test(v)&&!/^(TC|ID|Instructor|Course|Name|Info|Phone|Number|City|State|Site|Code|Address|E-?mail)\b/i.test(v)&&!labelHits(v).length;
   const tn=(labels.tc_name||[]).map(v=>({...v,value:v.value.replace(/^na\w{1,2}e\b\s*/i,'').trim()})).find(v=>okName(v.value));
   if(tn)f.training_center={value:tn.value.slice(0,90),conf:C(tn.value,tn.li,{factor:0.95}),how:'label'};
   else for(let i=0;i<lines.length;i++){
@@ -522,7 +583,7 @@ function compareToEntered(values,{kind,expires_on,profileName,issuer,jurisdictio
  if(profile!=='dates_only'&&values.holder_name&&profileName){const m=namesMatch(values.holder_name,profileName);if(m===false)out.push({field:'holder_name',severity:'mismatch',document:values.holder_name,entered:profileName,text:`Name on the document (${values.holder_name}) doesn't match your profile name (${profileName}).`})}
  if(profile==='aha_resus'&&values.course&&KIND_COURSE[kind]){const c=String(values.course).toUpperCase().split(/\s/)[0];if(c!==KIND_COURSE[kind])out.push({field:'course',severity:'mismatch',document:values.course,entered:KIND_COURSE[kind],text:`The document is a ${values.course} card, but this credential is ${KIND_COURSE[kind]}.`})}
  if(profile==='cert'&&values.course){const cat=(catalog||_globals().catalog);const me=cat.find(k=>k.kind===kind);const re=me&&kindPattern(me);if(re&&!re.test(values.course)){const other=cat.find(k=>k.category==='Certifications'&&k.kind!==kind&&kindPattern(k)?.test(values.course));if(other)out.push({field:'course',severity:'mismatch',document:values.course,entered:me.short||kind,text:`The document is for ${values.course}, but this credential is ${me.short||kind}.`})}}
- if(profile==='aha_resus'&&values.credential_id&&values.issued_on&&/^\d{12}$/.test(values.credential_id)&&values.credential_id.slice(0,2)!==values.issued_on.slice(2,4))out.push({field:'credential_id',severity:'mismatch',document:values.credential_id,text:`The eCard code should start with the issue year (${values.issued_on.slice(2,4)}), but it starts with ${values.credential_id.slice(0,2)}.`});
+ /* v14.3: no eCard-code vs issue-year check: real AHA cards issued in 2026 carry codes starting with 27. */
  if(profile==='license'){
   if(values.jurisdiction&&jurisdiction&&values.jurisdiction!==jurisdiction)out.push({field:'jurisdiction',severity:'mismatch',document:values.jurisdiction,entered:jurisdiction,text:`The license on the document is from ${values.jurisdiction.replace('US-','')}, but you selected ${jurisdiction.replace('US-','')}.`});
   if(values.multistate){const docMulti=values.multistate==='multistate',entered=kind==='RN_LICENSE_MULTISTATE';if(docMulti!==entered)out.push({field:'multistate',severity:'mismatch',document:values.multistate,entered:entered?'multistate':'single-state',text:`The document shows a ${values.multistate} license, but you chose ${entered?'multistate':'single-state'}.`})}
@@ -613,6 +674,14 @@ async function imageCanvas(file){
  const c=canvasOf(w*k,h*k),x=c.getContext('2d');x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(src,0,0,c.width,c.height);
  if(src.close)src.close();return c;
 }
+/* v14.3: light background artwork (AHA's grey torch watermark) can hide a printed code
+   from OCR. Second look: grey levels, and anything lighter than mid-grey becomes white. */
+function whiten(c){
+ const o=canvasOf(c.width,c.height),x=o.getContext('2d');x.drawImage(c,0,0);
+ const d=x.getImageData(0,0,o.width,o.height),a=d.data;
+ for(let i=0;i<a.length;i+=4){const l=0.299*a[i]+0.587*a[i+1]+0.114*a[i+2];const v=l>175?255:Math.max(0,Math.round((l-40)*255/135));a[i]=a[i+1]=a[i+2]=v}
+ x.putImageData(d,0,0);return o;
+}
 function rotate(c,deg){const r=deg%180!==0,o=canvasOf(r?c.height:c.width,r?c.width:c.height),x=o.getContext('2d');x.translate(o.width/2,o.height/2);x.rotate(deg*Math.PI/180);x.drawImage(c,-c.width/2,-c.height/2);return o}
 function scaled(c,max){const k=Math.min(1,max/Math.max(c.width,c.height));if(k===1)return c;const o=canvasOf(c.width*k,c.height*k);o.getContext('2d').drawImage(c,0,0,o.width,o.height);return o}
 async function decodeQr(c){
@@ -631,7 +700,7 @@ async function ocr(c){
     field's confidence comes from the words it was read from */
  (r.data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>{
   const ws=[];
-  (l.words||[]).forEach(wd=>{const raw=String(wd.text||'').trim();if(!raw)return;const c=(wd.confidence||0)/100,bb=wd.bbox||{};ws.push({t:raw,c,x0:bb.x0,x1:bb.x1,h:bb.y1!=null&&bb.y0!=null?bb.y1-bb.y0:0});const t=raw.toLowerCase().replace(/[^a-z0-9]/g,'');if(t)words[t]=Math.max(words[t]||0,c)});
+  (l.words||[]).forEach(wd=>{const raw=String(wd.text||'').trim();if(!raw)return;const c=(wd.confidence||0)/100,bb=wd.bbox||{};ws.push({t:raw,c,x0:bb.x0,x1:bb.x1,y0:bb.y0,y1:bb.y1,h:bb.y1!=null&&bb.y0!=null?bb.y1-bb.y0:0});const t=raw.toLowerCase().replace(/[^a-z0-9]/g,'');if(t)words[t]=Math.max(words[t]||0,c)});
   if(ws.length)lines.push(ws);
  })));
  return{text:r.data.text||'',conf:r.data.confidence,words,lines};
@@ -646,8 +715,16 @@ async function textItems(page){
  }
  return(await page.getTextContent()).items;
 }
-async function pdfText(page){
+/* v14.3: word boxes from the PDF text layer (for the two-column label reader); y grows downward */
+function pdfGeo(items,yOff){
+ const out=[];
+ for(const it of items){const str=String(it.str||'');if(!str.trim())continue;const x=it.transform[4],y=it.transform[5],h=Math.abs(it.height||it.transform[3]||8),w=it.width||str.length*h*0.5,cw=w/Math.max(1,str.length);
+  const re=/\S+/g;let m;while((m=re.exec(str)))out.push({t:m[0],c:1,x0:x+m.index*cw,x1:x+(m.index+m[0].length)*cw,y0:yOff-(y+h*0.8),y1:yOff-(y-h*0.2)})}
+ return out;
+}
+async function pdfText(page,geoOut,yOff=0){
  const items=await textItems(page);const rows=[];
+ if(geoOut)geoOut.push(...pdfGeo(items,yOff));
  for(const it of items){if(!it.str||!it.str.trim())continue;const y=it.transform[5],x=it.transform[4];let row=rows.find(r=>Math.abs(r.y-y)<Math.max(2,(it.height||8)*0.45));if(!row){row={y,items:[]};rows.push(row)}row.items.push({x,s:it.str,w:it.width||0})}
  rows.sort((a,b)=>b.y-a.y);
  return rows.map(r=>{r.items.sort((a,b)=>a.x-b.x);let out='',end=null;for(const i of r.items){if(end!=null)out+=(i.x-end>12?'   ':(i.x-end>1.5?' ':''));out+=i.s;end=i.x+i.w}return out}).join('\n');
@@ -670,13 +747,13 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
   onProgress({stage:'load',label:'Opening the PDF on this device',progress:0.05});
   const lib=await pdfjs();
   const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,disableFontFace:true,enableXfa:false}).promise;
-  let text='';for(let p=1;p<=Math.min(doc.numPages,2);p++){text+=(await pdfText(await doc.getPage(p)))+'\n'}
+  let text='';const geo=[];for(let p=1;p<=Math.min(doc.numPages,2);p++){text+=(await pdfText(await doc.getPage(p),geo,-p*5000))+'\n'}
   onProgress({stage:'qr',label:'Looking for the QR code',progress:0.4});
   const page=await doc.getPage(1),vp0=page.getViewport({scale:1}),k=Math.min(3,1800/Math.max(vp0.width,vp0.height)),vp=page.getViewport({scale:k});
   canvas=canvasOf(vp.width,vp.height);const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
   await page.render({canvasContext:ctx,canvas,viewport:vp}).promise;
   qr=await decodeQr(canvas);
-  if(text.replace(/\s/g,'').length>=40){res=parseCardText(text,{...P,method:'PDF_TEXT',qr});lastText=text}
+  if(text.replace(/\s/g,'').length>=40){res=parseCardText(text,{...P,method:'PDF_TEXT',qr,geo});lastText=text}
   else{onProgress({stage:'ocr',label:'This PDF is a scan. Reading it with OCR',progress:0.5});const o=await ocr(canvas);lastText=o.text;res=parseCardText(o.text,{...P,method:'PDF_OCR',qr,ocrConf:o.conf,words:o.words,ocrLines:o.lines})}
   try{doc.destroy()}catch{}
  }else{
@@ -689,11 +766,48 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
   const good=r=>r.found.filter(k=>r.fieldsWanted.includes(k)).length;const enough=Math.min(3,res.fieldsWanted.length);
   if(good(res)<enough){for(const deg of [90,270,180]){onProgress({stage:'ocr',label:`Trying the image turned ${deg}°`,progress:0.6});const c2=rotate(canvas,deg);const o2=await ocr(c2);const r2=parseCardText(o2.text,{...P,method:'IMAGE_OCR',qr,ocrConf:o2.conf,words:o2.words,ocrLines:o2.lines});if(good(r2)>good(res)){res=r2;rotated=deg;lastText=o2.text}if(good(res)>=res.fieldsWanted.length-1)break}}
  }
+ /* v14.3: an AHA card read by OCR without its eCard code gets a second look on a whitened copy */
+ if(res&&res.method!=='PDF_TEXT'&&res.profile==='aha_resus'&&!res.fields.credential_id&&canvas){
+  onProgress({stage:'ocr',label:'Looking again for the eCard code',progress:0.85});
+  const base=rotated?rotate(canvas,rotated):canvas;
+  /* 1) just the strip under the "eCard Code" label, whitened and enlarged */
+  const B=res.notes&&res.notes._ecardBox;
+  if(B){
+   const lw=B.x1-B.x0,x0=Math.max(0,B.x0-lw*0.6),x1=Math.min(base.width,B.x1+lw*0.6),y0=Math.max(0,B.y1+B.H*0.05),y1=Math.min(base.height,B.y1+B.H*2.4);
+   if(x1-x0>4&&y1-y0>4){
+    const k=Math.max(1,Math.min(3,60/B.H)),pad=20,cc=canvasOf((x1-x0)*k+pad*2,(y1-y0)*k+pad*2),cx=cc.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cc.width,cc.height);cx.imageSmoothingQuality='high';cx.drawImage(base,x0,y0,x1-x0,y1-y0,pad,pad,(x1-x0)*k,(y1-y0)*k);
+    const o4=await ocr(whiten(cc));
+    const ws=(o4.lines||[]).flat().filter(w=>/[A-Za-z0-9]/.test(w.t));
+    const cand=parseEcardStrip(ws,res);
+    if(cand){res.fields.credential_id=cand;delete res.notes.credential_id;res.found=FIELDS.filter(k=>res.fields[k]);res.missing=res.missing.filter(k=>k!=='credential_id');res.secondLook='strip';
+     if(cand.type==='ALNUM'&&res.issuer==='AHA')res.issuer='AHA_RQI';const sid=suggestedSource(res.kind,res.issuer,cand.value);if(sid&&res.source&&res.source.how==='issuer on the document')res.source={id:sid,how:'issuer on the document'}}
+   }
+  }
+ }
+ if(res&&res.method!=='PDF_TEXT'&&res.profile==='aha_resus'&&!res.fields.credential_id&&canvas){
+  /* 2) the whole page, whitened */
+  const base=rotated?rotate(canvas,rotated):canvas;const o3=await ocr(whiten(base));
+  const r3=parseCardText(o3.text,{...P,method:res.method,qr,ocrConf:o3.conf,words:o3.words,ocrLines:o3.lines});
+  const n=r=>r.found.length+Object.keys(r.fields).filter(k=>!r.found.includes(k)).length;
+  if(r3.fields.credential_id&&n(r3)>=n(res)-1){r3.secondLook=true;res=r3;lastText=o3.text}
+ }
+ if(res&&res.notes)delete res.notes._ecardBox;
  onProgress({stage:'done',label:'Checking the details',progress:1});
  if(debug)res.text=lastText;/* debug only: raw text is never stored or sent */
  res.supported=true;res.rotated=rotated;res.ms=Math.round(performance.now()-t0);res.fileKind=kind;res.qrPayloadKind=qr?(/heart\.org/i.test(qr)?'aha':'other'):null;
  res.expiry=documentExpiry(res.fields,res.issuer);
  return res;
+}
+/* best eCard-code token in an OCR'd strip: 12 digits (AHA) or letters+digits (RQI), never a TC-ID shape */
+function parseEcardStrip(ws,res){
+ const tcid=res.fields.training_center_id&&res.fields.training_center_id.value;
+ for(const w of ws){
+  const n=normCode(w.t);if(!n||n.odd||TC_ID_SHAPE.test(n.code)||n.code===tcid)continue;
+  if(n.type!=='AHA'&&!(n.type==='ALNUM'&&n.code.length>=8))continue;
+  const c=Math.min(OCR_CAP,(w.c==null?0.8:w.c)+LABEL_BONUS);
+  return{value:n.code,conf:clamp(c,0,OCR_CAP),how:'value under the label (second look)',type:n.type};
+ }
+ return null;
 }
 async function terminate(){if(workerP){try{(await workerP).terminate()}catch{}workerP=null}}
 

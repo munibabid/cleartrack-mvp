@@ -24,7 +24,7 @@ const puppeteer = require('puppeteer-core');
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr14-shots/';
 const FIX = '/tmp/p14-fixtures';
-const VERSION = 'v14.2 demo';
+const VERSION = 'v14.3 demo';
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); };
