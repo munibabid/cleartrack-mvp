@@ -127,7 +127,7 @@ function abInit(){
  $('abAddV84').innerHTML=CREDENTIAL_CATALOG.filter(k=>!AB_EXCLUDE.has(k.kind)&&!k.kind.startsWith('QUAL_')&&!k.specialty).map(k=>chipHtml('abAdd',k.kind,k.short||k.label,false)).join('');
  $('abExpMinV11').value=SPECIALTY_EXPERIENCE_DEFAULT.minMonths;$('abExpWinV11').value=SPECIALTY_EXPERIENCE_DEFAULT.windowMonths;
  abFillWaive();
- ['abNameV84','abFacilityV84','abStartV84','abWeeksV84','abNoteV84','abExpMinV11','abExpWinV11'].forEach(id=>$(id).oninput=abPreview);
+ ['abNameV84','abFacilityV84','abStartV84','abWeeksV84','abNoteV84','abExpMinV11','abExpWinV11'].forEach(id=>$(id).oninput=abPreview);if($('abSkillsV144'))$('abSkillsV144').onchange=abPreview;
  $('abStateV84').onchange=abPreview;$('abWorkTypeV84').onchange=()=>{abFillWaive();abPreview()};
  $('abSpecV84').onchange=abPreview;$('abAddV84').onchange=abPreview;$('abWaiveV84').onchange=abPreview;
  $('abPublishV84').onclick=abPublish;
@@ -137,8 +137,10 @@ const abChecked=cls=>[...document.querySelectorAll('.'+cls+':checked')].map(c=>c
 function abDraft(){
  const start=$('abStartV84').value,weeks=Math.max(1,Math.min(52,+$('abWeeksV84').value||13)),name=$('abNameV84').value.trim(),fac=$('abFacilityV84').value.trim();
  const end=start?isoDay(addDays(new Date(start+'T12:00:00'),weeks*7)):'';
- return{id:'custom-'+Date.now(),orgId:orgViewAs,name:name||'Untitled assignment',city:'',jurisdiction:$('abStateV84').value,workType:$('abWorkTypeV84').value,specialties:abChecked('abSpec'),facility:(fac||'Unnamed facility')+' (demo facility)',overrides:{add:abChecked('abAdd'),waive:abChecked('abWaive'),note:$('abNoteV84').value.trim(),...abExperience()},start,end,weeks,custom:true};
+ return{id:'custom-'+Date.now(),orgId:orgViewAs,name:name||'Untitled assignment',city:'',jurisdiction:$('abStateV84').value,workType:$('abWorkTypeV84').value,specialties:abChecked('abSpec'),facility:(fac||'Unnamed facility')+' (demo facility)',overrides:{add:abChecked('abAdd'),waive:abChecked('abWaive'),note:$('abNoteV84').value.trim(),...abExperience(),...abSkills()},start,end,weeks,custom:true};
 }
+/* v14.4: facility skills-checklist rule (12 months default, 24 months, or per assignment). */
+function abSkills(){const v=$('abSkillsV144')?.value||'12';return v==='12'?{}:v==='per'?{skills:{perAssignment:true}}:{skills:{months:+v}}}
 /* Organization-set recent-experience rule (only stored when it differs from the default). */
 function abExperience(){const w=Math.max(1,Math.min(120,Math.round(+$('abExpWinV11').value||SPECIALTY_EXPERIENCE_DEFAULT.windowMonths))),m=Math.max(1,Math.min(w,Math.round(+$('abExpMinV11').value||SPECIALTY_EXPERIENCE_DEFAULT.minMonths)));
  return m===SPECIALTY_EXPERIENCE_DEFAULT.minMonths&&w===SPECIALTY_EXPERIENCE_DEFAULT.windowMonths?{}:{experience:{minMonths:m,windowMonths:w}};

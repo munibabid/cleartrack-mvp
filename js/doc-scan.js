@@ -53,9 +53,9 @@ function scanDocExpiry(){
  return DocExtract.documentExpiry({expires_on:v.expires_on?{value:v.expires_on,monthOnly:v.expires_month_only||null}:null,renew_by:v.renew_by?{value:v.renew_by,exact:v.renew_exact}:null},acctScan.res.issuer);
 }
 function scanMismatchHtml(){
- const ms=scanMismatches(),hard=ms.filter(m=>m.severity==='mismatch'),info=ms.filter(m=>m.severity!=='mismatch');
- const exp=scanDocExpiry(),useDate=ms.some(m=>m.fix==='use-doc-date');
- if(!ms.length)return exp?`<div class="good-v81 small" id="acctScanOkV14">✓ The expiration you entered matches the document${acctScan.res.profile==='dates_only'?'':', and nothing else on it conflicts with your profile'}.</div>`:'';
+ const add=acctScan?.target==='add',ms=scanMismatches().filter(m=>!(add&&m.field==='expires_on')),hard=ms.filter(m=>m.severity==='mismatch'),info=ms.filter(m=>m.severity!=='mismatch');
+ const exp=scanDocExpiry(),useDate=!add&&ms.some(m=>m.fix==='use-doc-date');
+ if(!ms.length)return exp?`<div class="good-v81 small" id="acctScanOkV14">✓ ${add?'Nothing else on the document conflicts with what you entered':'The expiration you entered matches the document'+(acctScan.res.profile==='dates_only'?'':', and nothing else on it conflicts with your profile')}.</div>`:'';
  return`${hard.length?`<div class="alert-v81 mismatch-v14" id="acctMismatchV14" role="alert"><b>Credential mismatch detected</b><ul>${hard.map(m=>`<li data-field="${ec(m.field)}">${ec(m.text)}</li>`).join('')}</ul><div class="small">If you save it like this, it goes to the verifier's review queue flagged as a mismatch. Nothing is marked verified by a scan.</div></div>`:''}
  ${info.map(m=>`<div class="small notice">${ec(m.text)}</div>`).join('')}
  ${useDate&&exp?`<div class="acct-row-v10"><button type="button" class="pri mini" data-act="scan-use-date" id="acctUseDocDateV14">Use the date from the document (${ec(fd(exp.value))})</button></div>`:''}`;
@@ -75,18 +75,23 @@ function scanBoxHtml(target){
  return`<div class="scan-v14" id="acctScanBoxV14" data-state="done" data-profile="${ec(r.profile)}">
  <div class="scan-head-v14"><b>Read from your document</b> <span class="small">· ${ec(({PDF_TEXT:'PDF text',PDF_OCR:'scanned PDF (OCR)',IMAGE_OCR:'image (OCR)'})[r.method]||r.method)}${r.rotated?` · turned ${r.rotated}°`:''}${r.qrFound?' · QR code read':''} · ${(r.ms/1000).toFixed(1)} s</span></div>
  <div class="small">Check each detail against your document and correct anything wrong. ${priv?'This is a private record: only the dates are used, and only the expiration date is saved. Nothing else from it is stored.':'The values stay on this device: Veridun saves only which fields you confirmed and any mismatch flag. The verifier reads the document again on their side.'}</div>
- <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile|swapped/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}${!f&&r.notes?.[k]?`<span class="small scan-note-v142" id="acctScanNote-${k}">${ec(r.notes[k])}</span>`:''}</label>`}).join('')}${(r.infoFields||[]).filter(k=>r.fields[k]).map(k=>`<div class="scan-row-v14 scan-info-v142" data-info-field="${k}" id="acctScanInfo-${k}"><span class="scan-lbl-v14">${ec(DocExtract.FIELD_LABEL[k]||k)}</span><span class="scan-info-val-v142">${ec(r.fields[k].value)}</span><span class="small">${ec(DocExtract.TC_ID_NOTE)}</span></div>`).join('')}</div>
- ${exp?`<div class="small scan-interp-v14" id="acctScanInterpV14">${ec(exp.text)}</div>`:''}
+ <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14${s.target==='add'&&(k==='expires_on'||k==='renew_by')?' hidden scan-exp-moved-v144':''}" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile|swapped/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}${!f&&r.notes?.[k]?`<span class="small scan-note-v142" id="acctScanNote-${k}">${ec(r.notes[k])}</span>`:''}</label>`}).join('')}${(r.infoFields||[]).filter(k=>r.fields[k]).map(k=>`<div class="scan-row-v14 scan-info-v142" data-info-field="${k}" id="acctScanInfo-${k}"><span class="scan-lbl-v14">${ec(DocExtract.FIELD_LABEL[k]||k)}</span><span class="scan-info-val-v142">${k==='test_group'?'Group '+ec(r.fields[k].value)+' '+scanConfChip(r.fields[k].conf,true):k==='nihss_module'?ec(r.fields[k].value)+' '+scanConfChip(r.fields[k].conf,true):ec(r.fields[k].value)}</span><span class="small">${k==='nihss_module'?'As printed (“'+ec(r.fields[k].raw||'')+'”).':k==='test_group'?'As printed (“'+ec(r.fields[k].raw||'')+'”). Some facilities accept only certain groups, or a different group than last time.':ec(DocExtract.TC_ID_NOTE)}</span></div>`).join('')}</div>
+ ${exp&&s.target!=='add'?`<div class="small scan-interp-v14" id="acctScanInterpV14">${ec(exp.text)}</div>`:''}${exp&&s.target==='add'?`<div class="small" id="acctScanExpMovedV144">The expiration date read from the document is in the Expiration date field above.</div>`:''}
  ${r.warnings.length?`<div class="small notice">${r.warnings.map(ec).join('<br>')}</div>`:''}
  <div id="acctScanMismatchBoxV14">${scanMismatchHtml()}</div>
  <label class="acct-sec-v11 scan-confirm-v14"><input type="checkbox" id="acctScanConfirmV14"${s.confirmed?' checked':''}> I checked these details against my document</label>
  ${s.target!=='add'?`<div class="acct-row-v10"><button type="button" class="pri" data-act="scan-save" id="acctScanSaveV14">Save details</button><button type="button" class="sec" data-act="scan-cancel">Cancel</button></div>`:''}
  ${confirmedNote}
+ ${r.calculated?.suggested_renewal?`<div class="small scan-calc-v144" id="acctScanSuggestV144"><b>${ec(DocExtract.FIELD_LABEL.suggested_renewal)}:</b> ${ec(fd(r.calculated.suggested_renewal.value))} <span class="badge">CALCULATED · NOT PRINTED</span> 12 months from the completion date. Not printed on the certificate, not verified, and not saved as the expiration. Your facility’s rule is final.${r.calculated.suggested_renewal.value<new Date().toISOString().slice(0,10)?' That suggested date has passed: most facilities will want a newer NIHSS.':''}</div>`:''}
+ ${r.notes?.verifier?`<div class="small alert-v81" id="acctScanVerifierNoteV144">${ec(r.notes.verifier)}</div>`:''}
  <div class="small">Saving details does not verify the credential. It becomes “${SCAN_STATUS_TEXT}” until a verifier checks it with ${ec(scanSourceName(s))}.</div></div>`;
 }
 function scanSourceName(s){
  const id=s.res?.source?.id;const src=id&&typeof verificationSource==='function'?verificationSource(id):null;
- if(src)return src.name;const ctx=scanContext();const rt=ctx.kind&&typeof primaryRouteFor==='function'?primaryRouteFor(ctx.kind,ctx.jurisdiction):null;return rt?.name||'the issuer';
+ if(src)return src.name;const ctx=scanContext();
+ /* v14.4: NIHSS certificates come from several issuers; never default to one */
+ if(ctx.kind==='CERT_NIHSS')return'the issuer printed on the certificate (not identified yet)';
+ const rt=ctx.kind&&typeof primaryRouteFor==='function'?primaryRouteFor(ctx.kind,ctx.jurisdiction):null;return rt?.name||'the issuer';
 }
 function scanPaint(){
  if(!acctScan)return;const box=$('acctScanBoxV14');
@@ -95,7 +100,39 @@ function scanPaint(){
  const slot=acctScan.target==='add'?$('acctScanSlotV14'):document.querySelector(`[data-scan-slot="${acctScan.target}"]`);
  if(slot)slot.innerHTML=html;
 }
-function scanPaintMismatch(){const b=$('acctScanMismatchBoxV14');if(b)b.innerHTML=scanMismatchHtml();const i=$('acctScanInterpV14'),e=scanDocExpiry();if(i&&e)i.textContent=e.text}
+function scanPaintMismatch(){const b=$('acctScanMismatchBoxV14');if(b)b.innerHTML=scanMismatchHtml();const i=$('acctScanInterpV14'),e=scanDocExpiry();if(i&&e)i.textContent=e.text;scanExpMark()}
+/* v14.4: ONE expiration field on the add form. A date read from the document pre-fills it (marked
+   "from document, check it" with its confidence) unless the nurse already typed one; it stays editable.
+   A typed date that differs from the document shows a mismatch note under the field (and is flagged
+   for the verifier on save). The scan box no longer repeats the expiration or a "use this date" prompt. */
+function scanExpConf(){const r=acctScan?.res;const f=r?.fields?.expires_on||r?.fields?.renew_by;return f?f.conf:null}
+function scanPrefillExpiry(){
+ if(!acctScan||acctScan.target!=='add'||acctScan.status!=='done'||!acctScan.res?.supported)return;
+ const el=$('acctExpV10'),exp=scanDocExpiry();if(!el)return;
+ if(exp&&(!el.value||el.dataset.fromDoc)){el.value=exp.value;el.dataset.fromDoc=exp.value}
+ scanExpMark();
+}
+function scanExpMark(){
+ const el=$('acctExpV10'),src=$('acctExpSrcV144'),note=$('acctExpNoteV144');if(!el||!src||!note)return;
+ const on=acctScan&&acctScan.target==='add'&&acctScan.status==='done'&&acctScan.res?.supported;
+ const exp=on?scanDocExpiry():null;
+ if(!exp){src.innerHTML='';note.innerHTML='';if(acctScan&&acctScan.target==='add')acctScan.applyExpiry=false;return}
+ /* a skills checklist keeps an expiration only when the document prints one */
+ const k=typeof catalogKind==='function'?catalogKind($('acctKindV10')?.value||''):null;
+ if(k&&/^SKILLS_/.test(k.kind))$('acctExpDateRowV10')?.classList.remove('hidden');
+ const same=el.value===exp.value,c=scanExpConf();
+ acctScan.applyExpiry=same;
+ if(same){
+  src.innerHTML=`<span class="conf-v14 conf-${c>=0.9?'hi':c>=0.7?'mid':'lo'}" id="acctExpFromDocV144">from document, check it${c!=null?' · '+Math.round(c*100)+'%':''}</span>`;
+  note.innerHTML=`<span id="acctExpInterpV144">${ec(exp.text)}</span> You can change it if the document was read wrong.`;
+  return;
+ }
+ delete el.dataset.fromDoc;
+ src.innerHTML='';
+ note.innerHTML=el.value
+  ?`<div class="mismatch-v14 alert-v81" id="acctExpMismatchV144" role="alert">Your date (${ec(fd(el.value))}) doesn't match the document (${ec(fd(exp.value))}). If you save it like this, it is flagged for the verifier. <button type="button" class="sec mini" data-act="scan-use-date" id="acctUseDocDateV14">Use the document's date</button></div>`
+  :`<div id="acctExpEmptyV144">The document shows ${ec(fd(exp.value))}. <button type="button" class="sec mini" data-act="scan-use-date" id="acctUseDocDateV14">Use the document's date</button></div>`;
+}
 async function scanStart(target,file,kind){
  if(!file)return;
  if(!SCANNABLE(file)){acctScan={target,kind,status:'done',res:{supported:false,warnings:['Scanning works on PDF, PNG and JPEG files. This file was saved as is; type its details.'],fields:{},fieldsWanted:[]},values:{}};scanPaint();return}
@@ -106,7 +143,7 @@ async function scanStart(target,file,kind){
   if(acctScan!==my)return;
   my.res=res;my.status='done';my.doneAt=Date.now();
   for(const k of res.fieldsWanted||[]){my.values[k]=res.fields[k]?.value||'';my.orig[k]=my.values[k]}
-  scanPaint();
+  scanPaint();scanPrefillExpiry();
  }catch(e){if(acctScan!==my)return;my.status='error';my.error=DocExtract.friendlyError(e);scanPaint()}
 }
 /* What gets saved / logged once the nurse confirms. */
@@ -175,21 +212,22 @@ function scanCredInfo(c){
 }
 document.addEventListener('DOMContentLoaded',()=>{
  const ws=$('accountWorkspace');if(!ws)return;
- ws.addEventListener('input',e=>{const t=e.target;if(!acctScan||!t.dataset?.scanField)return;acctScan.values[t.dataset.scanField]=t.value;scanPaintMismatch()});
+ ws.addEventListener('input',e=>{const t=e.target;if(t.id==='acctExpV10'){scanPaintMismatch();return}if(!acctScan||!t.dataset?.scanField)return;acctScan.values[t.dataset.scanField]=t.value;scanPaintMismatch()});
  ws.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset?.scanField&&acctScan){acctScan.values[t.dataset.scanField]=t.value;scanPaintMismatch()}
   if(t.id==='acctScanConfirmV14'&&acctScan)acctScan.confirmed=t.checked;
-  if(t.id==='acctFileV10'){const f=t.files[0];const kind=(typeof acctLicenseKind==='function'&&acctLicenseKind())||$('acctKindV10').value;if(!f){acctScan=null;scanPaint();const sl=$('acctScanSlotV14');if(sl)sl.innerHTML='';return}
+  if(t.id==='acctFileV10'){const f=t.files[0];const kind=(typeof acctLicenseKind==='function'&&acctLicenseKind())||$('acctKindV10').value;if(!f){acctScan=null;scanPaint();{const el=$('acctExpV10');if(el&&el.dataset.fromDoc){el.value='';delete el.dataset.fromDoc}scanExpMark()}const sl=$('acctScanSlotV14');if(sl)sl.innerHTML='';return}
    if(!kind){acctScan=null;const sl=$('acctScanSlotV14');if(sl)sl.innerHTML='<div class="small notice" id="acctScanBoxV14">Choose the credential type first; the document is then read on this device.</div>';return}
    scanStart('add',f,kind)}
   if((t.id==='acctKindV10'||t.name==='acctLicTypeV10')&&$('acctFileV10')?.files[0]){const kind=(typeof acctLicenseKind==='function'&&acctLicenseKind())||$('acctKindV10').value;if(kind&&(!acctScan||acctScan.target!=='add'||acctScan.kind!==kind))scanStart('add',$('acctFileV10').files[0],kind)}
   if(['acctExpV10','acctJurV10'].includes(t.id)||t.name==='acctLicTypeV10')scanPaintMismatch();
+  if(t.id==='acctKindV10'&&!$('acctFileV10')?.files[0]){const el=$('acctExpV10');if(el&&el.dataset.fromDoc){el.value='';delete el.dataset.fromDoc}scanExpMark()}
  });
  ws.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;
   if(act==='scan-use-date'){const exp=scanDocExpiry();if(!exp)return;
-   if(acctScan.target==='add'){$('acctExpV10').value=exp.value;acctScan.applyExpiry=true}else{acctScan.applyExpiry=true;acctScan.docExpiry=exp.value}
+   if(acctScan.target==='add'){$('acctExpV10').value=exp.value;$('acctExpV10').dataset.fromDoc=exp.value;acctScan.applyExpiry=true}else{acctScan.applyExpiry=true;acctScan.docExpiry=exp.value}
    scanPaintMismatch();acctMsg('Expiration set to '+fd(exp.value)+' from the document.'+(acctScan.target==='add'?'':' Save details to keep it.'),'ok')}
   if(act==='scan-cancel'){acctScan=null;acctRenderAll()}
   if(act==='doc-rescan')scanRescan(b.dataset.id);

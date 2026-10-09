@@ -45,14 +45,14 @@ function acctRenderAll(){
 
 /* ---------- Passport: profile + credentials ---------- */
 function acctOptions(list,sel,blank){return(blank?`<option value="">${ec(blank)}</option>`:'')+list.map(([v,l])=>`<option value="${ec(v)}"${v===sel?' selected':''}>${ec(l)}</option>`).join('')}
-function acctHomeStateNote(code){const el=$('acctHomeNoteV10');if(el)el.innerHTML=code?ec(homeStateCompactText(code)):'Choose your home state to see whether it is a compact (NLC) state.'}
+function acctHomeStateNote(code){const el=$('acctHomeNoteV10');if(el)el.innerHTML=code?ec(homeStateCompactText(code)):'Choose your primary state of residence to see whether it is a compact (NLC) state.'}
 function acctProfileForm(p){
  return`<div class="panel-v81"><div class="ph">${p?'Edit your profile':'Set up your clinician profile'}</div><div class="pb"><form id="acctProfileFormV10" class="acct-form-v10">
  <label>Full name<input id="acctNameV10" required maxlength="120" value="${ec(p?.full_name||'')}" autocomplete="name"></label>
  <label>Credentials after your name <span class="small">(optional, e.g. RN, BSN)</span><input id="acctPostV10" maxlength="60" value="${ec(p?.post_nominals||'')}"></label>
  <label>Primary specialty<select id="acctSpecV10" required>${specialtyOptionsHtml(p?.specialty||'',p?'Select specialty':'Select specialty')}</select></label>
  <fieldset class="acct-fieldset-v10"><legend>Other specialties <span class="small">(optional, up to 5 — used when an opportunity accepts one of them instead of your primary)</span></legend><div class="acct-sec-specs-v11">${specialtiesByGroup().map(g=>`<details${(p?.secondary_specialties||[]).some(id=>g.items.some(s=>s.id===id))?' open':''}><summary>${ec(g.label)}</summary>${g.items.map(sp=>`<label class="acct-sec-v11"><input type="checkbox" class="acctSecSpecV10" value="${sp.id}"${(p?.secondary_specialties||[]).includes(sp.id)?' checked':''}> ${ec(sp.name)}</label>`).join('')}</details>`).join('')}</div></fieldset>
- <label>Home state<select id="acctHomeV10">${acctOptions(US_JURISDICTIONS.map(j=>[j.code,j.name]),p?.home_jurisdiction||'','Choose…')}</select></label>
+ <label>Primary state of residence<select id="acctHomeV10">${acctOptions(US_JURISDICTIONS.map(j=>[j.code,j.name]),p?.home_jurisdiction||'','Choose…')}</select></label>
  <div class="small acct-note-v10" id="acctHomeNoteV10"></div>
  <div class="acct-row-v10"><button class="pri" type="submit">Save profile</button>${p?'<button class="sec" type="button" data-act="cancel-profile">Cancel</button>':''}</div></form></div></div>`;
 }
@@ -82,7 +82,7 @@ function acctRenderPassport(){
  const a=acct(),c=a.cache,p=c.profile,el=$('acctPassportV10');
  if(!p||acctEditingProfile){el.innerHTML=acctProfileForm(p)+(!p?`<div class="small acct-note-v10">Your profile, credentials and shares are saved to your account so you can open them on any device where you sign in. The demo Passport (Alex Morgan) is not copied here.</div>`:'');acctHomeStateNote(p?.home_jurisdiction);return}
  const creds=c.credentials;
- const sec=(p.secondary_specialties||[]).filter(id=>id!==p.specialty),compact=p.home_jurisdiction?nlcStatusLabel(p.home_jurisdiction):'';el.innerHTML=`<div class="panel-v81"><div class="ph"><span>${ec(p.full_name)}${p.post_nominals?', '+ec(p.post_nominals):''}</span><button class="mini sec" type="button" data-act="edit-profile">Edit profile</button></div><div class="pb small">${ec(specialtyName(p.specialty))}${sec.length?' · also '+ec(sec.map(specialtyShort).join(', ')):' '} · Home state: ${ec(p.home_jurisdiction?jurisdictionName(p.home_jurisdiction):'not set')}${compact?' ('+ec(compact)+')':''} · <span class="acct-tag-v10 subtle">YOUR ACCOUNT</span></div><div class="pb small">${p.home_jurisdiction?ec(homeStateCompactText(p.home_jurisdiction)):''}</div></div>
+ const sec=(p.secondary_specialties||[]).filter(id=>id!==p.specialty),compact=p.home_jurisdiction?nlcStatusLabel(p.home_jurisdiction):'';el.innerHTML=`<div class="panel-v81"><div class="ph"><span>${ec(p.full_name)}${p.post_nominals?', '+ec(p.post_nominals):''}</span><button class="mini sec" type="button" data-act="edit-profile">Edit profile</button></div><div class="pb small">${ec(specialtyName(p.specialty))}${sec.length?' · also '+ec(sec.map(specialtyShort).join(', ')):' '} · Primary state of residence: ${ec(p.home_jurisdiction?jurisdictionName(p.home_jurisdiction):'not set')}${compact?' ('+ec(compact)+')':''} · <span class="acct-tag-v10 subtle">YOUR ACCOUNT</span></div><div class="pb small">${p.home_jurisdiction?ec(homeStateCompactText(p.home_jurisdiction)):''}</div></div>
  <div class="panel-v81"><div class="ph"><span>My credentials (${creds.length})</span><button class="mini pri" type="button" data-act="toggle-add">+ Add credential</button></div><div class="pb">
  <div id="acctAddWrapV10" class="hidden">${acctAddForm()}</div>
  ${creds.length?`<div class="acct-list-v10">${creds.map(acctCredRow).join('')}</div>`:'<div class="empty"><b>No credentials yet.</b><div class="small">Add your RN license, certifications, skills checklists and employer verifications. They start as “Submitted · not verified”.</div></div>'}
@@ -109,13 +109,13 @@ function acctLicenseCoversState(stateCode){
 }
 function acctReadinessPanel(p){
  const st=acctReady.state||p.home_jurisdiction||'';
- if(!st)return`<div class="panel-v81" id="acctReadyPanelV11"><div class="ph">Readiness check</div><div class="pb small">Set your home state in your profile to check readiness.</div></div>`;
+ if(!st)return`<div class="panel-v81" id="acctReadyPanelV11"><div class="ph">Readiness check</div><div class="pb small">Set your primary state of residence in your profile to check readiness.</div></div>`;
  const {items}=acctReadinessItems(p,st,acctReady.work),cov=acctLicenseCoversState(st);
  const lbl={MET:'✓ Verified',PENDING_VERIFICATION:'⏳ Submitted, not verified',MISSING:'○ Missing',EXPIRES_BEFORE_END:'⚠ Expires before the assignment ends',NOT_RECENT:'⚠ Not recent enough',LEVEL_TOO_LOW:'⚠ Needs a stronger verification'};
  const pend=items.filter(i=>i.status==='PENDING_VERIFICATION').length,miss=items.filter(i=>i.status!=='MET'&&i.status!=='PENDING_VERIFICATION').length;
  return`<div class="panel-v81" id="acctReadyPanelV11"><div class="ph">Readiness check · ${ec(specialtyShort(p.specialty))}</div><div class="pb">
  <div class="grid2-v83"><label>Assignment state<select id="acctReadyStateV11">${acctOptions(US_JURISDICTIONS.map(j=>[j.code,`${j.name} · ${nlcStatusLabel(j.code)}`]),st)}</select></label><label>Work type<select id="acctReadyWorkV11">${acctOptions(WORK_TYPE_BASES.map(w=>[w.id,w.name]),acctReady.work)}</select></label></div>
- <div class="small acct-ready-lic-v11" id="acctReadyLicV11"><b>${ec(jurisdictionName(st))} RN license:</b> <span class="badge REQ">REQUIRED</span> ${cov?ec(`covered by your ${cov.c.display_name} (${cov.basis})${cov.c.status==='VERIFIED'?' — '+levelLabel(cov.c.verification_level).toLowerCase():' — submitted, not verified'}`):ec(`not covered yet. ${nlcHonorsCompactIn(st)?'A multistate license from a compact home state, or a':'A'} ${jurisdictionName(st)} license is needed${nlcHonorsCompactIn(st)?'':' ('+nlcStatusLabel(st)+')'}.`)}</div>
+ <div class="small acct-ready-lic-v11" id="acctReadyLicV11"><b>${ec(jurisdictionName(st))} RN license:</b> <span class="badge REQ">REQUIRED</span> ${cov?ec(`covered by your ${cov.c.display_name} (${cov.basis})${cov.c.status==='VERIFIED'?' — '+levelLabel(cov.c.verification_level).toLowerCase():' — submitted, not verified'}`):ec(`not covered yet. ${nlcHonorsCompactIn(st)?'A multistate license issued by a compact primary state of residence, or a':'A'} ${jurisdictionName(st)} license is needed${nlcHonorsCompactIn(st)?'':' ('+nlcStatusLabel(st)+')'}.`)}</div>
  <div class="small" style="margin:6px 0">${items.length} requirements (state + ${ec(workTypeBase(acctReady.work)?.name||'')} base + ${ec(specialtyShort(p.specialty))} module) · ${pend} submitted, not verified · ${miss} missing. Nothing counts as met until a real verifier checks it at the level each requirement needs.</div>${acctPassportLicenseNote()}
  <ul class="req-list acct-ready-list-v11">${items.map(i=>`<li data-kind="${ec(i.req.kind)}" data-status="${i.status}">${ec(lbl[i.status]||i.status)} · ${ec(i.label)} <span class="layer-tag-v84 layer-${i.layer}">${LAYERS[i.layer]}</span>${i.req.minMonths?` <span class="small">· at least ${i.req.minMonths} months of work in the last ${i.req.windowMonths}</span>`:''}${i.note&&i.status!=='PENDING_VERIFICATION'?`<div class="small">${ec(i.note)}</div>`:''}${requirementWhyHtml(i)}</li>`).join('')}</ul>
  ${specialtyPreferred(p.specialty).length?`<div class="small">Preferred, not required: ${specialtyPreferred(p.specialty).map(k=>ec(catalogKind(k)?.short||k)).join(' · ')}</div>`:''}
@@ -125,7 +125,7 @@ function acctCredRow(c){
  const s=acctCredStatus(c),priv=catalogPrivacy(c.kind)==='PRIVATE';
  const lic=c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE',home=acct().cache.profile?.home_jurisdiction,m=c.metadata||{};
  const hist=acct().cache.events.filter(e=>e.credential_id===c.id).slice().reverse().map(e=>`${ACCT_EVENT_TEXT[e.event_type]||e.event_type} ${fmtDT(e.occurred_at)}`);
- return`<div class="acct-item-v10" data-cred="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(catalogKind(c.kind)?.short||catalogKind(c.kind)?.label||c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''}${c.expires_on?' · expires '+fd(c.expires_on):''}${priv?' · <span class="badge PRIVATE">PRIVATE</span>':''}</div><div class="small">${ec(s.sub)}</div>${acctProvenanceHtml(c,s)}${lic&&c.jurisdiction_code?`<div class="small acct-cov-v11">${ec(licenseCoverage(c.kind,c.jurisdiction_code).text)}${ec(licenseHomeStateHint(c.kind,c.jurisdiction_code,home))}</div>`:''}${catalogKind(c.kind)?.experience&&(m.years!=null||m.recent_months!=null||m.last_worked_on)?`<div class="small">${[m.years!=null?m.years+' yrs':'',m.recent_months!=null?m.recent_months+' months in the last 2 years':'',m.last_worked_on?'last worked '+fd(m.last_worked_on):''].filter(Boolean).map(ec).join(' · ')}</div>`:''}<div class="small acct-hist-v11">History: ${hist.length?ec(hist.join(' · ')):'added'} · not verified by anyone yet</div>
+ return`<div class="acct-item-v10" data-cred="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(catalogKind(c.kind)?.short||catalogKind(c.kind)?.label||c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''}${c.expires_on?' · expires '+fd(c.expires_on):''}${priv?' · <span class="badge PRIVATE">PRIVATE</span>':''}</div><div class="small">${ec(s.sub)}</div>${acctProvenanceHtml(c,s)}${lic&&c.jurisdiction_code?`<div class="small acct-cov-v11">${ec(licenseCoverage(c.kind,c.jurisdiction_code).text)}${ec(licenseHomeStateHint(c.kind,c.jurisdiction_code,home))}</div>`:''}${catalogKind(c.kind)?.experience&&(m.years!=null||m.recent_months!=null||m.last_worked_on)?`<div class="small">${[m.years!=null?m.years+' yrs':'',m.recent_months!=null?m.recent_months+' months in the last 2 years':'',m.last_worked_on?'last worked '+fd(m.last_worked_on):'',m.last_worked_on?'counts as recent until '+fd(experienceRecentUntil(m.last_worked_on,catalogKind(c.kind)?.recencyMonths))+' (calculated)':''].filter(Boolean).map(ec).join(' · ')}</div>`:''}${isSkillsKind(c.kind)?`<div class="small acct-skills-v144">${m.completed_on?ec('completed '+fd(m.completed_on)+' · suggested redo by '+fd(skillsRedoBy(m.completed_on))+' (calculated; the facility rule is final)'):'completion date not recorded'} · self-attested, never shown as verified</div>`:''}<div class="small acct-hist-v11">History: ${hist.length?ec(hist.join(' · ')):'added'} · not verified by anyone yet</div>
  <div class="small">Document: ${c.source_document_path?`private file · <button class="linkbtn-v10" type="button" data-act="doc-open" data-id="${c.id}">Open (60-second signed link)</button>${c.status!=='VERIFIED'&&/\.(pdf|png|jpe?g|webp)$/i.test(c.source_document_path)?` · <button class="linkbtn-v10" type="button" data-act="doc-rescan" data-id="${c.id}">Re-scan document</button>`:''}`:'none'} · <label class="linkbtn-v10">${c.source_document_path?'Replace':'Upload'} file<input type="file" class="acct-doc-input-v10 sr-only-v10" data-id="${c.id}" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label></div>
  ${acctDocDetailsHtml(c)}<div data-scan-slot="${c.id}">${typeof scanBoxHtml==='function'?scanBoxHtml(c.id):''}</div></div>
  <div class="acct-item-side-v10"><span class="badge ${s.cls}">${ec(s.text)}</span><button class="mini sec" type="button" data-act="cred-delete" data-id="${c.id}">Delete</button></div></div>`;
@@ -137,9 +137,11 @@ function acctAddForm(){
  <label id="acctNameRowV10" class="hidden">Credential name<input id="acctCustomNameV10" maxlength="120"></label>
  <div id="acctExpHelpV10" class="small hidden" style="margin:6px 0"></div>
  <div id="acctExpRowV10" class="hidden"><div class="grid2-v83"><label>Years in this specialty <span class="small">(optional)</span><input type="number" id="acctExpYearsV10" min="0" max="60" step="0.5"></label><label>Months worked in the last 2 years <span class="small">(optional)</span><input type="number" id="acctExpRecentV10" min="0" max="24"></label></div><label>Last worked in this specialty<input type="date" id="acctExpLastV10"></label></div>
- <fieldset id="acctLicTypeRowV10" class="acct-fieldset-v10 hidden"><legend>License type</legend><label class="acct-sec-v11"><input type="radio" name="acctLicTypeV10" value="MULTI"> Multistate (compact) — issued by your home state</label><label class="acct-sec-v11"><input type="radio" name="acctLicTypeV10" value="SINGLE"> Single-state — covers this state only</label></fieldset>
+ <fieldset id="acctLicTypeRowV10" class="acct-fieldset-v10 hidden"><legend>License type</legend><label class="acct-sec-v11"><input type="radio" name="acctLicTypeV10" value="MULTI"> Multistate (compact) — issued by your primary state of residence</label><label class="acct-sec-v11"><input type="radio" name="acctLicTypeV10" value="SINGLE"> Single-state — covers this state only</label></fieldset>
  <div id="acctLicenseNoteV10" class="small hidden" style="margin:6px 0"></div>
- <label>Expiration date <span class="small">(if it has one)</span><input type="date" id="acctExpV10"></label>
+ <div id="acctSkillsRowV144" class="hidden"><label>Completed on<input type="date" id="acctSkillsDoneV144"></label><div class="small" id="acctSkillsCalcV144"></div><div class="small acct-note-v10">Skills checklists are usually provided by your agency or facility (often through a skills-checklist vendor) and are self-attested by you. Veridun never shows them as verified. Some facilities ask for a new checklist for every assignment; their rule is final.</div></div>
+ <div class="small hidden" id="acctExpCalcV144"></div>
+ <div id="acctExpDateRowV10"><label for="acctExpV10">Expiration date <span class="small">(if it has one)</span> <span id="acctExpSrcV144"></span></label><input type="date" id="acctExpV10"><div id="acctExpNoteV144" class="small"></div></div>
  <label>Source document <span class="small">(optional · PDF, PNG, JPEG, DOC, DOCX · max 10 MB · private)</span><input type="file" id="acctFileV10" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label>
  <div class="small">PDF and image files are read on this device so you can check the details before saving. Nothing is sent to an AI service.</div>
  <div id="acctScanSlotV14">${typeof scanBoxHtml==='function'?scanBoxHtml('add'):''}</div>
@@ -150,11 +152,20 @@ function acctAddForm(){
 function acctSyncAddForm(){
  const sel=$('acctKindV10');if(!sel)return;const k=catalogKind(sel.value);
  $('acctJurRowV10').classList.toggle('hidden',!k||!k.jurisdiction);$('acctNameRowV10').classList.toggle('hidden',!k||k.kind!=='OTHER');
- if(k&&k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;const cur=$('acctJurV10').value;$('acctJurV10').innerHTML=acctOptions(list.map(j=>[j.code,j.name]),cur||(acct().cache.profile?.home_jurisdiction||''),k.jurisdiction==='NLC_HOME'?'Home state (compact)…':'Choose a state…')}
+ if(k&&k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;const cur=$('acctJurV10').value;$('acctJurV10').innerHTML=acctOptions(list.map(j=>[j.code,j.name]),cur||(acct().cache.profile?.home_jurisdiction||''),k.jurisdiction==='NLC_HOME'?'Primary state of residence (compact)…':'Choose a state…')}
  $('acctPrivNoteV10').textContent=k?(k.privacy==='PRIVATE'?'Private record: organizations only ever see “Requirement satisfied”, never details, dates or the document.':'Shareable: organizations you share with see the name, issuer, state and expiration, never the document.')+(k.kind==='RN_LICENSE'||k.kind==='RN_LICENSE_MULTISTATE'?' Status stays “Submitted, not verified” until a verifier checks it with '+licensePrimarySource(k.kind,$('acctJurV10').value||acct().cache.profile?.home_jurisdiction)+'.':' '):'';
  const eh=$('acctExpHelpV10');if(eh){eh.classList.toggle('hidden',!k?.experience);eh.innerHTML=k?.experience?ec(experienceHelpText(k.kind)):'';}
  const er=$('acctExpRowV10');if(er)er.classList.toggle('hidden',!k?.experience);
+ /* v14.4: experience and skills checklists have no expiration field: experience counts as recent
+    until last worked + the window (calculated); a checklist has a completion date and a calculated
+    suggested redo date. Neither calculated date is ever saved as an expiration. */
+ const sk=k&&isSkillsKind(k.kind);$('acctExpDateRowV10')?.classList.toggle('hidden',!!(k?.experience||sk));$('acctSkillsRowV144')?.classList.toggle('hidden',!sk);$('acctExpCalcV144')?.classList.toggle('hidden',!k?.experience);acctCalcNotes();
  acctLicenseNote();
+}
+function acctCalcNotes(){
+ const k=catalogKind($('acctKindV10')?.value||'');
+ const ec2=$('acctExpCalcV144');if(ec2&&k?.experience){const lw=$('acctExpLastV10')?.value,m=k.recencyMonths||EXPERIENCE_DEFAULT_WINDOW_MONTHS,u=experienceRecentUntil(lw,m);ec2.innerHTML=u?`Counts as recent until <b>${ec(fd(u))}</b> <span class="badge">CALCULATED</span> (last worked + ${m} months). Not an expiration; each facility's recency window is final.`:`Enter the last date you worked in this specialty to see until when it counts as recent (last worked + ${m} months, calculated).`}
+ const sc=$('acctSkillsCalcV144');if(sc&&k&&isSkillsKind(k.kind)){const d=$('acctSkillsDoneV144')?.value,u=skillsRedoBy(d);sc.innerHTML=u?`Suggested redo by <b>${ec(fd(u))}</b> <span class="badge">CALCULATED</span> (completed + ${SKILLS_DEFAULT_REDO_MONTHS} months). Not an expiration; the facility rule is final (some need a new checklist per assignment).`:''}
 }
 async function acctSubmitCredential(){
  const a=acct(),k=catalogKind(acctLicenseKind()||$('acctKindV10').value);if(!k)throw new Error('Choose a credential type.');
@@ -164,10 +175,11 @@ async function acctSubmitCredential(){
  const type=k.kind==='OTHER'?'CUSTOM_'+(custom.toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL'):credentialTypeCode(k.kind,jur);
  const file=$('acctFileV10').files[0]||null;
  const meta=k.experience?Object.fromEntries(Object.entries({years:$('acctExpYearsV10').value!==''?+$('acctExpYearsV10').value:null,recent_months:$('acctExpRecentV10').value!==''?+$('acctExpRecentV10').value:null,last_worked_on:$('acctExpLastV10').value||null}).filter(([,v])=>v!=null&&v!=='')):{};
- if(k.kind==='RN_LICENSE_MULTISTATE'&&jur){const h=a.cache.profile?.home_jurisdiction;if(h&&jur!==h&&!confirm(`A multistate license is issued only by your primary state of residence. Your home state is ${jurisdictionName(h)}, but this license is from ${jurisdictionName(jur)}.\n\nSave it anyway? (If you moved, update your home state in your profile.)`))return null;if(!nlcCanIssueMultistate(jur))throw new Error(`${jurisdictionName(jur)} can't issue multistate licenses (${nlcStatusLabel(jur)}). Choose “RN License — single-state”, or pick a compact home state.`)}
+ if(k.kind==='RN_LICENSE_MULTISTATE'&&jur){const h=a.cache.profile?.home_jurisdiction;if(h&&jur!==h&&!confirm(`A multistate license is issued only by your primary state of residence. Your primary state of residence is ${jurisdictionName(h)}, but this license is from ${jurisdictionName(jur)}.\n\nSave it anyway? (If you moved, update your primary state of residence in your profile.)`))return null;if(!nlcCanIssueMultistate(jur))throw new Error(`${jurisdictionName(jur)} can't issue multistate licenses (${nlcStatusLabel(jur)}). Choose “RN License — single-state”, or pick a compact primary state of residence.`)}
+ if(isSkillsKind(k.kind)&&$('acctSkillsDoneV144')?.value)meta.completed_on=$('acctSkillsDoneV144').value;
  const sum=typeof scanForAdd==='function'?scanForAdd():null;
  if(sum&&k.privacy!=='PRIVATE')meta.doc=sum.doc;
- const saved=await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:$('acctExpV10').value||null,metadata:meta},file);
+ const saved=await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:k.experience?null:isSkillsKind(k.kind)?((acctScan?.target==='add'&&acctScan.applyExpiry&&$('acctExpV10').value)||null):($('acctExpV10').value||null),metadata:meta},file);
  if(sum){await scanAfterSave(saved.id,sum,{applied:!!acctScan?.applyExpiry});acctLastScanResult={name,mismatch:sum.ms.length>0}}
  if(acctScan?.target==='add')acctScan=null;
  return name;
@@ -192,8 +204,8 @@ function acctLicenseNote(){
  const kind=acctLicenseKind(),cov=jur?licenseCoverage(kind,jur):null,warn=licenseHomeStateHint(kind,jur,home);
  const lines=[];
  if(warn&&kind==='RN_LICENSE_MULTISTATE')lines.push('<b>'+ec(warn.replace(/^ · /,''))+'</b>');
- if(home)lines.push(ec(homeStateIsCompact(home)?`Your home state, ${jurisdictionName(home)}, is a compact state, so a license from ${jurisdictionName(home)} defaults to multistate. Choose single-state if yours isn't multistate.`:`Your home state, ${jurisdictionName(home)}, isn't a compact state: a license from it covers ${jurisdictionName(home)} only.`));
- else lines.push('Set your home state in your profile so Veridun can tell whether your license can be multistate.');
+ if(home)lines.push(ec(homeStateIsCompact(home)?`Your primary state of residence, ${jurisdictionName(home)}, is a compact state, so a license from ${jurisdictionName(home)} defaults to multistate. Choose single-state if yours isn't multistate.`:`Your primary state of residence, ${jurisdictionName(home)}, isn't a compact state: a license from it covers ${jurisdictionName(home)} only.`));
+ else lines.push('Set your primary state of residence in your profile so Veridun can tell whether your license can be multistate.');
  if(cov)lines.push(ec(cov.text));
  if(jur)lines.push('Verification: not verified yet. A real check would use '+ec(licensePrimarySource(kind,jur))+'.');
  box.classList.remove('hidden');box.innerHTML=lines.join('<br>');
@@ -383,6 +395,7 @@ function acctWire(){
   if(t.id==='acctJurV10'){acctLicTypeTouched=false;acctLicenseNote()}
   if(t.name==='acctLicTypeV10'){acctLicTypeTouched=true;acctLicenseNote()}
   if(t.id==='acctHomeV10')acctHomeStateNote(t.value);
+  if(t.id==='acctExpLastV10'||t.id==='acctSkillsDoneV144')acctCalcNotes();
   if(t.id==='acctReadyStateV11'||t.id==='acctReadyWorkV11'){acctReady={state:$('acctReadyStateV11').value,work:$('acctReadyWorkV11').value};acctRenderAll()}
   if(['acctShareDurV10','acctShareStartV10','acctShareEndV10','acctShareCustomV10','acctShareBufferV11'].includes(t.id))acctShareCoverageWarn(e);
   if(t.classList.contains('acctSecSpecV10')&&t.checked){const n=document.querySelectorAll('.acctSecSpecV10:checked').length;if(n>5){t.checked=false;acctMsg('Up to 5 secondary specialties.','err')}}
@@ -441,7 +454,7 @@ function acctProvenanceHtml(c,s){
 }
 function acctPassportLicenseNote(){
  const lic=(acct().cache.credentials||[]).filter(c=>c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE');
- if(!lic.length)return'<div class="notice alert-v81 small" id="acctPassLicV13"><b>Passport incomplete:</b> every Passport needs an RN license. Add yours (home state, or multistate if your home state is in the compact).</div>';
+ if(!lic.length)return'<div class="notice alert-v81 small" id="acctPassLicV13"><b>Passport incomplete:</b> every Passport needs an RN license. Add yours (from your primary state of residence, or multistate if that state is in the compact).</div>';
  const ok=lic.some(c=>c.status==='VERIFIED'&&levelMeets(c.verification_level,'PRIMARY_SOURCE_VERIFIED'));
  return`<div class="small" id="acctPassLicV13"><b>Passport RN license:</b> ${ok?'primary-source verified ✓':'added — the Passport counts as complete once a verifier confirms it with the board or Nursys'}. A license for another state becomes <b>Required</b> when an assignment there isn't covered by your home or compact license.</div>`;
 }

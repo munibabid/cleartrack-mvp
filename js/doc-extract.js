@@ -16,7 +16,10 @@
 const FIELDS=['holder_name','credential_id','course','issued_on','renew_by','expires_on','training_center','jurisdiction','multistate'];
 /* v14.2: read but informational only (never used for verification, never logged as a field). */
 const INFO_FIELDS=['training_center_id'];
-const FIELD_LABEL={holder_name:'Name on the document',credential_id:'Certificate / card ID',course:'Credential on the document',issued_on:'Issue / completion date',renew_by:'Recommended renewal (month/year)',expires_on:'Expiration date',training_center:'Training center',jurisdiction:'State',multistate:'Multistate (compact)',training_center_id:'Training Center ID'};
+/* v14.4: the NIHSS test group (Group A–F) is read as printed, with its own confidence. Like the
+   Training Center ID it stays out of the logged field lists (the server allow-list is frozen). */
+const NIHSS_INFO_FIELDS=['test_group','nihss_module'];
+const FIELD_LABEL={holder_name:'Name on the document',credential_id:'Certificate / card ID',course:'Credential on the document',issued_on:'Issue / completion date',renew_by:'Recommended renewal (month/year)',expires_on:'Expiration date',training_center:'Training center',jurisdiction:'State',multistate:'Multistate (compact)',training_center_id:'Training Center ID',test_group:'NIHSS test group',nihss_module:'NIHSS module',suggested_renewal:'Suggested renewal (calculated, not printed)'};
 const ECARD_NOT_FOUND="eCard code not found. Type it from your card; it's needed for AHA verification.";
 const TC_ID_NOTE='Who ran the class. Not used for verification.';
 const REQUIRED_FIELDS=['holder_name','credential_id','course','issued_on','renew_by'];
@@ -95,13 +98,14 @@ function labelNear(lines,li,re){
  return re.test(lines[li]||'')?0:re.test(lines[li+1]||'')?1:re.test(lines[li-1]||'')?-1:null;
 }
 
-const NAME_STOP=/\b(provider|american|heart|association|red\s*cross|issue|issued|date|renew|renewal|recommended|training|center|centre|instructor|ecard|e-card|code|course|card|completion|certificate|certification|basic|life|support|advanced|cardiovascular|pediatric|successfully|completed|curriculum|program|valid|expires?|cpr|aed|bls|acls|pals|heartcode|location|holder|student|name|has|the|of|and|in|for|this|with|accordance|evaluations?|cognitive|skills?)\b/i;
+const NAME_STOP=/\b(provider|american|heart|association|red\s*cross|issue|issued|date|renew|renewal|recommended|training|center|centre|instructor|ecard|e-card|code|course|card|completion|certificate|certification|basic|life|support|advanced|cardiovascular|pediatric|successfully|completed|curriculum|program|valid|expires?|cpr|aed|bls|acls|pals|heartcode|location|holder|student|name|has|the|of|and|in|for|this|with|accordance|evaluations?|cognitive|skills?|license|licence|number|board|department|commonwealth|expiration)\b/i;
 function cleanName(s){
  let t=String(s||'').replace(/,?\s+\b(RN|R\.N\.|BSN|MSN|LPN|LVN|APRN|NP|CNM|CRNA|DNP|PhD|CCRN|CEN|MBA|MPH)\b[\s,A-Z\-]*$/,'').replace(/[^A-Za-z\u00C0-\u024F'’.\- ]+/g,' ').replace(/\s+/g,' ').trim();
  t=t.replace(/^(mr|mrs|ms|dr)\.?\s+/i,'');
  const words=t.split(' ').filter(w=>w.replace(/[^A-Za-z\u00C0-\u024F]/g,'').length>0);
  if(words.length<2||words.length>5)return null;
  if(words.some(w=>NAME_STOP.test(w)))return null;
+ if(/\b(registered|practical|vocational)\s+(professional\s+)?nurse\b/i.test(t))return null;
  if(words.filter(w=>w.replace(/[.'’\-]/g,'').length>=2).length<2)return null;
  return words.map(w=>w===w.toUpperCase()||w===w.toLowerCase()?w.charAt(0).toUpperCase()+w.slice(1).toLowerCase():w).join(' ');
 }
@@ -132,7 +136,7 @@ function profileFor(kind,catalog){
  if(k.category==='Certifications'||kind==='QUAL_SPECIALTY_CERT')return'cert';
  return'record';
 }
-const PROFILE_FIELDS={aha_resus:['holder_name','credential_id','course','issued_on','renew_by','training_center'],license:['holder_name','credential_id','jurisdiction','multistate','issued_on','expires_on'],cert:['holder_name','credential_id','course','issued_on','expires_on'],record:['holder_name','issued_on','expires_on'],dates_only:['issued_on','expires_on']};
+const PROFILE_FIELDS={aha_resus:['holder_name','credential_id','course','issued_on','renew_by','training_center'],license:['holder_name','credential_id','course','jurisdiction','multistate','issued_on','expires_on'],cert:['holder_name','credential_id','course','issued_on','expires_on'],record:['holder_name','issued_on','expires_on'],dates_only:['issued_on','expires_on']};
 const PROFILE_REQUIRED={aha_resus:['holder_name','credential_id','course','issued_on','renew_by'],license:['holder_name','credential_id','jurisdiction','expires_on'],cert:['holder_name','course','expires_on'],record:['holder_name','issued_on'],dates_only:['issued_on']};
 function _phraseRe(p){return[...p].map(ch=>/[-.]/.test(ch)?'[-. ]?':/\s/.test(ch)?'\\s+':/[*+?^${}()|[\]\\\/]/.test(ch)?'\\'+ch:ch).join('').replace(/(\\s\+)+/g,'\\s+')}
 const _patCache={};
@@ -162,7 +166,7 @@ function detectSource(flat,kind,sources){
  return null;
 }
 const RE_ISSUE=/issue|issued|completion|completed|date\s+of\s+(course|exam|test|completion|certification)|test\s*date|exam\s*date|administered|date\s+given|collected|certified\s+(since|on)|initial|original|awarded|conferred|earned|effective|course\s+date|class\s+date|read\s+on|date\s+read|signed/i;
-const RE_EXP=/renew|expir|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)|exp\.?\s*date|\bdue\b|recertif|good\s+through|valid\s+for|next\s*(test|due)/i;
+const RE_EXP=/renew|expir|certified\s+(through|thru|until)|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)|exp\.?\s*date|\bdue\b|recertif|good\s+through|valid\s+for|next\s*(test|due)/i;
 function pickDates(lines,{monthYearOk=true}={}){
  const {full,my}=findDates(lines);
  let issue=full.find(d=>labelNear(lines,d.li,RE_ISSUE)===0&&!RE_EXP.test(lines[d.li]))||full.find(d=>labelNear(lines,d.li,RE_ISSUE)!=null&&!RE_EXP.test(lines[d.li]));
@@ -174,8 +178,10 @@ function pickDates(lines,{monthYearOk=true}={}){
   if(isE&&!exp)exp=d;if(isI&&!issue)issue=d}
  if(!issue&&exp&&renewMy&&exp.iso.slice(0,7)<renewMy.ym){issue=exp;exp=null}
  const sorted=full.slice().sort((a,b)=>a.iso.localeCompare(b.iso));
- if(!issue&&sorted.length&&(renewMy||exp||sorted.length===1))issue=sorted.find(d=>d!==exp)||null;
- if(!issue&&sorted.length>=2){issue=sorted[0];if(!exp)exp=sorted[sorted.length-1]}
+ /* v14.4: a second copy of the expiration date (wallet card + certificate) is not an issue date */
+ const expOnly=d=>RE_EXP.test(lines[d.li]||'')&&!RE_ISSUE.test(lines[d.li]||'');
+ if(!issue&&sorted.length&&(renewMy||exp||sorted.length===1))issue=sorted.find(d=>d!==exp&&!(exp&&d.iso===exp.iso&&expOnly(d)))||null;
+ if(!issue&&new Set(sorted.map(d=>d.iso)).size>=2){issue=sorted[0];if(!exp)exp=sorted[sorted.length-1]}
  if(!exp&&!renewMy&&sorted.length>=2&&issue){const later=sorted.filter(d=>d.iso>issue.iso);if(later.length===1)exp=later[0]}
  return{issue,exp,renewMy};
 }
@@ -193,6 +199,65 @@ function findId(lines,flat,reLbl,{allowBare12=false,aha=false}={}){
  if(allowBare12){const m=/(?<![\dA-Za-z])(\d{12})(?![\dA-Za-z])/.exec(flat.replace(/(\d{4}) (\d{4}) (\d{4})/g,'$1$2$3'));if(m)return{code:m[1],type:'AHA',how:'pattern'}}
  return null;
 }
+/* v14.4: certificate numbers on certifications (NIHSS and others). Every value near a
+   "Certificate Number / Certificate # / Certificate ID / Test ID" label is a candidate:
+   the rest of the label's line, or the cell in the same column on the line above or below
+   (value-above-label certificates print "IPA24…  Mar 7, 2024" over "Certificate Number
+   Date Completed"). Footer form codes ("KJ-0919 PART1 9/19 © 2019 …") lose; letters + a
+   2-digit year (AHA/ASA "IPA24…") is a format hint only. The case is kept as printed. */
+/* v14.4: who issued an NIHSS certificate, from the issuer PRINTED on it (never from a logo):
+   AHA/ASA, Apex Innovations (incl. NIHSS+), or NIH Stroke Scale International. None or more
+   than one → undetermined, and the verifier is asked to identify it. Registry ids. */
+const NIHSS_ISSUERS=[
+ {id:'aha-asa-nihss',name:'American Heart Association / American Stroke Association',re:/american\s+heart\s+association|american\s+stroke\s+association|learn\.heart\.org|professional\s+education\s+hub|\bheart\.org\b/i},
+ {id:'apex-nihss',name:'Apex Innovations',re:/apex\s*innovations|apexinnovations\.com/i},
+ {id:'nihss-plus',name:'NIHSS+ (Apex Innovations)',re:/NIHSS\s*\+|nihss\.plus/i,family:'apex-nihss'},
+ {id:'nihss-international',name:'NIH Stroke Scale International',re:/NIH\s*Stroke\s*Scale\s*International|nihstrokescale\.org/i}];
+const NIHSS_UNDETERMINED='The certificate does not name its issuer clearly, so the verifier is undetermined. Identify the issuer printed on the certificate (AHA/ASA, Apex Innovations, or NIH Stroke Scale International) before verifying. A logo alone is not enough.';
+function addMonthsIso(iso,n){const [y,m,d]=String(iso).split('-').map(Number);const t=new Date(Date.UTC(y,m-1+n,1));const last=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth()+1,0)).getUTCDate();t.setUTCDate(Math.min(d,last));return t.toISOString().slice(0,10)}
+function nihssIssuer(flat){
+ const hits=NIHSS_ISSUERS.map(x=>({x,m:x.re.exec(flat)})).filter(h=>h.m);
+ if(!hits.length)return{id:null,note:NIHSS_UNDETERMINED};
+ const fams=new Set(hits.map(h=>h.x.family||h.x.id));
+ if(fams.size>1)return{id:null,note:'The certificate names more than one possible issuer ('+hits.map(h=>h.x.name).join(', ')+'), so the verifier is undetermined. Check which one issued it before verifying.',ambiguous:true};
+ const h=hits.find(h=>h.x.family)||hits[0];return{id:h.x.id,name:h.x.name,raw:h.m[0]};
+}
+const CERT_FORMAT_HINT=/^[A-Z]{2,4}\d{2}[A-Za-z0-9]{6,}$/;
+const FOOTER_LINE=/©|\(c\)\s*\d{4}|copyright|\bpart\s*\d|\brev\.?\s*\d|\bform\s+[A-Z0-9-]+|all\s+rights\s+reserved/i;
+function certId(lines,reLbl){
+ const segs=l=>{const out=[];const re=/\S+(?:\s{1,2}\S+)*/g;let m;while((m=re.exec(String(l||''))))out.push({t:m[0],i:m.index});return out};
+ const tokOf=t=>{const m=/(?:^|[\s:#])([A-Za-z]{0,5}[\-]?[0-9][A-Za-z0-9\-]{3,30})(?=$|[\s,;.])/.exec(' '+t);return m?m[1]:null};
+ const cands=[];
+ for(let i=0;i<lines.length;i++){
+  const m=reLbl.exec(lines[i]);if(!m)continue;
+  const ls=segs(lines[i]),k=Math.max(0,ls.findIndex(x=>x.i<=m.index&&m.index<x.i+x.t.length+1));
+  const after=lines[i].slice(m.index+m[0].length).replace(/^[\s:#.\-]+/,'').split(/\s{3,}/)[0];
+  const push=(t,li,pos,line)=>{const tok=t&&tokOf(t);if(!tok)return;const alnum=tok.replace(/[^A-Za-z0-9]/g,'');if(alnum.length<5||/^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}$/.test(tok))return;
+   let sc=pos;if(CERT_FORMAT_HINT.test(tok))sc+=2;if(alnum.length>=8)sc+=1;if(alnum.length<7)sc-=1;if(FOOTER_LINE.test(line||''))sc-=4;if(/^[A-Z]{1,3}-\d{3,4}$/.test(tok))sc-=2;
+   cands.push({tok,li,sc,pos})};
+  push(after,i,3,lines[i]);
+  for(const [d,pos] of [[-1,2],[1,2]]){const L=lines[i+d];if(L==null)continue;const ss=segs(L);
+   const cell=ss.length===ls.length?ss[k]:ss.length===1?ss[0]:ss.reduce((b,x)=>!b||Math.abs(x.i-ls[k].i)<Math.abs(b.i-ls[k].i)?x:b,null);
+   if(cell)push(cell.t,i+d,pos+(ss.length===ls.length&&ls.length>1?1:0),L)}
+ }
+ if(!cands.length)return null;
+ cands.sort((a,b)=>b.sc-a.sc);const c=cands[0];
+ const mixed=/[a-z]/.test(c.tok)&&/[A-Z]/.test(c.tok);const code=mixed?c.tok:c.tok.toUpperCase();
+ return{code,type:/^\d+$/.test(code)?'NUM':'ALNUM',how:'label',raw:c.tok,li:c.li,weak:c.sc<3};
+}
+/* v14.4: some certificates (e.g. AACN CCRN) print the number with no "Number" label, on the same line
+   as the issuer's verification address ("aacn.org/verify        ##########"). The verification address is
+   the printed anchor; the number must sit beside it (same line, or the line right under it). Any other
+   unlabelled number is never used. Confidence stays below "high" so the user checks it. */
+const VERIFY_ANCHOR=/\b[a-z0-9.-]+\.(?:org|com|net|gov)\/verif\w*\b|\bverify\s+(?:at|online)\b/i;
+function verifyLineId(lines){
+ for(let i=0;i<lines.length;i++){const m=VERIFY_ANCHOR.exec(lines[i]);if(!m)continue;
+  for(const [L,li] of [[lines[i].slice(m.index+m[0].length),i],[lines[i+1]||'',i+1]]){
+   if(li!==i&&!/^\s*\S+\s*$/.test(L))continue;
+   const t=/(?:^|\s)([A-Z]{0,3}\d{6,12})(?=\s|$)/.exec(L);if(t&&!FOOTER_LINE.test(lines[li]))return{code:t[1],type:/^\d+$/.test(t[1])?'NUM':'ALNUM',how:'beside the verification address',raw:t[1],li,anchor:true}}
+ }
+ return null;
+}
 function findName(lines,flat,{profileName=''}={}){
  let name=null,how='';
  for(let i=0;i<lines.length&&!name;i++){
@@ -205,20 +270,61 @@ function findName(lines,flat,{profileName=''}={}){
   const pre=lines[i].slice(0,m.index).trim();
   name=(pre&&cleanName(pre))||cleanName(lines[i-1])||cleanName(lines[i-2]);if(name)how='before the completion statement';
  }
+ /* v14.4: state boards print the name AFTER the grant ("…issues the license of Registered Nurse:" / "is hereby licensed as") */
+ const reGrant=/(issues?|grants?|awards?)\s+(the\s+|this\s+)?(?:[A-Z][A-Z-]{1,8}\s+)?(licen[cs]e|registration|certificate|certification)\b[^\n]*?(:|\bto)\s*(.*)$|(is\s+hereby\s+)?licensed\s+(to\s+practice\s+)?as\s+an?\s+[^\n]*?:\s*(.*)$/i;
+ for(let i=0;i<lines.length&&!name;i++){
+  const m=reGrant.exec(lines[i]);if(!m)continue;
+  const rest=(m[5]!=null?m[5]:m[8])||'';
+  for(const c of [rest,lines[i+1]]){const n=c&&cleanName(c);if(n){name=n;how='after the grant';break}}
+ }
+ /* v14.4: a licensee block (name, street address, "City, ST 12345") on license wallet cards */
+ const reStreet=/^\s*\d{1,6}[A-Za-z]?\s+[A-Za-z0-9.' ]{2,40}\b(st|street|ave|avenue|blvd|rd|road|dr|drive|way|ln|lane|ct|court|pl|place|cir|circle|ter|terrace|pkwy|hwy|sq|loop|trail|trl|row)\b\.?/i,reCity=/[A-Za-z .'-]{2,30},?\s+[A-Z]{2}\s+\d{5}(-\d{4})?\b/;
+ for(let i=0;i<lines.length&&!name;i++){
+  if(!reStreet.test(lines[i]))continue;
+  if(!(reCity.test(lines[i+1]||'')||reCity.test(lines[i+2]||'')||reCity.test(lines[i])))continue;
+  const n=cleanName(lines[i-1]);if(n){name=n;how='licensee address block'}
+ }
  if(!name&&profileName){const re=new RegExp(profileName.trim().split(/\s+/).map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[\\s\\S]{0,4}'),'i');const m=re.exec(flat);if(m){name=cleanName(m[0]);how='matches your profile name'}}
  return name?{name,how}:null;
 }
 function findJurisdiction(flat,jurisdictions){
+ /* v14.4: the issuing state comes from board / government wording ("Commonwealth of
+    Massachusetts", "Massachusetts Board of Registration in Nursing", "State of Texas",
+    "Massachusetts General Laws"). A bare state name is only a weak hint, and never one
+    inside a street address ("250 Washington St."), a city ("Washington, DC") or a
+    mailing address; 2-letter codes alone are never used (they appear in addresses). */
  const js=jurisdictions||_globals().jurisdictions;let best=null;
+ const BOARD='(state\\s+)?board\\s+of\\s+(registered\\s+)?(nursing|nurse|registration)';
  for(const j of js){
-  const nm=String(j.name||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');if(!nm)continue;
-  const strong=new RegExp('(state\\s+of\\s+'+nm+'|'+nm+'\\s+(state\\s+)?board\\s+of\\s+(registered\\s+)?nursing|'+nm+'\\s+board|board\\s+of\\s+nursing[^\\n]{0,12}'+nm+'|commonwealth\\s+of\\s+'+nm+')','i');
-  const m=strong.exec(flat);if(m&&(!best||best.weak||m.index<best.i))best={code:j.code,name:j.name,i:m.index,weak:false};
-  if(!best){const w=new RegExp('\\b'+nm+'\\b','i').exec(flat);if(w)best={code:j.code,name:j.name,i:w.index,weak:true}}
+  const nm=String(j.name||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');if(!nm)continue;
+  const strong=new RegExp('(state\\s+of\\s+'+nm+'\\b|commonwealth\\s+of\\s+'+nm+'\\b|\\b'+nm+'\\s+'+BOARD+'|\\b'+nm+'\\s+board\\b|board\\s+of\\s+(registered\\s+)?nursing[^\\n]{0,12}\\b'+nm+'\\b|\\b'+nm+'\\s+(general\\s+laws|department\\s+of\\s+(public\\s+)?health|division\\s+of\\s+professional|nursing\\s+board|licens\\w+\\s+board))','i');
+  const m=strong.exec(flat);if(m&&(!best||best.weak||m.index<best.i))best={code:j.code,name:j.name,i:m.index,weak:false,raw:m[0]};
+ }
+ if(!best){
+  const ADDR=/^\s*(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|way|ln|lane|ct|court|pl|place|sq|square|pkwy|parkway|hwy|highway|cir|circle|ter|terrace|county|co\.|university|hospital|medical|memorial|heights|park|plaza|ave\.)\b\.?/i;
+  const weak=[];
+  for(const j of js){
+   const nm=String(j.name||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+');if(!nm)continue;
+   const re=new RegExp('\\b'+nm+'\\b','ig');let m;
+   while((m=re.exec(flat))){
+    const before=flat.slice(Math.max(0,m.index-12),m.index),after=flat.slice(m.index+m[0].length,m.index+m[0].length+14);
+    if(/\d[\w\-]*\s+$/.test(before))continue;
+    if(/west\s+$/i.test(before))continue;/* Virginia inside West Virginia *//* "250 Washington St." */
+    if(ADDR.test(after))continue;
+    if(/^,?\s*(D\.?\s?C\.?)\b/.test(after))continue;/* Washington, DC */
+    if(/^\s+(state\s+)?(university|college)/i.test(after))continue;
+    /* a city/state pair "…, Maine 04101" in a mailing address */
+    if(/^\s*\d{5}(-\d{4})?\b/.test(after)&&/,\s*$/.test(before))continue;
+    weak.push({code:j.code,name:j.name,i:m.index,weak:true,raw:m[0]});
+   }
+  }
+  if(weak.length){/* the state named most often, then the earliest */
+   const cnt={};weak.forEach(w=>cnt[w.code]=(cnt[w.code]||0)+1);weak.sort((a,b)=>cnt[b.code]-cnt[a.code]||a.i-b.i);best=weak[0];best.count=cnt[best.code];
+  }
  }
  if(!best||best.weak){/* letter-spaced headings ("T E X A S  B O A R D") lose their spaces in PDF text */
   const ns=flat.replace(/\s+/g,'').toUpperCase();
-  for(const j of js){const n=String(j.name||'').replace(/\s+/g,'').toUpperCase();if(!n)continue;const i=Math.min(...[ns.indexOf('STATEOF'+n),ns.indexOf(n+'BOARD'),ns.indexOf(n+'STATEBOARD')].map(x=>x<0?1e9:x));if(i<1e9&&(!best||best.weak||i<best.i))best={code:j.code,name:j.name,i,weak:false}}
+  for(const j of js){const n=String(j.name||'').replace(/\s+/g,'').toUpperCase();if(!n)continue;const i=Math.min(...[ns.indexOf('STATEOF'+n),ns.indexOf('COMMONWEALTHOF'+n),ns.indexOf(n+'BOARD'),ns.indexOf(n+'STATEBOARD')].map(x=>x<0?1e9:x));if(i<1e9&&(!best||best.weak||i<best.i))best={code:j.code,name:j.name,i,weak:false,raw:j.name}}
  }
  return best;
 }
@@ -435,12 +541,13 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   return clamp(Math.min(OCR_CAP,w+(label?LABEL_BONUS:0))*(label?1:NO_LABEL)*factor,0,OCR_CAP);
  };
  const lineOf=s=>{const t=nz(s);if(!t)return null;const i=lines.findIndex(l=>nz(l).includes(t));return i<0?null:i};
- const f={};const warnings=[];const notes={};const want=PROFILE_FIELDS[profile];
+ const f={};const warnings=[];const notes={};const calculated={};/* v14.4: calculated dates live here, never in fields */const want=PROFILE_FIELDS[profile];
  // ---- issuer / suggested registry source ----
  let issuer=null,source=null;
  if(profile==='aha_resus'){
   issuer=/red\s*cross/i.test(flat)?'RED_CROSS':/\bRQI\b|heartcode\s*complete|rqi1stop/i.test(flat)?'AHA_RQI':/american\s*heart|heart\.org|\bAHA\b/i.test(flat)?'AHA':null;
- }else if(profile!=='dates_only'&&profile!=='license'){source=detectSource(flat,kind,sources);issuer=source?source.id:null}
+ }else if(kind==='CERT_NIHSS'){const n=nihssIssuer(flat);if(n.id){source={id:n.id,name:n.name,how:'issuer printed on the certificate: '+String(n.raw).replace(/\s+/g,' ')};issuer=n.id}else notes.verifier=n.note}
+ else if(profile!=='dates_only'&&profile!=='license'){source=detectSource(flat,kind,sources);issuer=source?source.id:null}
  // ---- which credential the document is ----
  if(profile==='aha_resus'){
   const title=/\b(BLS|ACLS|PALS)\s*(Provider|Instructor)\b/i.exec(flat);
@@ -501,12 +608,14 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   else{
    const reLbl=profile==='license'?/(license|licence|lic\.?|registration|certificate)\s*(number|no\.?|#|num)|\bRN\s*(#|no\.?|number)/i
     :/(e\s*-?\s*card|cert\w*|card|test|credential|verification|member|candidate|course\s*completion)\s*(id|#|number|no\.?|code|num)/i;
-   code=findId(lines,flat,reLbl,{});
+   code=profile==='cert'?(certId(lines,/(certificate|certification|cert\.?|credential|test|verification|member|candidate|card|customer|aacn)\s*(id|#|number|no\.?|num|code)\b|e\s*-?\s*card\s*(id|#|code)/i)||findId(lines,flat,reLbl,{})||verifyLineId(lines)):findId(lines,flat,reLbl,{});
+   /* v14.4: OCR reads 0 as O (and 1 as I/l) inside license numbers: "RNO000099" → RN0000099 */
+   if(code&&profile==='license'&&method!=='PDF_TEXT'){const mm=/^([A-Z]{0,4}?)([0-9OIL]{4,})$/.exec(code.code);if(mm&&/[OIL]/.test(mm[2])&&(mm[2].match(/\d/g)||[]).length>=3){code={...code,code:mm[1]+mm[2].replace(/O/g,'0').replace(/[IL]/g,'1'),fixed:true}}}
    if(!code&&profile==='license'){const m=/\b(RN|R\.N\.)\s*[-#:]?\s*(\d{5,10})\b/.exec(flat);if(m)code={code:'RN'+m[2],type:'ALNUM',how:'pattern',raw:m[0]}}
   }
   let q=codeFromQr(qr);if(q&&profile==='aha_resus'&&(exclude.has(q.code)||(issuer!=='RED_CROSS'&&TC_ID_SHAPE.test(q.code))))q=null;
   if(code||q){
-   let conf=code?C(code.raw||code.code,code.li!=null?code.li:lineOf(code.raw||code.code),{label:code.how!=='pattern',factor:code.how==='pattern'?0.94:1,wc:code.wc!=null?code.wc:null}):0.97;let how=code?code.how:'qr';
+   let conf=code?C(code.raw||code.code,code.li!=null?code.li:lineOf(code.raw||code.code),{label:code.how!=='pattern'&&!code.weak,factor:code.how==='pattern'?0.94:code.anchor?0.86:code.weak?0.8:1,wc:code.wc!=null?code.wc:null}):0.97;let how=code?code.how:'qr';
    if(code&&code.odd&&profile==='aha_resus'){conf*=0.6;warnings.push(`The eCard code read as ${code.code.length} digits; AHA codes have 12.`)}
    if(code&&q){if(q.code===code.code)conf=0.995;else if(profile==='aha_resus'){warnings.push('The code printed on the card and the code in its QR code differ. The QR code was used.');code=q;conf=0.9;how='qr'}}
    else if(!code){code=q}
@@ -517,13 +626,18 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
  }
  // ---- license specifics ----
  if(profile==='license'){
-  const j=findJurisdiction(flat,jurisdictions);if(j)f.jurisdiction={value:j.code,conf:C(j.name,lineOf(j.name),{label:!j.weak,factor:j.weak?0.9:1}),how:j.weak?'state name':'issuing board'};
+  const j=findJurisdiction(flat,jurisdictions);if(j)f.jurisdiction={value:j.code,conf:C(j.raw||j.name,lineOf(j.raw||j.name),{label:!j.weak,factor:j.weak?(j.count>1?0.9:0.8):1}),how:j.weak?'state name':'issuing board'};
   const single=/(not|non)[\s-]*(valid\s+for\s+)?multi-?\s?state|single[\s-]*state/i.exec(flat),multi=!single&&/multi-?\s?state|compact\s+(license|privilege)|\bNLC\b/i.exec(flat);
   if(single)f.multistate={value:'single-state',conf:C(single[0],lineOf(single[0]),{factor:0.95}),how:'wording'};
   else if(multi)f.multistate={value:'multistate',conf:C(multi[0],lineOf(multi[0]),{factor:0.95}),how:'wording'};
+  /* v14.4: license type as printed */
+  const lt=/\b(registered\s+(?:professional\s+)?nurse|licensed\s+(?:practical|vocational)\s+nurse|advanced\s+practice\s+registered\s+nurse|nurse\s+practitioner)\b/i.exec(flat);
+  if(lt){const t=lt[1].toLowerCase(),v=/^registered/.test(t)?'RN':/practical/.test(t)?'LPN':/vocational/.test(t)?'LVN':'APRN';f.course={value:v,conf:C(lt[0],lineOf(lt[0])),how:'license type printed: '+lt[0].replace(/\s+/g,' ')}}
+  /* v14.4: never invent multistate. When the document doesn't say, explain what the issuing state can issue. */
+  if(!f.multistate&&f.jurisdiction){const jj=(jurisdictions||_globals().jurisdictions).find(x=>x.code===f.jurisdiction.value);if(jj&&jj.nlc!=='IMPLEMENTED')notes.multistate=`Not printed on the document. ${jj.name} ${jj.nlc?'can\'t issue multistate (compact) licenses yet':'isn\'t in the Nurse Licensure Compact'}, so a ${jj.name} license covers ${jj.name} only.`;else if(jj)notes.multistate='Not printed on the document. Choose single-state or multistate yourself.'}
  }
  // ---- holder name ----
- if(want.includes('holder_name')){const n=findName(lines,flat,{profileName});if(n)f.holder_name={value:n.name,conf:C(n.name,lineOf(n.name),{label:n.how==='label'||n.how.startsWith('before')}),how:n.how}}
+ if(want.includes('holder_name')){const n=findName(lines,flat,{profileName});if(n)f.holder_name={value:n.name,conf:C(n.name,lineOf(n.name),{label:n.how==='label'||n.how.startsWith('before')||n.how.startsWith('after')}),how:n.how}}
  // ---- training center (AHA): its own label, never the TC ID / city / site ----
  if(want.includes('training_center')){
   const okName=v=>v&&v.length>=3&&v.replace(/[^A-Za-z]/g,'').length>=4&&!/^\W*T?C\W*I[DO0]\b/i.test(v)&&/[A-Za-z]{3,}/.test(v)&&!/^(TC|ID|Instructor|Course|Name|Info|Phone|Number|City|State|Site|Code|Address|E-?mail)\b/i.test(v)&&!labelHits(v).length;
@@ -538,12 +652,24 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
    if(okName(v)){f.training_center={value:v.slice(0,90),conf:C(v,i,{factor:0.92}),how:'label'};break}
   }
  }
+ // ---- NIHSS: test group as printed; no expiration invented ----
+ if(kind==='CERT_NIHSS'){
+  const g=/\b(?:(?:patient|test)\s*)?group\s*[:#\-–]?\s*([A-F])(?![A-Za-z0-9])/i.exec(flat)||/\bNIH\s*Stroke\s*Scale\s*[–\-:]\s*(?:Test\s*)?([A-F])\b(?![A-Za-z0-9])/i.exec(flat);
+  if(g)f.test_group={value:g[1].toUpperCase(),raw:g[0].trim(),conf:C(g[0],lineOf(g[0]),{factor:/group/i.test(g[0])?1:0.85}),how:'printed',info:true};
+  /* module as printed (initial vs recertification); never inferred from the group */
+  const mo=/\b(initial\s+(?:certification|module|course|test)|re-?\s?certification(?:\s+(?:module|course|test))?|renewal\s+(?:module|course|test))\b/i.exec(flat);
+  if(mo)f.nihss_module={value:/^init/i.test(mo[1])?'initial':'recertification',raw:mo[0].trim(),conf:C(mo[0],lineOf(mo[0]),{factor:0.95}),how:'printed',info:true};
+  /* calculated suggestion, kept apart from the printed expiration (which stays empty): renew
+     every 12 months from completion unless the facility rule says otherwise */
+  if(!f.expires_on&&f.issued_on)calculated.suggested_renewal={value:addMonthsIso(f.issued_on.value,12),calculated:true,how:'calculated: 12 months from the completion date, not printed on the certificate. The facility rule is final.'};
+  if(!f.expires_on)notes.expires_on='No expiration printed on this certificate. Facilities decide how recent an NIHSS must be (often within 12 or 24 months of completion).';
+ }
  const fieldsFound=FIELDS.filter(k=>f[k]);
  const required=PROFILE_REQUIRED[profile];
  const missing=required.filter(k=>!f[k]&&!(k==='expires_on'&&f.renew_by));
  if(!source&&profile==='aha_resus'){const sid=suggestedSource(kind,issuer,f.credential_id?.value);source=sid?{id:sid,how:'issuer on the document'}:null}
- if(!source&&profile!=='dates_only'){const r=_routeFor(kind,f.jurisdiction?.value,sources);if(r)source={id:r.id,name:r.name,how:'registry route for this credential type'}}
- return{fields:f,issuer,source,profile,kind,method,warnings,notes,found:fieldsFound,missing,score:fieldsFound.filter(k=>required.includes(k)||k==='credential_id').length,qrFound:!!codeFromQr(qr),textChars:flat.length,fieldsWanted:want,infoFields:profile==='aha_resus'?INFO_FIELDS.slice():[],required};
+ if(!source&&profile!=='dates_only'&&kind!=='CERT_NIHSS'){const r=_routeFor(kind,f.jurisdiction?.value,sources);if(r)source={id:r.id,name:r.name,how:'registry route for this credential type'}}
+ return{fields:f,calculated,issuer,source,profile,kind,method,warnings,notes,found:fieldsFound,missing,score:fieldsFound.filter(k=>required.includes(k)||k==='credential_id').length,qrFound:!!codeFromQr(qr),textChars:flat.length,fieldsWanted:want,infoFields:profile==='aha_resus'?INFO_FIELDS.slice():kind==='CERT_NIHSS'?NIHSS_INFO_FIELDS.slice():[],required};
 }
 function _routeFor(kind,jur,sources){
  if(!sources&&typeof primaryRouteFor==='function'){try{return primaryRouteFor(kind,jur||'')}catch{return null}}
@@ -552,6 +678,12 @@ function _routeFor(kind,jur,sources){
 
 /* Expiration the document implies, with how it was read. */
 function documentExpiry(fields,issuer){
+ /* v14.4: a printed expiration that has passed is shown as expired */
+ const r=_documentExpiry(fields,issuer);if(!r)return r;
+ const today=new Date().toISOString().slice(0,10);if(r.value&&r.value<today){r.expired=true;r.text+=' That date has passed: this credential is expired.'}
+ return r;
+}
+function _documentExpiry(fields,issuer){
  const e=fields?.expires_on;
  if(e&&e.value)return{value:e.value,text:e.monthOnly?`The document shows ${e.monthOnly.split('-').reverse().join('/')} (month and year only); Veridun reads it as the end of that month, ${e.value}.`:`The document shows an expiration date of ${e.value}.`};
  const r=fields?.renew_by;if(!r||!r.value)return null;
@@ -722,8 +854,24 @@ function pdfGeo(items,yOff){
   const re=/\S+/g;let m;while((m=re.exec(str)))out.push({t:m[0],c:1,x0:x+m.index*cw,x1:x+(m.index+m[0].length)*cw,y0:yOff-(y+h*0.8),y1:yOff-(y-h*0.2)})}
  return out;
 }
+/* v14.4: fillable-form PDFs (state license printouts) keep the name, number and dates in
+   form-field values, which the text layer leaves out. Read them as text at their boxes. */
+async function formItems(page,have){
+ let an=[];try{an=await page.getAnnotations({intent:'display'})}catch{return[]}
+ const out=[],seen=new Set((have||[]).map(it=>String(it.str||'').replace(/\s+/g,' ').trim()).filter(Boolean));
+ for(const a of an||[]){
+  if(!a||a.subtype!=='Widget'||a.hidden||a.noView||!a.rect||(a.fieldType!=='Tx'&&a.fieldType!=='Ch'))continue;
+  let ls=Array.isArray(a.textContent)&&a.textContent.length?a.textContent:null;
+  if(!ls){let v=a.fieldValue;if(Array.isArray(v))v=v.join(' ');if(typeof v!=='string')continue;ls=v.split(/\r\n|\r|\n/)}
+  ls=ls.map(t=>String(t||'').replace(/\s+/g,' ').trim()).filter(Boolean);if(!ls.length)continue;
+  const [x0,y0,x1,y1]=a.rect,H=Math.abs(y1-y0),top=Math.max(y0,y1),lh=Math.max(6,Math.min(14,H/ls.length));
+  ls.forEach((t,i)=>{if(seen.has(t))return;seen.add(t);out.push({str:t,transform:[lh,0,0,lh,Math.min(x0,x1)+2,top-lh*(i+1)+lh*0.25],height:lh,width:Math.min(Math.abs(x1-x0),t.length*lh*0.5),form:true})});
+ }
+ return out;
+}
 async function pdfText(page,geoOut,yOff=0){
- const items=await textItems(page);const rows=[];
+ let items=await textItems(page);const rows=[];
+ const fi=await formItems(page,items);if(fi.length)items=items.concat(fi);
  if(geoOut)geoOut.push(...pdfGeo(items,yOff));
  for(const it of items){if(!it.str||!it.str.trim())continue;const y=it.transform[5],x=it.transform[4];let row=rows.find(r=>Math.abs(r.y-y)<Math.max(2,(it.height||8)*0.45));if(!row){row={y,items:[]};rows.push(row)}row.items.push({x,s:it.str,w:it.width||0})}
  rows.sort((a,b)=>b.y-a.y);
@@ -754,7 +902,14 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
   await page.render({canvasContext:ctx,canvas,viewport:vp}).promise;
   qr=await decodeQr(canvas);
   if(text.replace(/\s/g,'').length>=40){res=parseCardText(text,{...P,method:'PDF_TEXT',qr,geo});lastText=text}
-  else{onProgress({stage:'ocr',label:'This PDF is a scan. Reading it with OCR',progress:0.5});const o=await ocr(canvas);lastText=o.text;res=parseCardText(o.text,{...P,method:'PDF_OCR',qr,ocrConf:o.conf,words:o.words,ocrLines:o.lines})}
+  /* v14.4: a text layer that explains less than half of what the document should show
+     (an image with a footer, flattened artwork) gets read by OCR too; the better read wins */
+  const need=r=>r?r.required.filter(k=>r.fields[k]||(k==='expires_on'&&r.fields.renew_by)).length:-1;
+  if(!res||need(res)*2<res.required.length){
+   onProgress({stage:'ocr',label:res?'Little text in this PDF. Reading it with OCR':'This PDF is a scan. Reading it with OCR',progress:0.5});
+   const o=await ocr(canvas);const r2=parseCardText(o.text,{...P,method:'PDF_OCR',qr,ocrConf:o.conf,words:o.words,ocrLines:o.lines});
+   if(!res||need(r2)>need(res)||(need(r2)===need(res)&&r2.found.length>res.found.length)){if(res)r2.textLayerThin=true;res=r2;lastText=o.text}
+  }
   try{doc.destroy()}catch{}
  }else{
   onProgress({stage:'load',label:'Opening the image on this device',progress:0.05});
@@ -811,7 +966,7 @@ function parseEcardStrip(ws,res){
 }
 async function terminate(){if(workerP){try{(await workerP).terminate()}catch{}workerP=null}}
 
-const DocExtract={INFO_FIELDS,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
+const DocExtract={INFO_FIELDS,NIHSS_INFO_FIELDS,NIHSS_UNDETERMINED,nihssIssuer,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
 root.DocExtract=DocExtract;
 if(typeof module!=='undefined'&&module.exports)module.exports=DocExtract;
 })(typeof window!=='undefined'?window:globalThis);

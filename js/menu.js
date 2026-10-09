@@ -32,14 +32,14 @@ function renderProfileViewV11(){
  $('profileViewV11').innerHTML=`<div class="v7-head"><div><h1>Profile</h1><div class="small">Specialty and professional information</div></div>${menuBackHtml()}</div>
  <div class="panel-v81"><div class="ph">${ec(p.name)}, ${ec(p.credentials)} <span class="demo-tag-v81">DEMO PROFILE · READ-ONLY</span></div><div class="pb small">
   Primary specialty: <b>${ec(specialtyName(p.specialty))}</b>${(p.secondarySpecialties||[]).length?` · other specialties: <b>${ec(p.secondarySpecialties.map(specialtyName).join(', '))}</b>`:''}<br>
-  Home state: <b>${ec(jurisdictionName(p.homeState))}</b> (${ec(nlcStatusLabel(p.homeState))})<br>${ec(homeStateCompactText(p.homeState))}</div></div>
+  Primary state of residence: <b>${ec(jurisdictionName(p.homeState))}</b> (${ec(nlcStatusLabel(p.homeState))})<br>${ec(homeStateCompactText(p.homeState))}</div></div>
  <div class="panel-v81"><div class="ph">Explore specialty requirements</div><div class="pb">
   <label for="profSpecV11">Specialty (${SPECIALTIES.length} RN specialties)</label><select id="profSpecV11">${specialtyOptionsHtml(sp,null)}</select>
   <div class="small" style="margin:8px 0">What the <b>${ec(specialtyName(sp))}</b> module adds on top of the work-type base set (demo template):</div>
   <div class="small"><b>Required</b> (counts toward readiness)</div><ul class="req-list" id="profReqV11">${req.map(k=>`<li>${ec(catalogKind(k)?.label||k)}${catalogKind(k)?.experience?` <span class="small">· default: at least ${catalogKind(k).minMonths} months of work in the last ${catalogKind(k).recencyMonths}; organizations can change it</span>`:''}</li>`).join('')}</ul>
   ${pref.length?`<div class="small"><b>Preferred</b> (shown, never blocks)</div><ul class="req-list">${pref.map(k=>`<li>${ec(catalogKind(k)?.label||k)}</li>`).join('')}</ul>`:''}
  </div></div>
- <div class="panel-v81"><div class="ph">Your own profile</div><div class="pb small">${a?(a.signedIn?`You're signed in. <button type="button" class="pri mini" id="profOpenAcctV11">Edit my account profile</button>`:`Sign in to set your own name, specialty and home state. Your account is separate from this demo. <button type="button" class="pri mini" id="profSignInV11">Sign in</button>`):'Accounts are not configured on this site.'}</div></div>`;
+ <div class="panel-v81"><div class="ph">Your own profile</div><div class="pb small">${a?(a.signedIn?`You're signed in. <button type="button" class="pri mini" id="profOpenAcctV11">Edit my account profile</button>`:`Sign in to set your own name, specialty and primary state of residence. Your account is separate from this demo. <button type="button" class="pri mini" id="profSignInV11">Sign in</button>`):'Accounts are not configured on this site.'}</div></div>`;
  $('profSpecV11').onchange=e=>{profPreviewSpec=e.target.value;renderProfileViewV11()};
  if($('profOpenAcctV11'))$('profOpenAcctV11').onclick=()=>menuGo('profile');
  if($('profSignInV11'))$('profSignInV11').onclick=menuShowSignIn;

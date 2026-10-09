@@ -44,7 +44,7 @@ function matchedSpecialty(a,n){return[n?.specialty,...(n?.secondarySpecialties||
    required by an earlier layer keeps that earlier authority. */
 function layeredRequirements(a,specialty){
  const base=workTypeBase(a.workType),ov=a.overrides||{},waive=ov.waive||[],out=[],seen=new Set();
- const push=(kind,layer,authority)=>{if(seen.has(kind))return;seen.add(kind);const x=experienceRule(kind,ov),r={kind,layer,authority};if(x){r.minMonths=x.minMonths;r.windowMonths=x.windowMonths;if(x.custom)r.experienceSetBy=a.facility||a.name}out.push(withPolicy(r,a,specialty))};
+ const push=(kind,layer,authority)=>{if(seen.has(kind))return;seen.add(kind);const x=experienceRule(kind,ov),r={kind,layer,authority};if(x){r.minMonths=x.minMonths;r.windowMonths=x.windowMonths;if(x.custom)r.experienceSetBy=a.facility||a.name}if(/^SKILLS_/.test(kind)&&ov.skills)r.skills={...ov.skills,setBy:ov.skills.setBy||a.facility||a.name};if(kind==='CERT_NIHSS'&&ov.nihss)r.nihss={...ov.nihss,setBy:ov.nihss.setBy||a.facility||a.name};out.push(withPolicy(r,a,specialty))};
  const j=normalizeJurisdictionCode(a.jurisdiction);seen.add(RN_AUTHORIZATION);
  out.push(withPolicy({kind:RN_AUTHORIZATION,jurisdiction:j,layer:'STATE',authority:`State licensure · ${issuerFor('RN_LICENSE',j)}`},a,specialty));
  (base?.kinds||[]).filter(k=>!waive.includes(k)).forEach(k=>push(k,'WORK_TYPE',`${base.name} base set (demo template)`));
@@ -69,7 +69,9 @@ function withPolicy(r,a,specialty){
  else if(r.layer==='SPECIALTY')policy={id:`VDN-SPEC-${specialty}`,version:POLICY_VERSIONS.SPECIALTY.version,requiredBy:`${specialtyName(specialty)} module (Veridun demo template)`,effective:POLICY_VERSIONS.SPECIALTY.effective};
  else{const ap=assignmentPolicy(a);policy={id:ap.id,version:ap.version,requiredBy:ap.requiredBy,effective:ap.effective}}
  const exp=r.minMonths?`At least ${r.minMonths} months of this specialty in the ${r.windowMonths} months before the start date${a?.start?' ('+a.start+')':''}`:null;
- const validity=r.kind===RN_AUTHORIZATION?`Must authorize RN practice in ${jurisdictionName(j)} and stay active through the assignment end${a?.end?' ('+a.end+')':''}`:exp||`Must stay valid through the assignment end${a?.end?' ('+a.end+')':''}`;
+ const nih=r.kind==='CERT_NIHSS'?(r.nihss?.rules?.length?'NIHSS recency by rule table: '+r.nihss.rules.map(x=>(x.group?'Group '+x.group:x.module?x.module:'any')+' → '+x.months+' months').join(', '):r.nihss?.withinMonths?`NIHSS completed within ${r.nihss.withinMonths} months, through the assignment end`:'NIHSS recency: issuer-stated window where one is published (AHA/ASA: up to 12 months), otherwise needs a facility rule')+(r.nihss?.acceptedGroups?.length?` · accepted groups ${r.nihss.acceptedGroups.join(', ')}`:'')+(r.nihss?.differentGroup?' · a different group than the previous certificate':''):null;
+ const sk=/^SKILLS_/.test(r.kind)?(r.skills?.perAssignment?'A new skills checklist for each assignment (self-attested)':`Skills checklist completed within ${r.skills?.months||12} months of the start date${r.skills?.months?'':' (default; the facility rule is final)'} (self-attested)`):null;
+ const validity=nih?nih:sk?sk:r.kind===RN_AUTHORIZATION?`Must authorize RN practice in ${jurisdictionName(j)} and stay active through the assignment end${a?.end?' ('+a.end+')':''}`:exp||`Must stay valid through the assignment end${a?.end?' ('+a.end+')':''}`;
  return{...r,minLevel:lvl.level,levelRule:lvl,policy,assignmentPolicy:assignmentPolicy(a),validityRule:validity};
 }
 function layerCounts(reqs){const c={STATE:0,WORK_TYPE:0,SPECIALTY:0,FACILITY:0};reqs.forEach(r=>c[r.layer]++);return c}

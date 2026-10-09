@@ -34,7 +34,7 @@ const R = [], matrix = {};
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null && !c ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); return c; };
 const RAW = /TypeError|ReferenceError|undefined is not|is not a function|is not iterable|async iterable|iterator symbol|dynamically imported|SyntaxError|\bnull\b|\[object /;
 const b64 = f => fs.readFileSync(path.join(FIX, f)).toString('base64');
-const PDF = b64('xb-bls-card.pdf'), PNG = b64('xb-nihss.png'), TCID = b64('xb-bls-tcid.png'), TWOCOL = b64('xb-bls-2col.png');
+const PDF = b64('xb-bls-card.pdf'), PNG = b64('xb-nihss.png'), TCID = b64('xb-bls-tcid.png'), TWOCOL = b64('xb-bls-2col.png'), MAFORM = b64('xb-ma-form.pdf'), MAFLAT = b64('xb-ma-flat.pdf'), NIHSS = b64('xb-nihss-aha.pdf'), CCRN = b64('xb-ccrn.pdf');
 
 function ctxOpts(engine, vp) {
   if (vp === 'desktop') return { viewport: { width: 1280, height: 800 } };
@@ -70,6 +70,28 @@ async function run(browser, engine, vp, mode) {
     // v14.3: two-column AHA card (TC info left, Instructor info right, label above value, grey watermark)
     const tw = await read(TWOCOL, 'bls-2col.png', 'image/png', 'CERT_BLS');
     t('v14.3 two-column card: eCard code found, TC ID = CA pattern, Instructor ID kept out, TC name not merged', tw.ok && tw.id === '271100000056' && tw.tc === 'CA00002' && tw.tcn === 'Example Permanente Education' && tw.issued === '2026-06-03', JSON.stringify(tw));
+    // v14.4: state license as a fillable-form PDF, a flattened scan (thin text layer → OCR), and an AHA/ASA NIHSS certificate
+    const rd = (b, name, type, kind) => pg.evaluate(async ([b, name, type, kind]) => {
+      try { const r = await DocExtract.extractFromFile(new File([Uint8Array.from(atob(b), c => c.charCodeAt(0))], name, { type }), { kind }); const o = { ok: true, m: r.method, src: r.source && r.source.id }; for (const [k, x] of Object.entries(r.fields)) o[k] = x.value; o.suggested = r.calculated && r.calculated.suggested_renewal && r.calculated.suggested_renewal.value; const cm = DocExtract.compareToEntered({ jurisdiction: o.jurisdiction }, { kind, jurisdiction: 'US-ME' }).find(x => x.field === 'jurisdiction'); o.cmp = cm && cm.text; return o; }
+      catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+    }, [b, name, type, kind]);
+    const mf = await rd(MAFORM, 'ma-form.pdf', 'application/pdf', 'RN_LICENSE');
+    t('v14.4 form-field license PDF: name, number, MA (not WA), expiration; mismatch says MA', mf.ok && mf.m === 'PDF_TEXT' && mf.holder_name === 'Testa Fakename' && mf.credential_id === 'RN0000099' && mf.jurisdiction === 'US-MA' && mf.expires_on === '2029-02-14' && !mf.issued_on && !mf.multistate && /from MA, but you selected ME/.test(mf.cmp || ''), JSON.stringify(mf));
+    const fl = await rd(MAFLAT, 'ma-flat.pdf', 'application/pdf', 'RN_LICENSE');
+    t('v14.4 thin text layer falls back to OCR: MA + name + expiration', fl.ok && fl.m === 'PDF_OCR' && fl.jurisdiction === 'US-MA' && fl.holder_name === 'Testa Fakename' && fl.expires_on === '2029-02-14', JSON.stringify(fl));
+    const nh = await rd(NIHSS, 'nihss.pdf', 'application/pdf', 'CERT_NIHSS');
+    t('v14.4 NIHSS: certificate # by its label (not the footer code), AHA/ASA verifier, group C, no printed expiration', nh.ok && nh.credential_id === 'IPA24Z9QbXY00001' && nh.src === 'aha-asa-nihss' && nh.test_group === 'C' && !nh.expires_on && nh.suggested === '2025-03-07' && !nh.suggested_renewal, JSON.stringify(nh));
+    const cc = await rd(CCRN, 'ccrn.pdf', 'application/pdf', 'CERT_CCRN');
+    t('v14.4 CCRN: unlabelled 10-digit number read only beside the verification address (not the decoy); Certified through = expiration', cc.ok && cc.credential_id === '1234567890' && cc.holder_name === 'Testa Fakename' && cc.expires_on === '2028-02-28', JSON.stringify(cc));
+    // v14.4: experience + skills checklists show calculated dates, never an expiration; checklists are never verified
+    const ck = await pg.evaluate(() => {
+      const c = { kind: 'SKILLS_ICU', completed: '2025-01-15', primary: 'VERIFIED', prov: { active: true } };
+      $('kindSearchV82').value = catalogKind('SKILLS_ICU').label; v81SyncAddForm();
+      const form = [$('dtRowV144').classList.contains('hidden'), !$('skillsRowV144').classList.contains('hidden')];
+      $('kindSearchV82').value = ''; v81SyncAddForm();
+      return { redo: skillsRedoBy('2025-01-15'), recent: experienceRecentUntil('2025-01-15'), badge: verificationBadge(c).text, per: evaluateSkills({ skills: { perAssignment: true } }, c, { id: 'x' }).status, form };
+    });
+    t('v14.4 checklist: completed + suggested redo (calculated), per-assignment rule, self-attested badge; experience counts-as-recent date', ck.redo === '2026-01-15' && ck.recent === '2027-01-15' && /NOT VERIFIED/.test(ck.badge) && ck.per === 'NEEDS_REVIEW' && ck.form.every(Boolean), JSON.stringify(ck));
     // ---- account UI through the in-page fake backend ----
     await pg.evaluate(FAKE);
     const id = await pg.evaluate(async b => {
@@ -82,6 +104,14 @@ async function run(browser, engine, vp, mode) {
     await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); });
     const rs = await pg.evaluate(() => ({ st: document.getElementById('acctScanBoxV14').dataset.state, v: acctScan.values, txt: document.getElementById('acctScanBoxV14').innerText, mm: (document.getElementById('acctMismatchV14') || {}).innerText || '' }));
     t('"Re-scan document" (signed URL → fetch → read) works', rs.st === 'done' && rs.v.credential_id === '261100000017' && /May 8, 2028/.test(rs.mm), rs.st + ' ' + rs.txt.slice(0, 160));
+    // v14.4: ONE expiration field on the add form, pre-filled from the document and marked
+    await pg.evaluate(() => { acctScan = null; acctRenderAll(); document.querySelector('[data-act="toggle-add"]').click(); });
+    await pg.waitForSelector('#acctKindV10'); await pg.selectOption('#acctKindV10', 'CERT_CCRN');
+    await pg.setInputFiles('#acctFileV10', { name: 'ccrn.pdf', mimeType: 'application/pdf', buffer: Buffer.from(CCRN, 'base64') });
+    await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && b.dataset.state === 'done'; });
+    const pf = await pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, box: $('acctScanBoxV14').innerText, id: acctScan.values.credential_id }));
+    t('v14.4 add form: one expiration field pre-filled from the document ("from document, check it · NN%"); no duplicate prompt in the scan box', pf.exp === '2028-02-28' && /from document, check it · \d+%/.test(pf.src) && !/No expiration entered|Use the date from the document/.test(pf.box) && pf.id === '1234567890', JSON.stringify({ exp: pf.exp, src: pf.src, id: pf.id }));
+    await pg.evaluate(() => { acctScan = null; acctRenderAll(); });
     await pg.evaluate(() => document.querySelector('.acctTab[data-target="acctVerifyV12"]').click());
     await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), id, { timeout: 30000 });
     await pg.evaluate(id => document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`).click(), id);

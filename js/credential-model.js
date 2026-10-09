@@ -21,6 +21,8 @@ function userChain(c){if(c.privateOnly)return 'PRIVATE';if(c.chain==='ACCEPTED')
    in this demo is a demo seed or a simulated check, so VERIFIED reads
    "VERIFIED · DEMO". The optional XRPL proof is a quiet secondary label. */
 function verificationBadge(c){
+ /* v14.4: skills checklists are self-attested by the nurse and never shown as verified */
+ if(/^SKILLS_/.test(String(c.kind||''))&&c.primary==='VERIFIED')return{cls:'PENDING',text:'SELF-ATTESTED · NOT VERIFIED'};
  if(c.primary==='VERIFIED'&&c.prov?.active){const l=typeof credentialLevel==='function'?credentialLevel(c):null;return{cls:'VERIFIED',text:(l?levelLabel(l).toUpperCase():'VERIFIED')+' · DEMO'}}
  if(c.primary==='VERIFIED')return{cls:'PENDING',text:'NEEDS RE-VERIFICATION'};
  if(c.primary==='VERIFYING')return{cls:'PENDING',text:'PENDING VERIFICATION'};

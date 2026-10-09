@@ -167,7 +167,7 @@ function experienceHelpText(kind){const k=catalogKind(kind);if(!k?.experience)re
 
 const CREDENTIAL_CATALOG=[
  {kind:'RN_LICENSE',label:'RN License — single-state',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'REQUIRED',source:'STATE_BOARD',keywords:'registered nurse license state board'},
- {kind:'RN_LICENSE_MULTISTATE',label:'RN License — multistate (NLC compact)',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'NLC_HOME',source:'STATE_BOARD',keywords:'compact nlc multistate home state'},
+ {kind:'RN_LICENSE_MULTISTATE',label:'RN License — multistate (NLC compact)',category:'Licenses',section:'Licenses & Certifications',privacy:'SHAREABLE',jurisdiction:'NLC_HOME',source:'STATE_BOARD',keywords:'compact nlc multistate home state primary state of residence'},
  {kind:'CERT_BLS',label:'BLS — Basic Life Support',short:'BLS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AHA / approved certification issuer'},
  {kind:'CERT_ACLS',label:'ACLS — Advanced Cardiovascular Life Support',short:'ACLS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AHA / approved certification issuer'},
  {kind:'CERT_PALS',label:'PALS — Pediatric Advanced Life Support',short:'PALS',category:'Certifications',section:'Licenses & Certifications',privacy:'SHAREABLE',issuer:'AHA / approved certification issuer'},
@@ -227,7 +227,7 @@ function issuerFor(kind,jur){if(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTA
 /* Home state + compact (NLC) helpers (PR 11). All derived from
    US_JURISDICTIONS, never hardcoded per state. */
 function homeStateCompactText(code){
- const j=jurisdiction(code);if(!j)return'Home state not set';
+ const j=jurisdiction(code);if(!j)return'Primary state of residence not set';
  const others=US_JURISDICTIONS.filter(x=>x.code!==j.code&&nlcHonorsCompactIn(x.code)).length;
  if(j.nlc==='IMPLEMENTED')return`${j.name} is a Nurse Licensure Compact state. An RN license issued here can be multistate: it lets you practice in ${j.name} and the ${others} other jurisdictions that honor compact licenses. Non-compact states (e.g. California, New York) still need their own license.`;
  if(j.nlc==='PARTIAL')return`${j.name} honors compact licenses from other states but can't issue multistate licenses yet, so a license from ${j.name} covers ${j.name} only.`;
@@ -236,13 +236,13 @@ function homeStateCompactText(code){
 }
 function homeStateIsCompact(code){return nlcCanIssueMultistate(code)}
 /* Primary source for verifying a license: Nursys + the issuing board. */
-function licensePrimarySource(kind,jur){const b=jurisdiction(jur)?.issuer||'the state board of nursing';return kind==='RN_LICENSE_MULTISTATE'?`Nursys / ${b} (home-state board)`:kind==='RN_LICENSE'?`${b} (or Nursys, where the board participates)`:issuerFor(kind,jur)}
+function licensePrimarySource(kind,jur){const b=jurisdiction(jur)?.issuer||'the state board of nursing';return kind==='RN_LICENSE_MULTISTATE'?`Nursys / ${b} (board of your primary state of residence)`:kind==='RN_LICENSE'?`${b} (or Nursys, where the board participates)`:issuerFor(kind,jur)}
 /* Inline hint about a license's state vs the nurse's home state. A multistate
    license must be issued by the primary state of residence. */
 function licenseHomeStateHint(kind,jur,home){
  const h=jurisdiction(home),j=jurisdiction(jur);if(!j)return'';
- if(kind==='RN_LICENSE_MULTISTATE'&&h&&j.code!==h.code)return` · ⚠ A multistate license is issued only by your primary state of residence. Your home state is ${h.name}: check the state, or update your home state.`;
- if(kind==='RN_LICENSE'&&h&&j.code===h.code&&nlcCanIssueMultistate(j.code))return` · ${j.name} is your home state and a compact state: if your license is multistate, choose “RN License — multistate (NLC compact)”.`;
+ if(kind==='RN_LICENSE_MULTISTATE'&&h&&j.code!==h.code)return` · ⚠ A multistate license is issued only by your primary state of residence. Your primary state of residence is ${h.name}: check the state, or update your primary state of residence.`;
+ if(kind==='RN_LICENSE'&&h&&j.code===h.code&&nlcCanIssueMultistate(j.code))return` · ${j.name} is your primary state of residence and a compact state: if your license is multistate, choose “RN License — multistate (NLC compact)”.`;
  return'';
 }
 /* Where a license authorizes practice, per the jurisdictions data. */
