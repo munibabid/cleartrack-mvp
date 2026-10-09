@@ -9,7 +9,7 @@
 <script src="https://unpkg.com/xrpl@5.3.0/build/xrpl-latest-min.js" integrity="sha384-ZYUY+olM49qzMChi4X9rVVRYUuL6GcWXCLRhnVwRqVW/EpBX8PzThCiVnjZFi0Pb" crossorigin="anonymous"></script>
 <!-- qrcode@1.5.1 (MIT) is vendored in js/vendor: pinned, integrity-checked, no network request. 1.5.1 is the latest version with a browser build. -->
 <script src="js/vendor/qrcode-1.5.1.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="css/app.css?v=14.4">
+<link rel="stylesheet" href="css/app.css?v=14.5">
 </head>
 <body>
 
@@ -60,7 +60,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.4 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.5 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -219,6 +219,7 @@
 <div id="addContextV82" class="notice hidden" style="margin:0 0 12px"></div>
 <label for="kindSearchV82">Credential type</label><input id="kindSearchV82" list="kindListV82" placeholder="Search: RN license, compact, BLS, ACLS, TB…" autocomplete="off"><datalist id="kindListV82"></datalist>
 <div id="jurisdictionRowV81" class="hidden"><label for="jurSearchV82" id="jurLabelV82">License jurisdiction (US state or territory)</label><input id="jurSearchV82" list="jurListV82" placeholder="Search any US state or territory…" autocomplete="off"><datalist id="jurListV82"></datalist><div id="jurHintV82" class="small" style="margin:-6px 0 12px"></div></div>
+<div id="licScopeRowV145" class="hidden"><b>License scope</b><div id="licScopeFixedV145" class="small hidden"></div><div id="licScopeChoiceV145" class="hidden"><label><input type="radio" name="licScopeV145" value="MULTISTATE"> Multistate (compact) — issued by your primary state of residence</label> <label><input type="radio" name="licScopeV145" value="SINGLE_STATE"> Single-state — covers this state only</label></div><div id="licScopeNoteV145" class="small" style="margin:0 0 12px"></div></div>
 <div id="otherRowV81" class="hidden"><label for="nm">Credential name</label><input id="nm" placeholder="e.g. Chemotherapy provider card"></div>
 <div id="experienceHelpV11" class="small hidden" style="margin:6px 0"></div>
 <div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years of experience in this specialty <span class="small">(optional)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
@@ -282,32 +283,32 @@
 
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
-<script src="js/credential-model.js"></script>
+<script src="js/credential-model.js?v=14.5"></script>
 <script src="js/specialties.js"></script>
-<script src="js/credential-catalog.js?v=14.4"></script>
+<script src="js/credential-catalog.js?v=14.5"></script>
 <script src="js/verification-registry.js"></script>
-<script src="js/doc-extract.js?v=14.4"></script>
-<script src="js/extraction-benchmark.js?v=14.4"></script>
-<script src="js/demo-data.js"></script>
-<script src="js/requirements.js?v=14.4"></script>
+<script src="js/doc-extract.js?v=14.5"></script>
+<script src="js/extraction-benchmark.js?v=14.5"></script>
+<script src="js/demo-data.js?v=14.5"></script>
+<script src="js/requirements.js?v=14.5"></script>
 <script src="js/assignments.js"></script>
-<script src="js/readiness-engine.js?v=14.4"></script>
+<script src="js/readiness-engine.js?v=14.5"></script>
 <script src="js/analytics.js"></script>
-<script src="js/verification.js"></script>
+<script src="js/verification.js?v=14.5"></script>
 <script src="js/xrpl.js"></script>
-<script src="js/sharing.js"></script>
-<script src="js/insights.js?v=14.4"></script>
-<script src="js/roles/clinician.js?v=14.4"></script>
-<script src="js/roles/organization.js"></script>
-<script src="js/roles/verifier.js?v=14.4"></script>
-<script src="js/app.js"></script>
+<script src="js/sharing.js?v=14.5"></script>
+<script src="js/insights.js?v=14.5"></script>
+<script src="js/roles/clinician.js?v=14.5"></script>
+<script src="js/roles/organization.js?v=14.5"></script>
+<script src="js/roles/verifier.js?v=14.5"></script>
+<script src="js/app.js?v=14.5"></script>
 <script src="js/tour.js"></script>
 <script src="js/lookup-sources.js"></script>
 <script src="js/anchor.js"></script>
-<script src="js/account-mfa.js?v=14.4"></script>
-<script src="js/doc-scan.js?v=14.4"></script>
-<script src="js/extraction-panel.js?v=14.4"></script>
-<script src="js/account.js?v=14.4"></script>
-<script src="js/menu.js?v=14.4"></script>
+<script src="js/account-mfa.js?v=14.5"></script>
+<script src="js/doc-scan.js?v=14.5"></script>
+<script src="js/extraction-panel.js?v=14.5"></script>
+<script src="js/account.js?v=14.5"></script>
+<script src="js/menu.js?v=14.5"></script>
 </body>
 </html>

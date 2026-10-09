@@ -77,6 +77,18 @@ The entry screen has a **Your account · staging** card under the three demo wor
 
 ### On-device document reading (PR 14)
 
+**v14.5: one RN License type, one license-scope field, no stale expiration.**
+
+- **One credential type, "RN License".** The separate "RN License — single-state" and "— multistate" types are gone. New licenses are stored as `RN_LICENSE` with `compact_privilege_type` (`MULTISTATE` or `SINGLE_STATE`) in the credential metadata. Older `RN_LICENSE_MULTISTATE` entries are still read as RN_LICENSE + multistate (demo data is migrated on load). Pickers never offer the old type. Shared assertions carry only kind + label, so a multistate RN_LICENSE is named "Multistate RN License (NLC · home: X)". That name is how the organization view keeps compact coverage.
+- **One license-scope field.**
+  - If the license's state can't issue multistate licenses (not in the NLC, or not implemented yet, e.g. Massachusetts), the license is single-state automatically, shown as a fixed line with no choice.
+  - In a compact state there is one multistate / single-state choice. It is pre-filled from the document when the document prints it ("from document, check it · NN%"). Otherwise it uses the default (multistate only for a license from your primary state of residence), marked "not shown on the document · default".
+  - A choice that conflicts with the document shows a mismatch note and is flagged for the verifier.
+  - The scan box no longer has its own "Multistate (compact)" select.
+- **Explanations talk about the license's state.** The primary state of residence is mentioned only to say that multistate licenses come from it, e.g. "Multistate licenses are issued by your primary state of residence (Maine). This license is from Michigan, so it covers Michigan only."
+- **No stale expiration.** The expiration field remembers whether its value came from a document or was typed. A new file, a new credential type, or removing the file replaces or clears a document-filled date. If the new document prints none, the field is empty and marked "not printed on the document". Only a typed date is kept, with a mismatch note when it differs. For an NIHSS with no printed expiration, the calculated suggested renewal is still shown separately.
+- **Tests.** New p145 suite (synthetic Michigan, Texas-multistate, Maine and NIHSS documents; residence-differs, stored-data compatibility, file and type switching, typed date kept) plus cross-browser checks, including WebKit mobile.
+
 **v14.4: state licenses, NIHSS certificates, and "primary state of residence".**
 
 - **Fillable-form license PDFs.** Some state boards (e.g. Massachusetts) issue the license as a filled-in PDF form: the name, number and dates are form-field values, and the PDF text layer holds only the boilerplate. The scanner now reads form-field values as text. If a PDF's text layer still explains less than half of what the document should show, the page is also read with OCR (pdf.js legacy build + Tesseract, as for images) and the better read wins.

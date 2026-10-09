@@ -17,6 +17,7 @@ $('resetDemo').onclick=()=>{if(confirm('Reset demo data to the starting state? D
 $('save').onclick=addCredentialFromForm;
 $('kindSearchV82').oninput=v81SyncAddForm;
 $('jurSearchV82').oninput=v81SyncAddForm;
+document.querySelectorAll('input[name=licScopeV145]').forEach(r=>r.onchange=v81SyncAddForm);
 document.querySelectorAll('.xadd').forEach(b=>b.onclick=()=>$('add').close());
 document.querySelectorAll('.xproof').forEach(b=>b.onclick=()=>$('proof').close());
 document.querySelectorAll('.xonboard').forEach(b=>b.onclick=()=>$('onboard').close());

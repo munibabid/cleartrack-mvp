@@ -50,7 +50,7 @@ function completeMissingRequirement(aid){
 }
 /* ---- Add Credential form (searchable catalog dropdowns, automatic privacy) ---- */
 function fillDatalist(id,labels){$(id).innerHTML=labels.map(l=>`<option value="${ec(l)}"></option>`).join('')}
-function initAddForm(){fillDatalist('kindListV82',CREDENTIAL_CATALOG.map(k=>k.label))}
+function initAddForm(){fillDatalist('kindListV82',pickerCatalog().map(k=>k.label))}
 function openAddForm(pre={}){
  resetAddForm();
  if(pre.kind)$('kindSearchV82').value=catalogKind(pre.kind)?.label||'';
@@ -66,7 +66,13 @@ function v81SyncAddForm(){
  $('otherRowV81').classList.toggle('hidden',k?.kind!=='OTHER');
  if(needsJur){fillDatalist('jurListV82',list.map(jurisdictionOptionLabel));$('jurLabelV82').textContent=k.jurisdiction==='NLC_HOME'?'Primary state of residence (NLC)':'License jurisdiction (US state or territory)'}
  const j=needsJur?resolveJurisdiction($('jurSearchV82').value,list):null;
- $('jurHintV82').textContent=!needsJur?'':j?`${j.name}: ${nlcStatusLabel(j.code)} · issuer: ${j.issuer}${licenseHomeStateHint(k.kind,j.code,DEMO_PROFILE.homeState)}`:k.jurisdiction==='NLC_HOME'?`Only the ${list.length} NLC states that issue multistate licenses are listed.`:`Type to search all ${list.length} US states and territories.`;
+ $('jurHintV82').textContent=!needsJur?'':j?`${j.name}: ${nlcStatusLabel(j.code)} · issuer: ${j.issuer}`:k.jurisdiction==='NLC_HOME'?`Only the ${list.length} NLC states that issue multistate licenses are listed.`:`Type to search all ${list.length} US states and territories.`;
+ /* v14.5: one license-scope field (fixed single-state outside the compact; a choice in compact states) */
+ const sr=$('licScopeRowV145');if(sr){const lic=k?.kind==='RN_LICENSE'&&!!j;sr.classList.toggle('hidden',!lic);if(lic){const info=licenseScopeInfo(j.code,DEMO_PROFILE.homeState);$('licScopeFixedV145').classList.toggle('hidden',info.choice);$('licScopeChoiceV145').classList.toggle('hidden',!info.choice);
+  if(!info.choice)$('licScopeFixedV145').innerHTML=`<b>Single-state</b> (set automatically: ${ec(j.name)} can't issue multistate licenses)`;
+  else if(!document.querySelector('input[name=licScopeV145]:checked')||sr.dataset.jur!==j.code)document.querySelectorAll('input[name=licScopeV145]').forEach(r=>r.checked=r.value===info.defaultScope);
+  sr.dataset.jur=j.code;const sc=info.choice?(document.querySelector('input[name=licScopeV145]:checked')?.value||info.defaultScope):'SINGLE_STATE';
+  $('licScopeNoteV145').innerHTML=[...info.lines,info.choice?licenseCoverage(sc==='MULTISTATE'?'RN_LICENSE_MULTISTATE':'RN_LICENSE',j.code).text:''].filter(Boolean).map(ec).join('<br>')}}
  let note='Choose a credential type to see how it will be handled.';
  const expHelp=k?.experience?experienceHelpText(k.kind):'';$('experienceHelpV11').classList.toggle('hidden',!expHelp);$('experienceHelpV11').innerHTML=expHelp;
  const expRow=$('experienceRowV11');if(expRow){expRow.classList.toggle('hidden',!k?.experience);if(!k?.experience){$('expYearsV11').value='';$('expLastV11').value='';$('expRecentV11').value=''}}
@@ -79,10 +85,11 @@ function addCredentialFromForm(){
  const k=resolveCatalogKind($('kindSearchV82').value);if(!k){alert('Choose a credential type from the list.');return}
  let jur='';
  if(k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS,j=resolveJurisdiction($('jurSearchV82').value,list);if(!j){alert(k.jurisdiction==='NLC_HOME'?'Choose your primary state of residence from the list (only states that issue multistate licenses).':'Choose the license jurisdiction from the list (any US state or territory).');return}jur=j.code}
- const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur);if(!name){alert('Enter a credential name.');return}
+ const scope=k.kind==='RN_LICENSE'?(nlcCanIssueMultistate(jur)?(document.querySelector('input[name=licScopeV145]:checked')?.value||'SINGLE_STATE'):'SINGLE_STATE'):null;
+ const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur,undefined,scope);if(!name){alert('Enter a credential name.');return}
  const type=k.kind==='OTHER'?('CUSTOM_'+(($('nm').value||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL')):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
   const exp=k.experience?{years:$('expYearsV11').value!==''?+ $('expYearsV11').value:undefined,recentMonths:$('expRecentV11').value!==''?+$('expRecentV11').value:undefined,lastWorked:$('expLastV11').value||''}:{};
- const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:(k.experience||isSkillsKind(k.kind))?'':$('dt').value,...(isSkillsKind(k.kind)&&$('skillsDoneV144')?.value?{completed:$('skillsDoneV144').value}:{}),file:f?f.name:'',...exp,prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
+ const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',...(scope?{compact_privilege_type:scope}:{}),expiration:(k.experience||isSkillsKind(k.kind))?'':$('dt').value,...(isSkillsKind(k.kind)&&$('skillsDoneV144')?.value?{completed:$('skillsDoneV144').value}:{}),file:f?f.name:'',...exp,prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
  const old=renewalTargetV85!=null?creds.find(x=>x.id===renewalTargetV85&&x.kind===c.kind&&(x.jurisdiction||'')===(jur||'')):null;if(old)c.renews=old.id;renewalTargetV85=null;
  creds.push(c);save();
  v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION',detail:{document:f?'PRIVATE_FILENAME_ONLY':'NONE',...(c.renews?{renews:c.renews}:{})}});
@@ -261,7 +268,7 @@ function renderHomeDashboard(){
    assignment you are pursuing needs, and that your home/compact license
    does not cover, is Required for that assignment, not Optional. */
 function pursuedAssignments(){const ev=eventsSinceSeed(),ids=new Set(ev.filter(e=>e.event_type==='ASSIGNMENT_INTEREST').map(e=>e.assignment_id));const f=featuredAssignment();if(f)ids.add(f.id);return getAssignments().filter(a=>ids.has(a.id))}
-function passportLicense(list=creds){const lic=list.filter(c=>isRnLicense(c)&&!['REVOKED','REJECTED','EXPIRED'].includes(c.primary));return lic.find(c=>c.kind==='RN_LICENSE_MULTISTATE'&&c.jurisdiction===DEMO_PROFILE.homeState)||lic.find(c=>c.jurisdiction===DEMO_PROFILE.homeState)||lic[0]||null}
+function passportLicense(list=creds){const lic=list.filter(c=>isRnLicense(c)&&!['REVOKED','REJECTED','EXPIRED'].includes(c.primary));return lic.find(c=>licenseScopeOf(c)==='MULTISTATE'&&c.jurisdiction===DEMO_PROFILE.homeState)||lic.find(c=>c.jurisdiction===DEMO_PROFILE.homeState)||lic[0]||null}
 function credentialRequirementRole(c){
  if(isRnLicense(c)){
   if(passportLicense()?.id===c.id)return{required:true,label:'REQUIRED',why:'Every Passport needs an RN license'};

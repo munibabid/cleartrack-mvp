@@ -7,7 +7,7 @@ function openVerify(id){const c=creds.find(x=>x.id===id);if(!c)return;c.primary=
 function v81Verify(id){
  const c=creds.find(x=>x.id===id);if(!c)return;
  if(isRnLicense(c)&&!jurisdiction(c.jurisdiction)){v81Log('VERIFICATION_FAILED',id,{actor_type:'VERIFIER',result:'JURISDICTION_MISSING',manual_intervention:true});alert('Jurisdiction missing: the license needs a US state or territory before it can be checked.');return}
- if(c.kind==='RN_LICENSE_MULTISTATE'&&!nlcCanIssueMultistate(c.jurisdiction)){v81Log('VERIFICATION_FAILED',id,{actor_type:'VERIFIER',result:'NOT_AN_NLC_HOME_STATE',manual_intervention:true});alert(`${jurisdictionName(c.jurisdiction)} does not issue multistate (NLC) licenses — ${nlcStatusLabel(c.jurisdiction)}.`);return}
+ if(licenseScopeOf(c)==='MULTISTATE'&&!nlcCanIssueMultistate(c.jurisdiction)){v81Log('VERIFICATION_FAILED',id,{actor_type:'VERIFIER',result:'NOT_AN_NLC_HOME_STATE',manual_intervention:true});alert(`${jurisdictionName(c.jurisdiction)} does not issue multistate (NLC) licenses — ${nlcStatusLabel(c.jurisdiction)}.`);return}
  const finish=new Date(),startEv=v81Events().find(e=>e.credential_id===id&&e.event_type==='VERIFICATION_STARTED');
  if(!startEv)v81Log('VERIFICATION_STARTED',id,{timestamp:finish.toISOString(),actor_type:'VERIFIER',verification_method:'SIMULATED_PRIMARY_SOURCE'});
  const dur=startEv?finish-new Date(startEv.timestamp):0;

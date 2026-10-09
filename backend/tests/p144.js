@@ -255,7 +255,7 @@ function partC() {
   const strings = (all.match(/(['"`])(?:(?!\1)[^\\\n]|\\.)*\1/g) || []).filter(s => /home state/i.test(s) && !/keywords|nlc multistate home state/.test(s));
   ok('C1 no user-facing "home state" wording left (compact explanations say "primary state of residence")', strings.length === 0, strings.slice(0, 3).join(' | '));
   ok('C2 license type option reads "issued by your primary state of residence"', /Multistate \(compact\) — issued by your primary state of residence/.test(all));
-  ok('C3 compact explanation: "Your primary state of residence, X, is a compact state"', /Your primary state of residence, \$\{jurisdictionName\(home\)\}, is a compact state/.test(all));
+  ok('C3 compact explanation (v14.5): "Multistate licenses are issued by your primary state of residence (X)"', /Multistate licenses are issued by your primary state of residence \(\$\{h\.name\}\)/.test(all + fs.readFileSync(path.join(root, 'credential-catalog.js'), 'utf8')));
 }
 
 (async () => {

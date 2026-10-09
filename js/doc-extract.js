@@ -702,7 +702,7 @@ const _fmtD=iso=>{if(!iso)return'';const [y,m,d]=String(iso).split('-').map(Numb
 /* Compare what the document says with what was entered. Works for every
    kind: dates for all, then name / credential / state / multistate where
    the kind's profile reads them. */
-function compareToEntered(values,{kind,expires_on,profileName,issuer,jurisdiction,trainingCenterId=null,catalog=null}={}){
+function compareToEntered(values,{kind,expires_on,profileName,issuer,jurisdiction,trainingCenterId=null,catalog=null,compactPrivilegeType=null}={}){
  const out=[];const profile=profileFor(kind,catalog);
  /* v14.2: a Training Center ID typed (or read) as the eCard code can't verify anything */
  if(profile==='aha_resus'&&issuer!=='RED_CROSS'&&values.credential_id){const c=String(values.credential_id).toUpperCase().replace(/[\s\-]/g,'');const tc=String(trainingCenterId||values.training_center_id||'').toUpperCase();if(TC_ID_SHAPE.test(c)||(tc&&c===tc))out.push({field:'credential_id',severity:'info',document:null,entered:values.credential_id,text:`${values.credential_id} looks like the Training Center ID (who ran the class), not the eCard code. AHA verification needs the eCard code printed on the card.`})}
@@ -718,7 +718,7 @@ function compareToEntered(values,{kind,expires_on,profileName,issuer,jurisdictio
  /* v14.3: no eCard-code vs issue-year check: real AHA cards issued in 2026 carry codes starting with 27. */
  if(profile==='license'){
   if(values.jurisdiction&&jurisdiction&&values.jurisdiction!==jurisdiction)out.push({field:'jurisdiction',severity:'mismatch',document:values.jurisdiction,entered:jurisdiction,text:`The license on the document is from ${values.jurisdiction.replace('US-','')}, but you selected ${jurisdiction.replace('US-','')}.`});
-  if(values.multistate){const docMulti=values.multistate==='multistate',entered=kind==='RN_LICENSE_MULTISTATE';if(docMulti!==entered)out.push({field:'multistate',severity:'mismatch',document:values.multistate,entered:entered?'multistate':'single-state',text:`The document shows a ${values.multistate} license, but you chose ${entered?'multistate':'single-state'}.`})}
+  if(values.multistate){const docMulti=values.multistate==='multistate',entered=kind==='RN_LICENSE_MULTISTATE'||compactPrivilegeType==='MULTISTATE';if(docMulti!==entered)out.push({field:'multistate',severity:'mismatch',document:values.multistate,entered:entered?'multistate':'single-state',text:`The document shows a ${values.multistate} license, but the license scope is set to ${entered?'multistate':'single-state'}.`})}
  }
  return out;
 }
