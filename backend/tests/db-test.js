@@ -284,6 +284,20 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  await as('verifier',async()=>db.query(`select public.record_verification($1,'VERIFIED','Some website','X-1',current_date)`,[samCa]),true);
  ok('pr13: PR 12 free-text check with an unknown source counts only as Document Reviewed',(await one(`select verification_level from credentials where id=$1`,[samCa])).verification_level==='DOCUMENT_REVIEWED');
 
+ /* ---------- PR 14: extraction_events (measurements only, never values) ---------- */
+ const aBls=(await one(`select id from credentials where clinician_id=$1 limit 1`,[uid('clinician:alex')])).id;
+ const xi=`insert into extraction_events (event,credential_id,clinician_id,actor_user_id,kind,profile,method,fields_expected,fields_found,fields_confirmed,confidence) values ($1,$2,$3,$4,'CERT_BLS','aha_resus','PDF_TEXT',$5::text[],$5::text[],$5::text[],$6::jsonb)`;
+ const F=['holder_name','credential_id','expires_on'],C={holder_name:0.98,credential_id:0.9,expires_on:0.7};
+ ok('pr14: nurse logs a SCAN of their own document (field names + numbers only)',!(await fails('alex',xi,['SCAN',aBls,uid('clinician:alex'),uid('user:alex'),F,C])));
+ ok('pr14: a field VALUE in the field list is refused',!!(await fails('alex',xi,['SCAN',aBls,uid('clinician:alex'),uid('user:alex'),['Jane Q. Notreal'],{}])));
+ ok('pr14: a value smuggled into confidence is refused (non-number / unknown key)',!!(await fails('alex',xi,['SCAN',aBls,uid('clinician:alex'),uid('user:alex'),F,{holder_name:'Jane Q. Notreal'}]))&&!!(await fails('alex',xi,['SCAN',aBls,uid('clinician:alex'),uid('user:alex'),F,{code_215012345678:0.9}]))&&!!(await fails('alex',xi,['SCAN',aBls,uid('clinician:alex'),uid('user:alex'),F,{holder_name:1.5}])));
+ ok('pr14: nurse cannot log for another nurse or as a verifier',!!(await fails('alex',xi,['SCAN',null,uid('clinician:jordan'),uid('user:alex'),F,C]))&&!!(await fails('alex',xi,['VERIFIER_CHECK',aBls,uid('clinician:alex'),uid('user:alex'),F,C])));
+ ok('pr14: verifier at aal2 logs a VERIFIER_CHECK, not at aal1',!(await fails('verifier',xi,['VERIFIER_CHECK',aBls,uid('clinician:alex'),uid('user:verifier'),F,C]))&&!!(await fails('verifier',xi,['VERIFIER_CHECK',aBls,uid('clinician:alex'),uid('user:verifier'),F,C],{aal:'aal1'})));
+ await as('alex',()=>db.query(xi,['CONFIRM',aBls,uid('clinician:alex'),uid('user:alex'),F,C]),true);
+ ok('pr14: events are append-only',!!(await fails('alex',`update extraction_events set scan_ms=1`))&&/append|not allowed|immutable|forbid/i.test(String(await db.query(`delete from extraction_events`).then(()=>'deleted',e=>e.message))));
+ ok('pr14: owner sees own events, another nurse sees none, anon is refused',(await rows('alex',`select id from extraction_events`)).length>=1&&(await rows('jordan',`select id from extraction_events`)).length===0&&!!(await fails('anon',`select id from extraction_events`)));
+ ok('pr14: issuer sources for non-AHA kinds are seeded (APEX NIHSS, ENA TNCC, BCEN, AACN, AAP NRP)',await n(`select count(*) from verification_sources where slug in ('apex-nihss','ena-tncc','bcen','aacn','aap-nrp') and status='APPROVED'`)===5);
+ ok('pr14: no issuer source lists RN licenses, Nursys lists no certifications',await n(`select count(*) from verification_sources where source_type<>'LICENSING_BOARD' and slug not like 'nursys%' and credential_kinds && array['RN_LICENSE','RN_LICENSE_MULTISTATE']`)===0&&await n(`select count(*) from verification_sources where slug like 'nursys%' and exists (select 1 from unnest(credential_kinds) k where k like 'CERT_%')`)===0);
 
  await db.end();
  const f=R.filter(r=>r.startsWith('FAIL')).length;console.log(`\n${R.length-f}/${R.length} passed`);process.exit(f?1:0);

@@ -291,3 +291,6 @@ select optgroup{font-weight:700}
 .acct-form-v10 input[type=date],.acct-form-v10 input[type=month],.psv-form-v13 input,.psv-form-v13 select{max-width:100%;min-width:0;box-sizing:border-box}
 .grid2-v83>label{min-width:0}
 @media (max-width:560px){.psv-form-v13 .grid2-v83,.acct-form-v10 .grid2-v83{grid-template-columns:1fr}.scan-fields-v14{grid-template-columns:1fr}#acctAccuracyV14 .v81-table,#verifyExtractV14 .v81-table{display:block;overflow-x:auto}}
+/* v14.1: verifier expiration note shows both dates */
+.expboth-v14{display:flex;flex-wrap:wrap;gap:4px 12px;margin:4px 0}
+.expboth-v14>span{white-space:nowrap}

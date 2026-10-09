@@ -24,7 +24,7 @@ const puppeteer = require('puppeteer-core');
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr14-shots/';
 const FIX = '/tmp/p14-fixtures';
-const VERSION = 'v14.0 demo';
+const VERSION = 'v14.1 demo';
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); };
@@ -292,6 +292,122 @@ async function partA5(browser) {
   await pg.close();
 }
 
+/* Live end-to-end on BASE against staging: throwaway nurse + verifier (mailinator, no email sent),
+   NIHSS scanned on the nurse's phone, verifier reads it on their own device and records it at APEX.
+   Everything created here is removed at the end (storage file by its owner, rows via SQL). */
+async function partC(browser, db, mask) {
+  const { generateSync } = require('otplib');
+  const PREFIX = 'veridun-pr14-';
+  const cleanup = async () => {
+    const all = (await db.query(`select id from auth.users where email like $1`, [PREFIX + '%@mailinator.com'])).rows.map(r => r.id);
+    if (!all.length) return;
+    const clin = (await db.query('select id from public.clinicians where user_id=any($1)', [all])).rows.map(r => r.id);
+    const creds = (await db.query('select id from public.credentials where clinician_id=any($1)', [clin])).rows.map(r => r.id);
+    await db.query('begin');
+    try {
+      for (const t of ['audit_events', 'analytics_events', 'monitoring_events', 'extraction_events']) await db.query(`alter table public.${t} disable trigger ${t}_append_only`);
+      await db.query('delete from public.extraction_events where actor_user_id=any($1) or clinician_id=any($2) or credential_id=any($3)', [all, clin, creds]);
+      await db.query('delete from public.audit_events where actor_user_id=any($1) or clinician_id=any($2) or credential_id=any($3)', [all, clin, creds]);
+      await db.query('delete from public.analytics_events where clinician_id=any($1)', [clin]);
+      await db.query('delete from public.monitoring_events where actor_user_id=any($1) or credential_id=any($2)', [all, creds]);
+      for (const t of ['audit_events', 'analytics_events', 'monitoring_events', 'extraction_events']) await db.query(`alter table public.${t} enable trigger ${t}_append_only`);
+      await db.query('delete from public.verification_anchors where credential_id=any($1)', [creds]);
+      await db.query('delete from public.credential_verifications where credential_id=any($1)', [creds]);
+      await db.query('delete from public.audit_anchors where clinician_id=any($1)', [clin]);
+      await db.query('delete from public.credentials where id=any($1)', [creds]);
+      await db.query('delete from public.clinicians where id=any($1)', [clin]);
+      await db.query('delete from auth.mfa_factors where user_id=any($1)', [all]);
+      await db.query('delete from auth.users where id=any($1)', [all]);
+      await db.query('commit');
+    } catch (e) { await db.query('rollback'); throw e; }
+  };
+  const make = async label => {
+    const u = { email: `${PREFIX}${label}-${crypto.randomBytes(3).toString('hex')}@mailinator.com`, password: 'T' + crypto.randomBytes(12).toString('base64url') + '9!', id: crypto.randomUUID() };
+    await db.query(`insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change)
+      values ('00000000-0000-0000-0000-000000000000',$1,'authenticated','authenticated',$2,extensions.crypt($3,extensions.gen_salt('bf')),now(),'{"provider":"email","providers":["email"]}','{}',now(),now(),'','','','')`, [u.id, u.email, u.password]);
+    await db.query(`insert into auth.identities (provider_id,user_id,identity_data,provider,last_sign_in_at,created_at,updated_at) values ($1::text,$1::uuid,jsonb_build_object('sub',$1::text,'email',$2::text,'email_verified',true),'email',now(),now(),now())`, [u.id, u.email]);
+    return u;
+  };
+  const mk = async () => { const ctx = await browser.createBrowserContext(); const pg = await ctx.newPage(); pg.setDefaultTimeout(120000); const errs = []; pg.on('pageerror', e => errs.push(e.message)); pg.on('dialog', d => d.accept()); await pg.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }); await pg.goto(BASE, { waitUntil: 'networkidle2' }); return { pg, errs, ctx }; };
+  const signIn = async (pg, u) => { await pg.evaluate(async (e, p) => { await store.account.signInWithPassword(e, p); }, u.email, u.password); await pg.waitForFunction(() => store.account.signedIn, { timeout: 30000 }); await W(400); await pg.evaluate(() => { if (!accountWorkspace.classList.contains('active')) acctShow(); }); await W(300); };
+  const idle = (pg, ms = 60000) => pg.waitForFunction(() => !document.body.classList.contains('acct-busy-v10'), { timeout: ms });
+  const tap = async (pg, sel) => { await pg.waitForSelector(sel, { timeout: 20000 }); await pg.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel); await W(120); await pg.evaluate(s => document.querySelector(s).click(), sel); };
+  const setVal = (pg, id, v) => pg.evaluate((id, v) => { const e = document.getElementById(id); if (!e) return; e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, id, v);
+  let nurse, ver, docPath = null, docRemoved = false;
+  try {
+    await cleanup();
+    const nurseU = await make('nurse'), verU = await make('verifier');
+    await db.query(`update public.users set role='verifier' where id=$1`, [verU.id]);
+    ok('live: throwaway nurse + verifier created (no email sent)', true);
+    nurse = await mk(); ver = await mk();
+    ok('live site shows ' + VERSION, await nurse.pg.evaluate(v => document.documentElement.textContent.includes(v), VERSION), BASE);
+    await signIn(nurse.pg, nurseU);
+    await nurse.pg.evaluate(async () => { await store.account.saveProfile({ full_name: 'Testa Fakename', post_nominals: 'RN', specialty: 'ICU', home_jurisdiction: 'US-CA' }); acctShow('acctPassportV10'); });
+    await W(400);
+    await tap(nurse.pg, '[data-act="toggle-add"]'); await W(200);
+    await nurse.pg.select('#acctKindV10', 'CERT_NIHSS'); await setVal(nurse.pg, 'acctExpV10', '2028-12-31');
+    await (await nurse.pg.$('#acctFileV10')).uploadFile(FIX + '/nihss-apex-text.pdf');
+    await nurse.pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }, { timeout: 120000 });
+    const sc = await nurse.pg.evaluate(() => ({ v: acctScan.values, src: acctScan.res.source && acctScan.res.source.id, mm: (document.getElementById('acctMismatchV14') || {}).innerText || '' }));
+    ok('live: NIHSS read on the phone, APEX suggested, mismatch vs typed Dec 31', sc.v.credential_id === '99000123' && sc.v.expires_on === '2028-03-14' && sc.src === 'apex-nihss' && /Credential mismatch detected/.test(sc.mm), JSON.stringify({ src: sc.src, exp: sc.v.expires_on }));
+    await tap(nurse.pg, '#acctUseDocDateV14'); await W(200);
+    await tap(nurse.pg, '#acctScanConfirmV14');
+    await tap(nurse.pg, '#acctAddFormV10 button[type=submit]'); await idle(nurse.pg);
+    const row = (await db.query(`select c.id, c.status::text, c.expires_on::text exp, c.metadata, c.source_document_path p from public.credentials c join public.clinicians k on k.id=c.clinician_id where k.user_id=$1 and c.kind='CERT_NIHSS'`, [nurseU.id])).rows[0];
+    docPath = row && row.p;
+    ok('live: saved VERIFYING with the document date, document in private storage', row && row.status === 'VERIFYING' && row.exp === '2028-03-14' && !!row.p, JSON.stringify(row && { st: row.status, exp: row.exp }));
+    const xe = (await db.query(`select event, kind, profile, source_slug, fields_found, fields_confirmed, confidence from public.extraction_events where credential_id=$1 or (clinician_id=(select id from public.clinicians where user_id=$2))`, [row.id, nurseU.id])).rows;
+    ok('live: extraction_events CONFIRM row stored (field names + numbers)', xe.some(e => e.event === 'CONFIRM' && e.kind === 'CERT_NIHSS' && e.source_slug === 'apex-nihss' && e.fields_found.includes('credential_id') && Object.values(e.confidence).every(v => typeof v === 'number')), JSON.stringify(xe.map(e => ({ ev: e.event, k: e.kind, s: e.source_slug, f: e.fields_found }))));
+    const au = JSON.stringify((await db.query(`select event_type, detail from public.audit_events where credential_id=$1`, [row.id])).rows);
+    const leak = JSON.stringify([row.metadata, xe]) + au;
+    ok('live: no extracted value reached the server (metadata, audit, telemetry)', !/99000123|Testa|2026-03-14|apexinnov/i.test(JSON.stringify([row.metadata, xe])) && !/99000123|2026-03-14/.test(au) && row.metadata.doc && row.metadata.doc.confirmed === true, leak.slice(0, 200));
+    // verifier on their own device
+    await signIn(ver.pg, verU);
+    await ver.pg.click('.acctTab[data-target="acctSecurityV12"]'); await W(250);
+    await ver.pg.click('#acctMfaEnrollBtnV12'); await idle(ver.pg);
+    await ver.pg.waitForSelector('#acctMfaSecretV12');
+    const secret = await ver.pg.$eval('#acctMfaSecretV12', el => el.textContent.trim().replace(/\s/g, ''));
+    await ver.pg.evaluate(c => { document.getElementById('acctMfaFirstV12').value = c; }, generateSync({ secret }));
+    await ver.pg.click('#acctMfaConfirmV12 button[type=submit]'); await idle(ver.pg);
+    ok('live: verifier reaches AAL2', await ver.pg.evaluate(() => store.account.mfa?.currentLevel === 'aal2'));
+    await tap(ver.pg, '.acctTab[data-target="acctVerifyV12"]'); await W(300);
+    await ver.pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), { timeout: 30000 }, row.id);
+    await tap(ver.pg, `.acct-verify-pick-v12[data-id="${row.id}"]`);
+    await ver.pg.waitForSelector('#acctVerifyFormV12[data-mode="registry"]', { timeout: 15000 });
+    const vf = await ver.pg.evaluate(() => ({ opts: [...document.querySelectorAll('#acctVerifySourceIdV13 option')].map(o => o.value), sel: document.getElementById('acctVerifySourceIdV13').value, applies: (document.getElementById('acctVerifyAppliesV14') || {}).innerText || '', form: document.getElementById('acctVerifyFormV12').innerText }));
+    ok('live: apex-nihss resolves from the live registry and is preselected; no Nursys', vf.sel === 'apex-nihss' && !vf.opts.some(o => /nursys|board-/.test(o)) && !/not in the live registry/i.test(vf.form), JSON.stringify(vf.opts));
+    await tap(ver.pg, '#acctVReadV14');
+    await ver.pg.waitForSelector('#acctCopyCodeV14', { timeout: 120000 });
+    const pre = await ver.pg.evaluate(() => ({ ref: document.getElementById('acctVerifyRefV12')?.value, exp: document.getElementById('acctVerifyExpV13')?.value }));
+    ok('live: verifier reads the document on their device via a signed link; ID + expiration prefilled', pre.ref === '99000123' && pre.exp === '2028-03-14', JSON.stringify(pre));
+    await ver.pg.evaluate(() => document.querySelectorAll('.acctDblV14').forEach(x => { if (x.value !== 'active') x.checked = true; }));
+    await setVal(ver.pg, 'acctVerifyResultV12', 'VERIFIED'); await setVal(ver.pg, 'acctVerifyStatusV13', 'ACTIVE');
+    await W(200); await ver.pg.screenshot({ path: SH + '09-live-verifier-nihss.png' });
+    await tap(ver.pg, '#acctVerifySaveV12'); await idle(ver.pg);
+    const rec = await ver.pg.evaluate(() => typeof acctLastRecord !== 'undefined' && acctLastRecord && { level: acctLastRecord.level, src: acctLastRecord.source_name });
+    const dbrow = (await db.query('select status::text, verification_level from public.credentials where id=$1', [row.id])).rows[0];
+    ok('live: record_source_check at APEX NIHSS → VERIFIED, ISSUER_VERIFIED', dbrow.status === 'VERIFIED' && dbrow.verification_level === 'ISSUER_VERIFIED' && (!rec || /APEX/i.test(rec.src || '')), JSON.stringify({ rec, dbrow }));
+    const vc = (await db.query(`select count(*)::int n from public.extraction_events where credential_id=$1 and event='VERIFIER_CHECK'`, [row.id])).rows[0].n;
+    ok('live: VERIFIER_CHECK event logged at aal2', vc === 1, vc);
+    await tap(ver.pg, '[data-act="acc-load"]'); await idle(ver.pg);
+    const acc = await ver.pg.evaluate(() => ({ from: typeof acctAccStatsV14 !== 'undefined' && acctAccStatsV14 && acctAccStatsV14.from, kinds: document.getElementById('accKindTableV14')?.innerText || '' }));
+    ok('live: accuracy panel reads extraction_events', acc.from === 'extraction_events' && /NIHSS/.test(acc.kinds), JSON.stringify(acc).slice(0, 160));
+    // the nurse removes the stored document (owner delete policy), then rows are removed below
+    const rm = await nurse.pg.evaluate(async p => { const { data, error } = await store.account.client.storage.from('source-documents').remove([p]); return error ? error.message : (data || []).length; }, row.p);
+    const objLeft = (await db.query(`select count(*)::int n from storage.objects where bucket_id='source-documents' and name like $1`, [nurseU.id + '/%'])).rows[0].n;
+    docRemoved = rm === 1;
+    ok('live: test document removed from storage', rm === 1 && objLeft === 0, JSON.stringify({ rm, objLeft }));
+    const errs = [...nurse.errs, ...ver.errs];
+    ok('live: no page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  } catch (e) { ok('p14 live end-to-end', false, mask(e && e.stack ? e.stack : e)); }
+  finally {
+    if (docPath && !docRemoved && nurse) await nurse.pg.evaluate(async p => store.account.client.storage.from('source-documents').remove([p]), docPath).catch(() => {});
+    for (const x of [nurse, ver]) if (x) await x.ctx.close().catch(() => {});
+    try { await cleanup(); const left = (await db.query('select count(*)::int n from auth.users where email like $1', [PREFIX + '%'])).rows[0].n; ok('live: test users cleaned up', left === 0, 'left ' + left); }
+    catch (e) { ok('live cleanup', false, mask(e.message)); }
+  }
+}
+
 async function partB(browser) {
   const { client, mask } = require('./live-db.js');
   const db = await client();
@@ -317,6 +433,7 @@ async function partB(browser) {
       end $$;
       rollback;`).then(() => 'ok', e => mask(e.message));
     ok('extraction_events refuses other users\' rows and non-numeric confidences (rolled back)', probe === 'ok', probe);
+    if (process.env.P14_SKIP_LIVE_E2E) skip('live end-to-end', 'P14_SKIP_LIVE_E2E set'); else await partC(browser, db, mask);
     const m1 = await munib();
     ok("Munib's account unchanged", JSON.stringify(m0) === JSON.stringify(m1));
   } catch (e) { ok('p14 live run', false, mask(e && e.stack ? e.stack : e)); }

@@ -59,26 +59,32 @@ alter table public.extraction_events enable row level security;
 
 -- Nurse: SCAN / CONFIRM rows for their own credentials (or with no credential
 -- yet, e.g. a scan before saving), always as themselves.
+drop policy if exists extraction_owner_insert on public.extraction_events;
 create policy extraction_owner_insert on public.extraction_events for insert to authenticated
   with check (actor_user_id = auth.uid()
               and event in ('SCAN','CONFIRM')
               and clinician_id = private.my_clinician_id()
               and (credential_id is null or private.owns_credential(credential_id)));
 -- Verifier (with a verified authenticator at aal2): VERIFIER_CHECK rows.
+drop policy if exists extraction_verifier_insert on public.extraction_events;
 create policy extraction_verifier_insert on public.extraction_events for insert to authenticated
   with check (actor_user_id = auth.uid()
               and event = 'VERIFIER_CHECK'
               and private.is_verifier()
               and private.privileged_mfa_ok());
+drop policy if exists extraction_read on public.extraction_events;
 create policy extraction_read on public.extraction_events for select to authenticated
   using (clinician_id = private.my_clinician_id() or private.is_verifier() or private.is_admin());
 -- Step-up, same as credentials: once a factor exists, aal2 is needed.
+drop policy if exists extraction_mfa_read on public.extraction_events;
 create policy extraction_mfa_read on public.extraction_events
   as restrictive for select to authenticated using (private.mfa_satisfied());
+drop policy if exists extraction_mfa_insert on public.extraction_events;
 create policy extraction_mfa_insert on public.extraction_events
   as restrictive for insert to authenticated with check (private.mfa_satisfied());
 
 -- Append-only (FK columns may still be nulled by ON DELETE SET NULL).
+drop trigger if exists extraction_events_append_only on public.extraction_events;
 create trigger extraction_events_append_only before update or delete on public.extraction_events
   for each row execute function private.forbid_mutation();
 revoke all on public.extraction_events from anon;
@@ -86,3 +92,6 @@ revoke update, delete, truncate, references, trigger on public.extraction_events
 grant select, insert on public.extraction_events to authenticated;
 revoke all on function private.extraction_field_ok(text[]) from public;
 revoke all on function private.extraction_confidence_ok(jsonb) from public;
+-- The CHECK constraints run as the inserting role, so authenticated needs execute.
+grant execute on function private.extraction_field_ok(text[]) to authenticated;
+grant execute on function private.extraction_confidence_ok(jsonb) to authenticated;
