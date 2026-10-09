@@ -65,6 +65,8 @@ function acctCredStatus(c){
  const lic=c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE';
  const v=(acct().cache.verifications||[]).find(x=>x.credential_id===c.id);
  const an=(acct().cache.anchors||[]).find(x=>x.credential_id===c.id);
+ const si=typeof scanCredInfo==='function'?scanCredInfo(c):{};
+ if((c.status==='VERIFYING'||c.status==='UNVERIFIED')&&si.scanned)return{cls:si.mismatch?'REVOKED':'PENDING',text:si.mismatch?'MISMATCH · AWAITING VERIFIER REVIEW':'DETAILS CAPTURED · AWAITING VERIFICATION',sub:(si.mismatch?'Credential mismatch detected between the document and what was entered. A verifier will review it. ':'Details captured from the document, awaiting verification. ')+(lic?`A real check uses ${licensePrimarySource(c.kind,c.jurisdiction_code)}.`:`A verifier checks it with ${(typeof primaryRouteFor==='function'&&primaryRouteFor(c.kind,c.jurisdiction_code)?.name)||'the issuer'}.`),v,an,scan:si};
  const sub=(c.status==='VERIFYING'||c.status==='UNVERIFIED')?(lic?`Not verified yet. A real check uses ${licensePrimarySource(c.kind,c.jurisdiction_code)}.`:'Not checked with the issuer yet.'):c.status==='VERIFIED'?((v?.source_name?'Source: '+v.source_name:'Verified')+(v?.checked_on?' · Checked: '+v.checked_on:'')+(v?.status_at_source?' · Status at source: '+v.status_at_source.toLowerCase():'')+(an?.tx_hash?' · XRPL anchor recorded (does not replace the source check)':' · ledger anchor pending')):c.status==='REJECTED'?'The source check did not confirm this credential':c.status==='REVOKED'&&v?.status_at_source?'The source showed '+v.status_at_source.toLowerCase():'';
  /* PR 13: the badge says HOW it was verified, not just "verified". */
  const lvlText=c.status==='VERIFIED'?(c.verification_level?levelLabel(c.verification_level).toUpperCase():'VERIFIED · LEVEL NOT RECORDED'):text;
@@ -124,7 +126,8 @@ function acctCredRow(c){
  const lic=c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE',home=acct().cache.profile?.home_jurisdiction,m=c.metadata||{};
  const hist=acct().cache.events.filter(e=>e.credential_id===c.id).slice().reverse().map(e=>`${ACCT_EVENT_TEXT[e.event_type]||e.event_type} ${fmtDT(e.occurred_at)}`);
  return`<div class="acct-item-v10" data-cred="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(catalogKind(c.kind)?.short||catalogKind(c.kind)?.label||c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''}${c.expires_on?' · expires '+fd(c.expires_on):''}${priv?' · <span class="badge PRIVATE">PRIVATE</span>':''}</div><div class="small">${ec(s.sub)}</div>${acctProvenanceHtml(c,s)}${lic&&c.jurisdiction_code?`<div class="small acct-cov-v11">${ec(licenseCoverage(c.kind,c.jurisdiction_code).text)}${ec(licenseHomeStateHint(c.kind,c.jurisdiction_code,home))}</div>`:''}${catalogKind(c.kind)?.experience&&(m.years!=null||m.recent_months!=null||m.last_worked_on)?`<div class="small">${[m.years!=null?m.years+' yrs':'',m.recent_months!=null?m.recent_months+' months in the last 2 years':'',m.last_worked_on?'last worked '+fd(m.last_worked_on):''].filter(Boolean).map(ec).join(' · ')}</div>`:''}<div class="small acct-hist-v11">History: ${hist.length?ec(hist.join(' · ')):'added'} · not verified by anyone yet</div>
- <div class="small">Document: ${c.source_document_path?`private file · <button class="linkbtn-v10" type="button" data-act="doc-open" data-id="${c.id}">Open (60-second signed link)</button>`:'none'} · <label class="linkbtn-v10">${c.source_document_path?'Replace':'Upload'} file<input type="file" class="acct-doc-input-v10 sr-only-v10" data-id="${c.id}" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label></div></div>
+ <div class="small">Document: ${c.source_document_path?`private file · <button class="linkbtn-v10" type="button" data-act="doc-open" data-id="${c.id}">Open (60-second signed link)</button>${c.status!=='VERIFIED'&&/\.(pdf|png|jpe?g|webp)$/i.test(c.source_document_path)?` · <button class="linkbtn-v10" type="button" data-act="doc-rescan" data-id="${c.id}">Re-scan document</button>`:''}`:'none'} · <label class="linkbtn-v10">${c.source_document_path?'Replace':'Upload'} file<input type="file" class="acct-doc-input-v10 sr-only-v10" data-id="${c.id}" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label></div>
+ ${acctDocDetailsHtml(c)}<div data-scan-slot="${c.id}">${typeof scanBoxHtml==='function'?scanBoxHtml(c.id):''}</div></div>
  <div class="acct-item-side-v10"><span class="badge ${s.cls}">${ec(s.text)}</span><button class="mini sec" type="button" data-act="cred-delete" data-id="${c.id}">Delete</button></div></div>`;
 }
 function acctAddForm(){
@@ -138,6 +141,8 @@ function acctAddForm(){
  <div id="acctLicenseNoteV10" class="small hidden" style="margin:6px 0"></div>
  <label>Expiration date <span class="small">(if it has one)</span><input type="date" id="acctExpV10"></label>
  <label>Source document <span class="small">(optional · PDF, PNG, JPEG, DOC, DOCX · max 10 MB · private)</span><input type="file" id="acctFileV10" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label>
+ <div class="small">PDF and image files are read on this device so you can check the details before saving. Nothing is sent to an AI service.</div>
+ <div id="acctScanSlotV14">${typeof scanBoxHtml==='function'?scanBoxHtml('add'):''}</div>
  <div class="small acct-note-v10" id="acctPrivNoteV10"></div>
  <div class="small acct-note-v10"><b>Staging:</b> use test documents only, no real PHI.</div>
  <div class="acct-row-v10"><button class="pri" type="submit">Save to my account</button><button class="sec" type="button" data-act="toggle-add">Cancel</button></div></form>`;
@@ -160,14 +165,18 @@ async function acctSubmitCredential(){
  const file=$('acctFileV10').files[0]||null;
  const meta=k.experience?Object.fromEntries(Object.entries({years:$('acctExpYearsV10').value!==''?+$('acctExpYearsV10').value:null,recent_months:$('acctExpRecentV10').value!==''?+$('acctExpRecentV10').value:null,last_worked_on:$('acctExpLastV10').value||null}).filter(([,v])=>v!=null&&v!=='')):{};
  if(k.kind==='RN_LICENSE_MULTISTATE'&&jur){const h=a.cache.profile?.home_jurisdiction;if(h&&jur!==h&&!confirm(`A multistate license is issued only by your primary state of residence. Your home state is ${jurisdictionName(h)}, but this license is from ${jurisdictionName(jur)}.\n\nSave it anyway? (If you moved, update your home state in your profile.)`))return null;if(!nlcCanIssueMultistate(jur))throw new Error(`${jurisdictionName(jur)} can't issue multistate licenses (${nlcStatusLabel(jur)}). Choose “RN License — single-state”, or pick a compact home state.`)}
- await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:$('acctExpV10').value||null,metadata:meta},file);
+ const sum=typeof scanForAdd==='function'?scanForAdd():null;
+ if(sum&&k.privacy!=='PRIVATE')meta.doc=sum.doc;
+ const saved=await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:$('acctExpV10').value||null,metadata:meta},file);
+ if(sum){await scanAfterSave(saved.id,sum,{applied:!!acctScan?.applyExpiry});acctLastScanResult={name,mismatch:sum.ms.length>0}}
+ if(acctScan?.target==='add')acctScan=null;
  return name;
 }
 /* RN licenses (PR 11): the home state drives compact (NLC) logic. When the
    license's state can issue multistate licenses, a License type choice
    appears; it defaults to multistate for the clinician's own compact home
    state (single-state can still be chosen). */
-let acctLicTypeTouched=false;
+let acctLicTypeTouched=false,acctLastScanResult=null;
 const acctIsLicenseKind=k=>!!k&&(k.kind==='RN_LICENSE'||k.kind==='RN_LICENSE_MULTISTATE');
 function acctLicenseKind(){
  const k=catalogKind($('acctKindV10')?.value);if(!acctIsLicenseKind(k))return k?.kind||'';
@@ -319,7 +328,7 @@ function acctOrgResultHtml(r){
 async function acctOpenShare(input){acctOrgResult=await acct().openShare(input);acctOrgShares=null}
 
 /* ---------- Activity ---------- */
-const ACCT_EVENT_TEXT={PROFILE_CREATED:'Profile created',PROFILE_UPDATED:'Profile updated',CREDENTIAL_ADDED:'Credential added',CREDENTIAL_DELETED:'Credential deleted',SHARE_CREATED:'Share created',SHARE_REVOKED:'Share revoked',SHARE_EXTENDED:'Share extended',SHARE_EXTENSION_DECLINED:'Extension declined',SHARE_VIEWED:'An organization viewed a share',SHARE_ACCESS_REFUSED:'An organization was refused (share not active)',SHARE_EXTENSION_REQUESTED:'An organization asked for more time',ASSIGNMENT_READY:'Ready for an assignment'};
+const ACCT_EVENT_TEXT={DOCUMENT_SCANNED:'Document read on this device, details confirmed',DOCUMENT_MISMATCH:'Credential mismatch detected',DOCUMENT_DATE_APPLIED:'Expiration set from the document',VERIFIER_CHECK:'Verifier double-checked the document details',PROFILE_CREATED:'Profile created',PROFILE_UPDATED:'Profile updated',CREDENTIAL_ADDED:'Credential added',CREDENTIAL_DELETED:'Credential deleted',SHARE_CREATED:'Share created',SHARE_REVOKED:'Share revoked',SHARE_EXTENDED:'Share extended',SHARE_EXTENSION_DECLINED:'Extension declined',SHARE_VIEWED:'An organization viewed a share',SHARE_ACCESS_REFUSED:'An organization was refused (share not active)',SHARE_EXTENSION_REQUESTED:'An organization asked for more time',ASSIGNMENT_READY:'Ready for an assignment'};
 function acctRenderActivity(){
  const a=acct(),ev=a.cache.events,el=$('acctActivityV10');
  el.innerHTML=`<div class="panel-v81"><div class="ph">Activity on my account (${ev.length})</div><div class="pb">${ev.length?ev.map(e=>`<div class="acct-event-v10"><span class="small mono">${ec(fmtDT(e.occurred_at))}</span> <b>${ec(acctEventText(e))}</b></div>`).join(''):'<div class="small">Nothing yet.</div>'}
@@ -362,7 +371,7 @@ function acctWire(){
  ws.addEventListener('submit',e=>{
   const id=e.target.id;if(!/V10$/.test(id))return;e.preventDefault();
   if(id==='acctProfileFormV10')acctDo(async()=>{const sec=[...document.querySelectorAll('.acctSecSpecV10:checked')].map(x=>x.value);await acct().saveProfile({full_name:$('acctNameV10').value,post_nominals:$('acctPostV10').value,specialty:$('acctSpecV10').value,secondary_specialties:sec,home_jurisdiction:$('acctHomeV10').value});acctEditingProfile=false},'Profile saved to your account.');
-  if(id==='acctAddFormV10')acctDo(async()=>{const n=await acctSubmitCredential();return n}).then(n=>{if(n)acctMsg(`${n} saved to your account. Status: Submitted, not verified.`,'ok')});
+  if(id==='acctAddFormV10')acctDo(async()=>{acctLastScanResult=null;const n=await acctSubmitCredential();return n}).then(n=>{if(!n)return;const sr=acctLastScanResult;acctMsg(sr?(sr.mismatch?`${n} saved. Credential mismatch detected: it goes to the verifier's review queue, flagged. Status: ${SCAN_STATUS_TEXT}.`:`${n} saved. Status: ${SCAN_STATUS_TEXT}.`):`${n} saved to your account. Status: Submitted, not verified.`,sr?.mismatch?'err':'ok')});
   if(id==='acctShareFormV10')acctDo(acctSubmitShare,'Share created. Copy the link or code now.');
   if(id==='acctOrgCreateFormV10')acctDo(async()=>{const o=await acct().createOrganization($('acctOrgNameV10').value);acctOrgId=o.id;acctOrgShares=null},'Organization created. You are its owner.');
   if(id==='acctOpenFormV10')acctDo(()=>acctOpenShare($('acctOpenInputV10').value));
@@ -377,7 +386,7 @@ function acctWire(){
   if(['acctShareDurV10','acctShareStartV10','acctShareEndV10','acctShareCustomV10','acctShareBufferV11'].includes(t.id))acctShareCoverageWarn(e);
   if(t.classList.contains('acctSecSpecV10')&&t.checked){const n=document.querySelectorAll('.acctSecSpecV10:checked').length;if(n>5){t.checked=false;acctMsg('Up to 5 secondary specialties.','err')}}
   if(t.id==='acctOrgPickV10'){acctOrgId=t.value;acctOrgShares=null;acctRenderAll()}
-  if(t.classList.contains('acct-doc-input-v10')&&t.files[0])acctDo(()=>acct().uploadDocument(t.dataset.id,t.files[0]),'Document uploaded to your private folder.');
+  if(t.classList.contains('acct-doc-input-v10')&&t.files[0]){const f=t.files[0],id=t.dataset.id;acctDo(()=>acct().uploadDocument(id,f),'Document uploaded to your private folder.').then(()=>{const c=acct().cache.credentials.find(x=>x.id===id);if(c&&c.status!=='VERIFIED'&&typeof scanStart==='function'&&SCANNABLE(f))scanStart(id,f,c.kind)})}
  });
  ws.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act,id=b.dataset.id,a=acct();
@@ -434,4 +443,12 @@ function acctPassportLicenseNote(){
  if(!lic.length)return'<div class="notice alert-v81 small" id="acctPassLicV13"><b>Passport incomplete:</b> every Passport needs an RN license. Add yours (home state, or multistate if your home state is in the compact).</div>';
  const ok=lic.some(c=>c.status==='VERIFIED'&&levelMeets(c.verification_level,'PRIMARY_SOURCE_VERIFIED'));
  return`<div class="small" id="acctPassLicV13"><b>Passport RN license:</b> ${ok?'primary-source verified ✓':'added — the Passport counts as complete once a verifier confirms it with the board or Nursys'}. A license for another state becomes <b>Required</b> when an assignment there isn't covered by your home or compact license.</div>`;
+}
+
+/* PR 14: the confirmed document details on a credential row (owner only). */
+function acctDocDetailsHtml(c){
+ const d=c.metadata?.doc;if(!d||!d.fields)return'';
+ const order=['holder_name','credential_id','course','issued_on','renew_by','expires_on','jurisdiction','multistate','training_center'];
+ const rows=order.filter(k=>d.fields[k]).map(k=>[k==='credential_id'?(d.profile==='aha_resus'?'eCard code':d.profile==='license'?'License number':'ID'):(DocExtract.FIELD_LABEL[k]||k),d.fields[k]]);
+ return`<details class="why-v13 acct-docdet-v14"><summary>Details from the document${d.mismatch?' · <span class="badge REVOKED">MISMATCH</span>':''}</summary><div class="why-grid-v13">${rows.map(([k,v])=>`<div>${ec(k)}</div><div>${ec(v)}</div>`).join('')}${d.document_expires_on?`<div>Expiration (document)</div><div>${ec(fd(d.document_expires_on))}</div>`:''}</div>${(d.mismatches||[]).length?`<div class="small">Mismatch: ${d.mismatches.map(m=>ec(m.field.replace('_',' '))).join(', ')}</div>`:''}<div class="small">Read on your device and confirmed by you on ${ec(fmtDT(d.read_at))}. Not verified.</div></details>`;
 }

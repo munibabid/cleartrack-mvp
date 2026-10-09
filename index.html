@@ -60,7 +60,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v13.0 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.0 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -200,10 +200,11 @@
 
 <section id="verificationWorkspace" class="role-workspace">
 <div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Verification Console</span></div><h1>Verification Console</h1><p>Simulated primary-source checks (demo only), queue, and audit activity. No real licensing board or issuer is contacted. All metrics are computed from the demo event log.</p></div><div><span class="demo-tag-v81">AUTHORIZED DEMO</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
-<div class="role-tabs-v81"><button class="verifyTab active" data-target="verifyOverview">Dashboard</button><button class="verifyTab" data-target="verifyQueueV81">Verification Queue</button><button class="verifyTab" data-target="verifySourcesV13">Verification Sources</button><button class="verifyTab" data-target="verifyMismatchV85">Mismatch Alerts</button><button class="verifyTab" data-target="verifyManualV85">Manual Review</button><button class="verifyTab" data-target="verifyMonitorV85">Monitoring</button><button class="verifyTab" data-target="verifyRevokeV85">Revocations</button><button class="verifyTab" data-target="verifyAuditV81">Audit Logs</button><button class="verifyTab" data-target="verifyAnalyticsV81">Analytics</button><button class="verifyTab" data-target="verifyProofsV81">Advanced Proofs</button></div>
+<div class="role-tabs-v81"><button class="verifyTab active" data-target="verifyOverview">Dashboard</button><button class="verifyTab" data-target="verifyQueueV81">Verification Queue</button><button class="verifyTab" data-target="verifySourcesV13">Verification Sources</button><button class="verifyTab" data-target="verifyExtractV14">Extraction Accuracy</button><button class="verifyTab" data-target="verifyMismatchV85">Mismatch Alerts</button><button class="verifyTab" data-target="verifyManualV85">Manual Review</button><button class="verifyTab" data-target="verifyMonitorV85">Monitoring</button><button class="verifyTab" data-target="verifyRevokeV85">Revocations</button><button class="verifyTab" data-target="verifyAuditV81">Audit Logs</button><button class="verifyTab" data-target="verifyAnalyticsV81">Analytics</button><button class="verifyTab" data-target="verifyProofsV81">Advanced Proofs</button></div>
 <div id="verifyOverview" class="verifyPanel"><div class="metrics-v81"><div class="metric-v81"><span>Pending</span><b id="verPendingV81">0</b></div><div class="metric-v81"><span>Verified</span><b id="verSuccessV81">0</b></div><div class="metric-v81"><span>Awaiting Manual Review</span><b id="verManualV81">0</b><small id="verManualDoneV85" class="small">0 completed</small></div><div class="metric-v81"><span>Mismatch Alerts</span><b id="verMismatchV85">0</b></div><div class="metric-v81"><span>Failed / Rejected</span><b id="verFailedV81">0</b></div><div class="metric-v81"><span>Revocations</span><b id="verRevokedV85">0</b></div><div class="metric-v81"><span>Median Time</span><b id="verMedianV81">—</b></div><div class="metric-v81"><span>Monitored ≤30 days</span><b id="verMonitorV82">—</b></div></div><div class="panel-v81"><div class="ph">Verification Queue</div><div class="pb" id="verifyQueuePreviewV81"></div></div><div class="panel-v81"><div class="ph">Mismatch Alerts <span class="demo-tag-v81">RULE-DERIVED</span></div><div class="pb" id="verifyMismatchPreviewV85"></div></div><div class="panel-v81"><div class="ph">Recent Audit Events</div><div class="pb audit-v81" id="verifyAuditPreviewV85"></div></div></div>
 <div id="verifyQueueV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Queue <span class="demo-tag-v81">SIMULATED PRIMARY-SOURCE</span></div><div class="pb" id="verifyQueueBodyV81"></div></div></div>
 <div id="verifySourcesV13" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Source Registry <span class="demo-tag-v81">REAL SOURCES · NOT CONNECTED IN THE DEMO</span></div><div class="pb" id="verifySourcesBodyV13"></div></div></div>
+<div id="verifyExtractV14" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Extraction Accuracy <span class="demo-tag-v81">MEASURED ON SYNTHETIC DOCUMENTS</span></div><div class="pb" id="verifyExtractBodyV14"></div></div></div>
 <div id="verifyMismatchV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Mismatch Alerts <span class="demo-tag-v81">RULE-DERIVED · DEMO</span></div><div class="pb" id="verifyMismatchBodyV85"></div></div></div>
 <div id="verifyManualV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Manual Review <span class="demo-tag-v81">DEMO</span></div><div class="pb" id="verifyManualBodyV85"></div></div></div>
 <div id="verifyMonitorV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Continuous Monitoring <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="verifyMonitorBodyV85"></div></div></div>
@@ -283,6 +284,8 @@
 <script src="js/specialties.js"></script>
 <script src="js/credential-catalog.js"></script>
 <script src="js/verification-registry.js"></script>
+<script src="js/doc-extract.js"></script>
+<script src="js/extraction-benchmark.js"></script>
 <script src="js/demo-data.js"></script>
 <script src="js/requirements.js"></script>
 <script src="js/assignments.js"></script>
@@ -300,6 +303,8 @@
 <script src="js/lookup-sources.js"></script>
 <script src="js/anchor.js"></script>
 <script src="js/account-mfa.js"></script>
+<script src="js/doc-scan.js"></script>
+<script src="js/extraction-panel.js"></script>
 <script src="js/account.js"></script>
 <script src="js/menu.js"></script>
 </body>
