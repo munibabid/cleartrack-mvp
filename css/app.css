@@ -260,3 +260,15 @@ select optgroup{font-weight:700}
 #acctMfaQrV12{display:block;background:#fff;border:1px solid var(--b);border-radius:12px;margin:8px 0}
 #acctMfaCodeV12,#acctMfaFirstV12{font-size:28px;letter-spacing:.2em;text-align:center}
 #acctMfaPromptV12{max-width:520px}
+
+/* PR 13: policy "Why?", provenance, registry */
+.why-v13{margin:4px 0 2px 18px}.why-v13>summary{cursor:pointer;color:#1d4ed8;font-size:12px;font-weight:600;min-height:28px;display:flex;align-items:center}
+.why-grid-v13{display:grid;grid-template-columns:minmax(110px,32%) 1fr;gap:3px 10px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;margin-top:4px;overflow-wrap:anywhere}
+.why-grid-v13>div:nth-child(odd){color:#64748b}
+.prov-head-v13{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:8px;padding:8px;margin-bottom:6px;overflow-wrap:anywhere}
+.prov-help-v13{margin-bottom:8px}.prov-line-v13{overflow-wrap:anywhere}.req-why-v13{color:#64748b;font-size:11px;max-width:220px}
+.route-v13{color:#334155;margin-top:2px;overflow-wrap:anywhere}
+.reg-list-v13{display:flex;flex-direction:column;gap:6px;margin-top:8px}.reg-row-v13{border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px}.reg-row-v13>summary{cursor:pointer;list-style:revert}
+.lvl-chip-v13{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:1px 8px;margin:2px 2px 0 0;font-size:11px}
+.psv-form-v13 .grid2-v83{gap:8px}
+@media (max-width:600px){.why-grid-v13{grid-template-columns:1fr}.why-grid-v13>div:nth-child(odd){margin-top:4px;font-weight:600}}

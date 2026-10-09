@@ -47,7 +47,9 @@ const SupabaseMapping={
    source_document_path:c.source_document_path||null};
  },
  rowToCredential(r){return{id:r.id,remote_id:r.id,kind:r.kind,type:r.type_code,name:r.display_name,jurisdiction:r.jurisdiction_code||'',primary:r.status,expiration:r.expires_on||'',
-  years:r.metadata?.years,recentMonths:r.metadata?.recent_months,lastWorked:r.metadata?.last_worked_on,file:'',chain:'NOT ISSUED',prov:{source:'',method:'',verifier:'',verifiedAt:r.verified_at||'',active:r.status==='VERIFIED',lastMonitored:r.last_monitored_at||''}}},
+  years:r.metadata?.years,recentMonths:r.metadata?.recent_months,lastWorked:r.metadata?.last_worked_on,file:'',chain:'NOT ISSUED',verificationLevel:r.verification_level||null,monitoringState:r.monitoring_state||'NOT_ENROLLED',prov:{source:'',method:'',verifier:'',verifiedAt:r.verified_at||'',active:r.status==='VERIFIED',lastMonitored:r.last_monitored_at||''}}},
+ /* PR 13: account credential + its latest recorded check (provenance). */
+ rowWithProvenance(r,v){const c=SupabaseMapping.rowToCredential(r);if(v){Object.assign(c.prov,{source:v.source_name||'',sourceId:v.source_slug||'',method:v.source_slug&&typeof verificationSource==='function'&&verificationSource(v.source_slug)?VERIFICATION_METHODS[verificationSource(v.source_slug).method]?.label||'':'Issuer lookup (PR 12 record)',verifier:v.verifier_label||'Veridun verifier',verifiedAt:v.checked_on||v.completed_at||'',statusAtSource:v.status_at_source||'',sourceExpiration:v.source_expires_on||'',reference:v.reference_code||'',monitoring:v.monitoring_state||'',policy:v.policy_ref||''})}return c},
  async sha256Hex(text){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('')},
  /* The share token never leaves the browser in clear: only sha256(token) is stored server-side. */
  async shareToRow(s,ids){return{id:s.remote_id||SupabaseMapping.uuid(),clinician_id:ids.clinicianId,org_id:ids.orgId,assignment_id:ids.assignmentId||null,
@@ -182,7 +184,9 @@ class SupabaseAdapter{
    cache.events=await this.run(c.from('audit_events').select('id,event_type,actor_type,result,detail,occurred_at,grant_id,credential_id').eq('clinician_id',cid).order('occurred_at',{ascending:false}).limit(100),'Load activity');
    const credIds=cache.credentials.map(x=>x.id);
    if(credIds.length){
-    cache.verifications=await this.run(c.from('credential_verifications').select('id,credential_id,outcome,source_name,checked_on,completed_at').in('credential_id',credIds).order('completed_at',{ascending:false}),'Load verifications');
+    /* PR 13 columns; falls back to the PR 12 columns if the database is older. */
+    cache.verifications=await this.run(c.from('credential_verifications').select('id,credential_id,outcome,source_name,checked_on,completed_at,source_slug,verification_level,status_at_source,source_expires_on,monitoring_state,verifier_label,policy_ref,reference_code').in('credential_id',credIds).order('completed_at',{ascending:false}),'Load verifications')
+     .catch(()=>{this.lastError=null;return this.run(c.from('credential_verifications').select('id,credential_id,outcome,source_name,checked_on,completed_at').in('credential_id',credIds).order('completed_at',{ascending:false}),'Load verifications')});
     cache.anchors=await this.run(c.from('verification_anchors').select('verification_id,credential_id,commitment,network,tx_hash,ledger_index,anchor_address,memo_type,anchored_at').in('credential_id',credIds),'Load anchors');
    }
   }
@@ -325,7 +329,14 @@ class SupabaseAdapter{
  }
  async verifierQueue(){
   const c=this.need();
-  return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue');
+  return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,verification_level,monitoring_state,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue').then(r=>{this.serverV13=true;return r})
+   .catch(()=>{this.serverV13=false;this.lastError=null;return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue')});
+ }
+ /* PR 13: a manual check of an APPROVED registry source (board / Nursys /
+    issuer / employer / vendor). The database decides the level. */
+ async recordSourceCheck({credentialId,sourceId,result,statusAtSource,sourceExpiresOn,reference,checkedOn,monitoring}){
+  const c=this.need();
+  return this.run(c.rpc('record_source_check',{p_credential:credentialId,p_source:sourceId,p_result:result,p_status_at_source:statusAtSource,p_source_expires_on:sourceExpiresOn||null,p_reference:reference,p_checked_on:checkedOn,p_monitoring:monitoring||'MANUAL_RECHECK'}),'Record source check');
  }
  async shareAnchors(grantId){const c=this.need();return this.run(c.rpc('share_anchor_disclosure',{p_grant:grantId}),'Anchor check')}
  async prepareActivityAnchor(){const c=this.need();return this.run(c.rpc('prepare_activity_anchor'),'Prepare activity anchor')}

@@ -6,14 +6,21 @@
 
 | Path | What it is |
 |---|---|
-| `backend/supabase/migrations/*.sql` | Postgres schema, row-level security (RLS), share-access functions, private storage bucket + policies. **6 migrations (PR 12 adds MFA step-up, issuer checks, and XRPL anchors), applied to staging** |
+| `backend/supabase/migrations/*.sql` | Postgres schema, row-level security (RLS), share-access functions, private storage bucket + policies. **8 migrations, all applied to staging** (PR 12 adds MFA step-up, issuer checks and XRPL anchors; 7–8 are PR 13, applied Oct 9, 2026 through the Management API, see below) |
 | `backend/supabase/migrations/20261008000004_accounts_sync.sql` | PR 10: self-serve organizations (`create_organization`), assignment context on grants, `PENDING_VERIFICATION` in share assertions, append-only tables that still allow account deletion |
 | `backend/supabase/migrations/20261008000005_specialties_experience.sql` | PR 11: `specialties` reference table (64 RN specialties, read-only to clients), specialty ids validated by trigger, `clinicians.secondary_specialties` (max 5) + `preferences`, `requirements.min_months` / `is_preferred`, `kind` returned by share-assertion functions (for compact-license coverage) |
 | `backend/supabase/seed/01_reference.sql` | Jurisdictions (56), issuers, the RN credential catalog (36 kinds), verification sources, platform requirement templates. **Generated from `js/`.** Applied to staging |
+| `backend/supabase/migrations/20261009000007_verification_registry.sql` | PR 13: Verification Source Registry columns, seven levels, `credential_catalog` / `requirements` minimum levels with locked floors (trigger), policy columns on `requirement_sets`, `credentials.verification_level` / `monitoring_state` (server-set only), PSV fields on `credential_verifications`, `record_source_check()` |
+| `backend/supabase/migrations/20261009000007_verification_registry.sql` (end) | PR 13: `get_share_assertions()` / `access_share_by_token()` also return `verification_level`, `verification_source`, `source_checked_on`, so an organization sees e.g. *Primary Source Verified · Source: California Board of Registered Nursing · checked …* instead of a bare VERIFIED. Level only while currently verified; private (Requirement satisfied) items get the level but never the source or date |
+| `backend/supabase/migrations/20261009000008_anchor_grant_hardening.sql` | PR 13 follow-up from the post-apply advisor check: removes Supabase's default `TRUNCATE` (bypasses RLS), `REFERENCES` and `TRIGGER` grants for `anon`/`authenticated` on the two XRPL anchor tables |
+| `backend/supabase/seed/03_verification_registry.sql` | PR 13: the 70 registry sources, catalog floors, policy versions, requirement minimum levels. **Generated from `js/`.** Applied to staging |
+| `backend/supabase/functions/nursys-enotify/` | PR 13: server-side stub. Returns 503 `configured:false` until NCSBN credentials are set as function secrets. Never returns a made-up result |
 | `backend/supabase/seed/02_demo.sql` | Demo data (Alex / Jordan / Sam, 4 fictional agencies, 5 opportunities). Local tests only, **not applied** to staging |
 | `backend/scripts/generate-seed.js` | Regenerates both seed files from the app's JS data, so the database can't drift from the demo |
 | `backend/supabase/tests/00_local_supabase_shim.sql` | **Test-only** stand-ins for Supabase's `auth`/`storage` schemas and API roles. Never apply to a real project |
-| `backend/tests/db-test.js` | Applies migrations + seeds to a throwaway local Postgres; 105 schema / seed / RLS tests |
+| `backend/tests/db-test.js` | Applies migrations + seeds to a throwaway local Postgres; 154 schema / seed / RLS tests (incl. PR 13) |
+| `backend/tests/p12.js`, `backend/tests/p13.js` | Live runs in a headless phone browser against staging: create throwaway `veridun-pr12-…` / `veridun-pr13-…@mailinator.com` users in SQL (no email), exercise 2FA, verifier checks, shares and levels, then delete every row they made. Reach the database through `tests/live-db.js` |
+| `backend/tests/live-db.js`, `backend/tests/api-db.js` | Database access for the live runs: direct Postgres when `SUPABASE_DB_URL` and port 5432/6543 are reachable, otherwise the Management API with `SUPABASE_ACCESS_TOKEN` (force with `LIVE_DB=api`). `node backend/tests/api-db.js "select 1"` or `@file.sql` runs one query |
 | `backend/tests/store-test.js` | 42 unit tests for the data-access layer (mocked supabase-js client, no network) |
 | `js/config.js` | Demo: `backend: 'local'`. Accounts: project URL + **publishable** key (public by design; RLS protects data) + redirect URL |
 | `js/store.js` | `LocalStorageAdapter` (demo) and `SupabaseAdapter` (accounts: auth, hydrate, writes, RPCs, storage) |
@@ -133,6 +140,7 @@ node backend/scripts/generate-seed.js
 Done (Oct 8, 2026):
 1. Supabase project created (US East). Email provider on. Site URL and Redirect URL set to `https://munibabid.github.io/cleartrack-mvp/` (by Munib).
 2. Migrations 1–4 and `01_reference.sql` applied and verified (22 tables, RLS on all, private `source-documents` bucket, functions executable only by `authenticated`).
+4. Migrations 5–8 and `03_verification_registry.sql` applied and verified (Oct 8–9; 7–8 through the Management API with a scoped token, see PR 13).
 3. `js/config.js` carries the project URL and the **publishable** key. The `service_role` / secret key was never requested or used.
 
 Still to do:
@@ -157,7 +165,9 @@ Still to do:
 
 | Suite | Where | What |
 |---|---|---|
-| `db-test.js` | local Postgres 17 + shim | 105 schema / seed / RLS / function tests, incl. migrations 4 and 5 |
+| `db-test.js` | local Postgres 17 + shim | 149 schema / seed / RLS / function tests, incl. migrations 4–7 |
+| `p12.js` | headless Chrome, real staging | 2FA + issuer check + XRPL anchor (PR 12) |
+| `p13.js` | headless Chrome; staging when reachable | Registry, levels, Why, provenance, golden path, mobile; account PSV route via `record_source_check` (skipped when the database can't be reached) |
 | `store-test.js` | Node, mocked supabase-js | 42 adapter tests: config/key validation, lazy client, magic-link redirect, `VERIFYING`-only inserts, private upload paths, signed URLs, hash-only tokens, no localStorage writes, final revocation |
 | `p2`–`p6`, `p8` | headless Chrome, signed out | existing demo regressions, unchanged except `p8` §3, which asserted the PR 8 stub's outbox and now asserts that the real adapter stays signed out and sends nothing |
 | `p10` | headless Chrome, **real staging project** | 43 signed-in checks with two throwaway users. Covers laptop + phone sync, org creation, share by link/code, honest statuses, isolation (A vs B, org vs credentials/documents, anon), extension request → approval, access events, activity, revoke (final), real-time expiry, one-time use, document delete, sign-out, demo intact. The test users and every row and object they created are deleted afterwards |
@@ -244,6 +254,38 @@ update public.users set role = 'verifier' where email = 'person@example.com';
 ```
 
 Then that person enrolls an authenticator (Security tab) before the Verify tab will record a check.
+
+## PR 13 — verification levels, source registry, policy trace
+
+**Levels** (`private.level_rank`): `CONTINUOUSLY_MONITORED` 6 › `PRIMARY_SOURCE_VERIFIED` 5 › `ISSUER_VERIFIED` 4 › `EMPLOYER_VERIFIED` / `VENDOR_VERIFIED` 3 › `DOCUMENT_REVIEWED` 2 › `SELF_ATTESTED` 1.
+
+**Rules the database enforces:**
+- `verification_sources` checks: document review, self-attestation and AI extraction can't grant PSV, AI extraction grants no level, and lookups must be https.
+- `requirements` trigger `private.requirements_level_floor`: a facility requirement can't go below a locked catalog floor (licenses PSV, certifications Issuer).
+- `credentials.verification_level` and `monitoring_state` can't be set by clients (`private.credentials_level_guard`). A non-VERIFIED credential never has a level. The restrictive policy `verifications_no_client_level` blocks client writes of verification levels.
+- `record_source_check(credential, source_slug, result, status_at_source, source_expires_on, reference, checked_on, monitoring)`: verifier role, AAL2, not your own credential. The source must be APPROVED and cover the kind; a board only covers its own state; Nursys covers its participating jurisdictions. Licenses top out at PSV. `ENROLLED` needs an approved monitoring source, which today means none, because e-Notify is pending. VERIFIED ⇔ status ACTIVE, licenses need an expiration, and a failed check maps to REVOKED / EXPIRED / REJECTED. It writes the verification row, the XRPL anchor commitment and an audit event.
+- PR 12's `record_verification` free-text path still works: the level comes from a matching approved source name, otherwise Document Reviewed.
+
+**Applied to staging (Oct 9, 2026):** migration 7, `seed/03_verification_registry.sql` and migration 8, through the Management API (below), after a dry run in a rolled-back transaction. Verified afterwards: RLS on all 25 public tables, 70 registry sources (56 approved boards, e-Notify PENDING, AI extraction UNAPPROVED with no level), 7 levels, `record_source_check()` security definer and executable by `authenticated` only (not `anon`), no `anon` EXECUTE on any public function, no `TRUNCATE` for API roles, every security-definer function pins `search_path`. Munib's BLS stayed *Submitted, not verified*.
+
+### Applying migrations without a direct Postgres connection
+
+When ports 5432/6543 are blocked but HTTPS works, apply SQL through the Supabase Management API with a **scoped personal access token**:
+
+1. Supabase → Account → Access Tokens → *Generate new token*: scope **Project** (this project only), **Database: Read & write**, everything else None, shortest expiry (7 days). Keep it in an environment variable (`SUPABASE_ACCESS_TOKEN`); never commit or print it.
+2. Each request runs one SQL string:
+   ```bash
+   curl -sS -X POST "https://api.supabase.com/v1/projects/kiwbasfbiarscalzhopy/database/query" \
+     -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+     --data "$(jq -Rs '{query: ("begin;\n" + . + "\ncommit;")}' < backend/supabase/migrations/<file>.sql)"
+   ```
+   A multi-statement string already runs as one implicit transaction; wrapping it in `begin; … commit;` makes that explicit (seed files carry their own). Do a dry run first by ending with `rollback;` instead.
+3. Run the post-apply checks above, then `p13.js` / `p12.js` (they use the same token automatically when Postgres is unreachable).
+4. Delete the token in Supabase when done.
+
+The frontend detects an un-migrated database and falls back to PR 12 behaviour, so the site keeps working either way.
+
+**Nursys e-Notify:** see `docs/NURSYS-ENOTIFY.md`.
 
 ## Known limits
 

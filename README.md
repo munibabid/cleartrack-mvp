@@ -8,7 +8,7 @@ Veridun (formerly NurseCredX, which grew out of ClearTrack) is a **portable, con
 
 It is aimed at travel, rapid-response, strike, per-diem/agency and local-contract RNs. APRN, NP, CRNA, physician and PA credentialing are out of scope.
 
-> ⚠️ **This is a demo plus a staging account backend.** In the demo, verification is **simulated**, all data is demo data stored only in your browser, and the role picker is **not** real authentication. **Your account** (email sign-in, since PR 10) stores your own data in a **pre-compliance Supabase staging project**: don't put real PHI or real health records in it yet. Nothing here is real primary-source verification.
+> ⚠️ **This is a demo plus a staging account backend.** In the demo, verification is **simulated**, all data is demo data stored only in your browser, and the role picker is **not** real authentication. **Your account** (email sign-in, since PR 10) stores your own data in a **pre-compliance Supabase staging project**: don't put real PHI or real health records in it yet. Demo verification is simulated. In accounts, a verifier with 2FA records a real **manual** lookup on the board, Nursys QuickConfirm or the issuer's page. Nothing is automated yet.
 
 ## Run it
 
@@ -75,9 +75,18 @@ The entry screen has a **Your account · staging** card under the three demo wor
 - **Demo tour** (`js/tour.js`): optional guided walkthrough of the golden path (about 75 seconds), with a highlighted target for each step. It logs `DEMO_TOUR_STARTED` / `DEMO_TOUR_COMPLETED`.
 - **Append-only event log** (localStorage) feeding the Verification Console audit log, the dashboards' activity feeds and every metric
 
+### Verification levels and sources (PR 13)
+- **Verification Source Registry** (`js/verification-registry.js`, verifier tab **Verification Sources**): 70 sources. That's all 56 boards of nursing, **Nursys QuickConfirm** (approved, manual, primary-source equivalent; every jurisdiction except Puerto Rico), **Nursys e-Notify** (*pending*: needs an institution account and NCSBN API credentials, see `docs/NURSYS-ENOTIFY.md`), the issuers (AHA eCards, AHA RQI, Red Cross certificate and Health & Safety Training lookups, AACN, BCEN, NCC; free web lookups only, no public API), employer, screening vendor, document review, self-attestation, and AI extraction (unapproved, no level).
+- **Seven verification levels:** Continuously Monitored › Primary Source Verified › Issuer Verified › Employer Verified / Vendor Verified › Document Reviewed › Self-Attested. Uploads, self-attestation and AI extraction can **never** count as primary source.
+- **Minimum level per requirement:** RN licenses need Primary Source Verified, certifications need Issuer Verified (both locked floors), experience, references and competencies need Employer, screening needs Vendor. A facility can raise a minimum but can't go below a locked floor. The Phoenix demo assignment tries to accept a Document Reviewed BLS, and the floor is kept and explained. A verified credential below the minimum shows **Below required level**.
+- **Policy "Why?"** on every readiness item (Organization view and account readiness): decision, why, required by, policy id + version, effective date, required verification, level rule, validity rule and assignment policy (e.g. `BHMC-ICU-2026.4`, a demo policy).
+- **Provenance** for every credential: level, source, method, verified by, checked, status at source, evidence reference, policy and XRPL anchor, with a plain-words explanation of what provenance means.
+- **Licenses follow the assignment:** the Passport needs an RN license. A state license that a pursued assignment needs and that your home/compact license doesn't cover is marked **Required** (e.g. Massachusetts for Boston).
+- **Accounts: manual primary-source check.** A verifier at AAL2 picks the approved source for the credential (the board for that state, or Nursys QuickConfirm), opens its lookup, and records the result, status at source, expiration, reference and monitoring state. The **database** sets the level (`record_source_check`), and the credential then shows *PRIMARY SOURCE VERIFIED · Source · Checked*. Nobody can set a level from the browser.
+
 ### Simulated (looks real, isn't)
 - **Monitoring, revocation and manual review** are simulated local actions. No issuer is polled.
-- **Primary-source verification.** "Run Simulated Primary-Source Check" marks a credential verified locally. No licensing board, Nursys, AHA or issuer is contacted. Provenance records the method as `Simulated primary-source check (DEMO)`.
+- **Primary-source verification in the demo.** "Run Simulated Primary-Source Check" uses the registry's route and level, but no board, Nursys, AHA or issuer is contacted. Provenance says `simulated lookup (DEMO)` and the reference is `DEMO-…`. In accounts, a verifier records a real manual lookup (PR 12/13). Nothing is automated: Nursys e-Notify is not connected.
 - Credential classification (`SIMULATED_CLASSIFICATION`) and uploads: only the **file name** is kept; file contents are never read or uploaded.
 - Verification durations are real elapsed times within the demo (seconds), not real-world turnaround.
 
@@ -93,7 +102,7 @@ The entry screen has a **Your account · staging** card under the three demo wor
 - International jurisdictions
 - Cross-device sharing **in the demo**: demo shares live in the clinician's browser (`localStorage`), so a demo share link only opens in the browser that created it. **Account shares (PR 10) work across devices**: see *Your account* above.
 - Older `?sharev7=` links are retired because they had no expiration or revocation. They now show a "no longer supported" notice.
-- Primary-source integrations, a real verifier workflow for accounts, continuous monitoring, notifications (email for extension requests and expirations), and moving the demo's readiness/opportunity views onto account data. Real sign-in and the staging back end shipped in PR 10.
+- Automated primary-source integrations (Nursys e-Notify is a stub until credentials exist), continuous monitoring, organization review and the Ready for Submission ladder (next PR), notifications (email for extension requests and expirations), and moving the demo's readiness/opportunity views onto account data. Real sign-in and the staging back end shipped in PR 10.
 - A profile editor (specialty is set per demo nurse) and editing the work-type base sets and specialty modules in the UI. The Assignment Builder composes the existing layers.
 
 ## Acceptance checklist (handoff §52)

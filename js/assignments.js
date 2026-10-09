@@ -5,7 +5,11 @@
    the demo anchor so the demo never goes stale.
    Boston: Massachusetts has enacted the NLC but it is not yet in effect, so a
    compact license does NOT authorize practice there. Houston: Texas honors
-   the compact. Oakland: California is not an NLC state. */
+   the compact. Oakland: California is not an NLC state.
+   policy (PR 13): the facility policy each assignment adopts (fictional ids,
+   versions and dates). Phoenix also tries to lower the BLS verification
+   level to Document Reviewed; the issuer floor is kept (see
+   requiredLevelFor in js/verification-registry.js). */
 const ORGANIZATIONS=[
  {id:'northstar',name:'Northstar Travel Nursing',type:'Travel staffing agency (demo)'},
  {id:'lonestar',name:'Lone Star Rapid Response',type:'Rapid response agency (demo)'},
@@ -14,11 +18,11 @@ const ORGANIZATIONS=[
 ];
 function organization(id){return ORGANIZATIONS.find(o=>o.id===id)||null}
 const ASSIGNMENT_DEFS=[
- {id:'boston-icu',orgId:'northstar',name:'Boston Travel ICU',city:'Boston',jurisdiction:'US-MA',workType:'TRAVEL_RN',specialties:['ICU'],facility:'Beacon Harbor Medical Center (demo facility)',overrides:{},startInDays:45,weeks:13,featured:true},
- {id:'houston-rapid',orgId:'lonestar',name:'Houston Rapid Response ICU',city:'Houston',jurisdiction:'US-TX',workType:'RAPID_RESPONSE_RN',specialties:['ICU'],facility:'Bayou City General (demo facility)',overrides:{add:['COMP_VENTILATOR'],note:'Rapid-response ICU: ventilator management competency required'},startInDays:21,weeks:8},
- {id:'oakland-strike',orgId:'pacific',name:'Oakland Strike RN',city:'Oakland',jurisdiction:'US-CA',workType:'STRIKE_RN',specialties:['ICU','ED','LD'],facility:'Eastbay Union Hospital (demo facility)',overrides:{},startInDays:7,weeks:6},
- {id:'phoenix-ed',orgId:'northstar',name:'Phoenix Travel ED',city:'Phoenix',jurisdiction:'US-AZ',workType:'TRAVEL_RN',specialties:['ED'],facility:'Saguaro Valley Medical Center (demo facility)',overrides:{waive:['HEALTH_PHYSICAL_CURRENT'],note:'Facility completes its own occupational-health physical at orientation'},startInDays:30,weeks:13},
- {id:'denver-ld',orgId:'summit',name:'Denver Per-Diem L&D',city:'Denver',jurisdiction:'US-CO',workType:'PER_DIEM_RN',specialties:['LD'],facility:"Front Range Women's Hospital (demo facility)",overrides:{add:['HEALTH_HEPB'],note:'Facility policy: Hepatitis B immunity for all perinatal staff'},startInDays:14,weeks:12}
+ {id:'boston-icu',orgId:'northstar',name:'Boston Travel ICU',city:'Boston',jurisdiction:'US-MA',workType:'TRAVEL_RN',specialties:['ICU'],facility:'Beacon Harbor Medical Center (demo facility)',overrides:{},policy:{id:'BHMC-ICU-2026.4',version:'2026.4',effective:'2026-09-01',requiredBy:'Beacon Harbor Medical Center (demo facility)'},startInDays:45,weeks:13,featured:true},
+ {id:'houston-rapid',orgId:'lonestar',name:'Houston Rapid Response ICU',city:'Houston',jurisdiction:'US-TX',workType:'RAPID_RESPONSE_RN',specialties:['ICU'],facility:'Bayou City General (demo facility)',overrides:{add:['COMP_VENTILATOR'],note:'Rapid-response ICU: ventilator management competency required'},policy:{id:'BCG-RR-ICU-2026.2',version:'2026.2',effective:'2026-07-15',requiredBy:'Bayou City General (demo facility)'},startInDays:21,weeks:8},
+ {id:'oakland-strike',orgId:'pacific',name:'Oakland Strike RN',city:'Oakland',jurisdiction:'US-CA',workType:'STRIKE_RN',specialties:['ICU','ED','LD'],facility:'Eastbay Union Hospital (demo facility)',overrides:{},policy:{id:'EUH-STRIKE-2026.1',version:'2026.1',effective:'2026-08-01',requiredBy:'Eastbay Union Hospital (demo facility)'},startInDays:7,weeks:6},
+ {id:'phoenix-ed',orgId:'northstar',name:'Phoenix Travel ED',city:'Phoenix',jurisdiction:'US-AZ',workType:'TRAVEL_RN',specialties:['ED'],facility:'Saguaro Valley Medical Center (demo facility)',overrides:{waive:['HEALTH_PHYSICAL_CURRENT'],minLevel:{CERT_BLS:'DOCUMENT_REVIEWED'},note:'Facility completes its own occupational-health physical at orientation'},policy:{id:'SVMC-ED-2026.3',version:'2026.3',effective:'2026-06-01',requiredBy:'Saguaro Valley Medical Center (demo facility)'},startInDays:30,weeks:13},
+ {id:'denver-ld',orgId:'summit',name:'Denver Per-Diem L&D',city:'Denver',jurisdiction:'US-CO',workType:'PER_DIEM_RN',specialties:['LD'],facility:"Front Range Women's Hospital (demo facility)",overrides:{add:['HEALTH_HEPB'],note:'Facility policy: Hepatitis B immunity for all perinatal staff'},policy:{id:'FRWH-LD-2026.1',version:'2026.1',effective:'2026-05-01',requiredBy:"Front Range Women's Hospital (demo facility)"},startInDays:14,weeks:12}
 ];
 const DEMO_ANCHOR_KEY='veridun_demo_anchor',CUSTOM_ASSIGNMENTS_KEY='veridun_custom_assignments';
 function demoAnchor(){const s=store.meta.demoAnchor();return s?new Date(s+'T00:00:00'):new Date(new Date().toISOString().slice(0,10)+'T00:00:00')}

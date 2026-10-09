@@ -7,9 +7,17 @@ function v81RoleContext(){
  return{assignments,featured,b,ev,pending,med,exp};
 }
 function readinessItemHtml(i){
- const icon={MET:'✓',PENDING_VERIFICATION:'⏳',EXPIRES_BEFORE_END:'⚠',NOT_RECENT:'⚠',MISSING:'○'}[i.status];
+ const icon={MET:'✓',PENDING_VERIFICATION:'⏳',EXPIRES_BEFORE_END:'⚠',NOT_RECENT:'⚠',LEVEL_TOO_LOW:'⚠',MISSING:'○'}[i.status];
  const sub=i.status==='MET'?i.basis:(i.note||'Missing');
- return`<li><b>${icon}</b> ${ec(i.label)}${i.layer?` <span class="layer-tag-v84 layer-${i.layer}">${LAYERS[i.layer]}</span>`:''} <span class="small">· ${ec(sub)}</span>${i.authority?`<div class="small auth-v84">Required by: ${ec(i.authority)}</div>`:''}</li>`;
+ return`<li data-kind="${ec(i.req?.kind||'')}" data-status="${ec(i.status)}"><b>${icon}</b> ${ec(i.label)}${i.layer?` <span class="layer-tag-v84 layer-${i.layer}">${LAYERS[i.layer]}</span>`:''} <span class="small">· ${ec(sub)}</span>${i.authority?`<div class="small auth-v84">Required by: ${ec(i.authority)}</div>`:''}${requirementWhyHtml(i)}</li>`;
+}
+/* PR 13 policy traceability: the "Why?" under every requirement. */
+function requirementWhyHtml(i){
+ const r=i.req||{},p=r.policy||{},ap=r.assignmentPolicy,lr=r.levelRule||{};
+ const rows=[['Decision',i.decision||i.status],['Why',i.why||''],['Required by',p.requiredBy||i.authority||''],['Policy',p.id?`${p.id} · version ${p.version}`:''],['Effective',p.effective||''],
+  ['Required verification',r.minLevel?levelLabel(r.minLevel)+(lr.setBy==='floor'?' (locked floor)':lr.setBy==='facility'?' (set by facility)':' (Veridun default)'):''],['Level rule',lr.basis||''],['Validity rule',r.validityRule||''],
+  ['Assignment policy',ap?`${ap.id} · version ${ap.version}${ap.effective?' · effective '+ap.effective:''}${ap.demo!==false?' (demo)':''}`:'']].filter(x=>x[1]);
+ return`<details class="why-v13"><summary>Why?</summary><div class="why-grid-v13">${rows.map(([k,v])=>`<div>${ec(k)}</div><div>${ec(v)}</div>`).join('')}</div></details>`;
 }
 function v81RenderOrganization(x){
  const{assignments,featured,b,ev,pending,med,exp}=x;
