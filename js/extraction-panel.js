@@ -66,7 +66,7 @@ function renderExtractionPanelV14(){
    ${exp?`<div>${ec(exp.text)}</div>`:''}${r.warnings.map(w=>`<div class="notice">${ec(w)}</div>`).join('')}
    <div>Verification source for this kind: <b>${ec(src?.name||'—')}</b>${src?.lookupUrl?` · <a href="${ec(src.lookupUrl)}" target="_blank" rel="noopener">official lookup</a>`:''}</div>
    <div>This session: ${tryStatsV14.n} document(s), ${tryStatsV14.found}/${tryStatsV14.fields} needed fields found. Nothing was uploaded or saved.</div></div>`;
-  }catch(err){out.textContent='Could not read it: '+(err.message||err)}
+  }catch(err){out.textContent=DocExtract.friendlyError(err)}
  };
 }
 /* Account verifier tab: live panel. */

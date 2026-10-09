@@ -1,0 +1,25 @@
+name: Document reader (Chromium, WebKit, Firefox)
+# v14.1: every PR reads a synthetic PDF and image on-device in all three engines,
+# phone + desktop, with and without the newer APIs older Safari lacks.
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  xbrowser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit firefox
+      - run: node tests/store-test.js
+      - run: node tests/xbrowser.js

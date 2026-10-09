@@ -69,7 +69,7 @@ ${acctDocBoxHtml(c)}
  <div class="small" id="acctVerifySourceInfoV13"></div>
  <div class="grid2-v83"><label>Result<select id="acctVerifyResultV12" required><option value="VERIFIED">Verified — the source confirmed it</option><option value="FAILED">Failed — the source did not confirm it</option></select></label>
  <label>Status shown by the source<select id="acctVerifyStatusV13" required>${[['ACTIVE','Active'],['INACTIVE','Inactive / lapsed'],['EXPIRED','Expired'],['PROBATION','On probation'],['SUSPENDED','Suspended'],['REVOKED','Revoked'],['NOT_FOUND','Not found']].map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></label></div>
- <div class="grid2-v83"><label>Expiration shown by the source${lic?'':' (if any)'}<input type="date" id="acctVerifyExpV13" value="${ec(docExp||c.expires_on||'')}"${lic?' required':''}><span class="small" id="acctVerifyExpNoteV14">${docExp?(docExp!==c.expires_on?`Prefilled from the document (${ec(fd(docExp))}); the nurse typed ${c.expires_on?ec(fd(c.expires_on)):'nothing'}. Change it to what the source shows.`:'Prefilled from the document. Change it to what the source shows.'):'Prefilled with what the nurse typed. Change it to what the source shows.'}</span></label>
+ <div class="grid2-v83"><label>Expiration shown by the source${lic?'':' (if any)'}<input type="date" id="acctVerifyExpV13" value="${ec(docExp||c.expires_on||'')}"${lic?' required':''}><span class="small" id="acctVerifyExpNoteV14">${acctExpNoteHtml(c,docExp,vexp)}</span></label>
  <label>Date you checked<input type="date" id="acctVerifyDateV12" required value="${acctToday()}" max="${acctToday()}"></label></div>
  <label>Reference or confirmation number<input id="acctVerifyRefV12" required maxlength="120" value="${ec(docRef)}" placeholder="${lic?'License number / Nursys report or board confirmation':'Card / certificate ID shown by the source'}. Stored off-chain only." autocomplete="off"></label>
 ${acctDoubleCheckHtml(c)}
@@ -169,6 +169,16 @@ function acctSourceAppliesText(c,route){
 /* The verifier reads the document on THIS device (signed link → pdf.js /
    OCR here). Extracted values are never stored on the server; only the
    nurse's confirmation flags are. */
+/* Expiration note: once the document has been read, its date wins and both dates are shown. */
+function acctExpNoteHtml(c,docExp,vexp){
+ const typed=c?.expires_on||'',flagged=(c?.metadata?.doc?.mismatch_fields||[]).includes('expires_on');
+ if(docExp){
+  const both=`<span class="expboth-v14"><span>Document: <b id="acctExpDocV14">${ec(fd(docExp))}</b>${vexp?.basis==='renew_by'||/end of/.test(vexp?.text||'')?' (month/year card: end of that month)':''}</span><span>Nurse typed: <b id="acctExpTypedV14">${typed?ec(fd(typed)):'nothing'}</b></span></span>`;
+  return docExp!==typed?`<span class="badge REVOKED">DATES DIFFER</span> Prefilled with the document date. ${both} Change it to what the source shows.`:`Prefilled from the document; it matches what the nurse typed. ${both}`;
+ }
+ if(c?.source_document_path)return`Prefilled with what the nurse typed (${typed?ec(fd(typed)):'nothing'}); not compared with the document yet${flagged?' and the nurse’s own scan flagged the date':''}. Use “Read the document on this device” to compare, then enter what the source shows.`;
+ return'Prefilled with what the nurse typed. Change it to what the source shows.';
+}
 let acctVScan=null;/* {id,status,label,res,error} */
 async function acctVerifierRead(c){
  acctVScan={id:c.id,status:'scanning',label:'Getting the document with a 60-second private link'};acctRenderVerify();
@@ -178,7 +188,7 @@ async function acctVerifierRead(c){
   const blob=await r.blob(),name=c.source_document_path.split('/').pop();
   const res=await DocExtract.extractFromFile(new File([blob],name,{type:blob.type||''}),{kind:c.kind,profileName:c.clinicians?.full_name||'',onProgress:x=>{if(acctVScan?.id!==c.id)return;acctVScan.label=x.label;const l=$('acctVScanLabelV14');if(l)l.textContent=x.label}});
   if(acctVScan?.id!==c.id)return;acctVScan={id:c.id,status:'done',res};
- }catch(e){acctVScan={id:c.id,status:'error',error:String(e.message||e)}}
+ }catch(e){acctVScan={id:c.id,status:'error',error:DocExtract.friendlyError(e)}}
  acctRenderVerify();
 }
 function acctDocBoxHtml(c){
@@ -188,8 +198,8 @@ function acctDocBoxHtml(c){
  const btn=c.source_document_path&&/\.(pdf|png|jpe?g|webp)$/i.test(c.source_document_path)?`<button type="button" class="mini sec" data-act="verify-read-doc" id="acctVReadV14">${res?'Read again':'Read the document on this device'}</button>`:'';
  let body='';
  if(v?.status==='scanning')body=`<div class="scan-bar-v14"><div style="width:40%"></div></div><div class="small" id="acctVScanLabelV14">${ec(v.label||'')}</div>`;
- else if(v?.status==='error')body=`<div class="small alert-v81">${ec(v.error)}</div>`;
- else if(res&&!res.supported)body=`<div class="small">${ec(res.warnings[0]||'This file type cannot be read.')}</div>`;
+ else if(v?.status==='error')body=`<div class="small alert-v81" id="acctVScanErrV14">${ec(v.error)} Open the document and check it by eye at the source.</div>`;
+ else if(res&&!res.supported)body=`<div class="small">${ec(res.warnings[0]||'This file type cannot be read.')} Open the document and check it by eye at the source.</div>`;
  else if(res){
   const f=res.fields,aha=res.profile==='aha_resus',code=f.credential_id?.value||'',rqi=aha&&(/[A-Za-z]/.test(code)||res.issuer==='AHA_RQI'),rc=res.issuer==='RED_CROSS';
   const src=res.source&&verificationSource(res.source.id);

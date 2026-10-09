@@ -76,6 +76,19 @@ The entry screen has a **Your account · staging** card under the three demo wor
 - **Append-only event log** (localStorage) feeding the Verification Console audit log, the dashboards' activity feeds and every metric
 
 ### On-device document reading (PR 14)
+
+**v14.1: works in every browser.** The fix came from an iPhone report: on Safari, "Re-scan document" and the verifier's "Read the document on this device" both failed with `undefined is not a function (near '...t of e...')`.
+- **Cause:** pdf.js reads PDF text with `for await` over a `ReadableStream`, which older Safari and iOS can't do.
+- **Fix:**
+  - Veridun now uses the pdf.js *legacy* build.
+  - It reads the text stream with an explicit `getReader()` loop.
+  - It polyfills `ReadableStream` async iteration, `Promise.withResolvers` and `Blob.arrayBuffer`.
+  - It checks for canvas, workers and WebAssembly before reading. If something is missing, or the reader fails, the user sees a plain message and can type the details instead. Raw JS errors are never shown.
+- **Verifier form:** once the document has been read, the expiration field uses the document's date, and the form shows both the document date and the date the nurse typed.
+- **Test:** `backend/tests/xbrowser.js` (Playwright) runs on every PR via `.github/workflows/browser-tests.yml`.
+  - Engines: Chromium, WebKit and Firefox, each at phone and desktop size.
+  - Each run happens twice: once as the engine ships, and once with the newer APIs removed, which reproduces the Safari error.
+
 - **Scan on upload, re-scan later:** PDF and image credentials are read **in the browser**: pdf.js text first, then vendored Tesseract.js OCR (scans, photos, rotated images), then QR decoding (BarcodeDetector or jsQR). The readers are lazy-loaded only when a scan starts. No document goes to an outside AI service.
 - **Every catalog kind is data-driven** (`DocExtract.profileFor`): AHA BLS/ACLS/PALS cards (name, eCard code, course, issue date, renew-by month, training center), RN licenses (number, state, multistate, dates), other certifications such as NIHSS, NRP, TNCC, ENPC, AWHONN, CCRN, CEN and C-EFM (name, ID, which credential, dates), records (name, dates), and private/skills kinds (**dates only**).
 - **Confirm, never verify:** every field shows a confidence and is confirmed or corrected by the nurse. The result is *Details captured, awaiting verification*. **Extracted values stay on the device.** The server keeps only which fields were confirmed or corrected, plus mismatch flags. The verifier reads the document again on their own device.

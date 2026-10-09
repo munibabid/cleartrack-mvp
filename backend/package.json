@@ -5,9 +5,14 @@
   "scripts": {
     "seed:generate": "node scripts/generate-seed.js",
     "test:db": "node tests/db-test.js",
-    "test:store": "node tests/store-test.js"
+    "test:store": "node tests/store-test.js",
+    "test:xbrowser": "node tests/xbrowser.js",
+    "test": "node tests/store-test.js && node tests/xbrowser.js"
   },
   "devDependencies": {
-    "pg": "^8.13.0"
+    "otplib": "^13.5.0",
+    "pg": "^8.13.0",
+    "playwright": "^1.64.0",
+    "puppeteer-core": "^25.13.0"
   }
 }

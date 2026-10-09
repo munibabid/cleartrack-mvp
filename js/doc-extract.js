@@ -361,8 +361,48 @@ function loadScript(src,integrity){
  if(loaded[src])return loaded[src];
  return loaded[src]=new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;if(integrity){s.integrity=integrity;s.crossOrigin='anonymous'}s.onload=res;s.onerror=()=>{delete loaded[src];rej(new Error('Could not load the document reader ('+src.split('/').pop()+').'))};document.head.appendChild(s)});
 }
+/* Feature detection + small polyfills. pdf.js (even the legacy build) async-iterates
+   ReadableStreams in getTextContent(); Safari before 26 has no ReadableStream async
+   iterator ("undefined is not a function (near '...t of e...')"). We read the text stream
+   with getReader() ourselves and also patch the iterator so no other path trips on it. */
+function polyfill(){
+ const RS=root.ReadableStream;
+ if(RS&&RS.prototype&&!RS.prototype[Symbol.asyncIterator]){
+  const values=function({preventCancel=false}={}){const reader=this.getReader();return{
+   next(){return reader.read()},
+   async return(v){if(!preventCancel){try{await reader.cancel(v)}catch{}}try{reader.releaseLock()}catch{}return{done:true,value:v}},
+   [Symbol.asyncIterator](){return this}}};
+  try{Object.defineProperty(RS.prototype,Symbol.asyncIterator,{value:values,configurable:true,writable:true});if(!RS.prototype.values)Object.defineProperty(RS.prototype,'values',{value:values,configurable:true,writable:true})}catch{}
+ }
+ if(typeof Promise.withResolvers!=='function'){try{Object.defineProperty(Promise,'withResolvers',{configurable:true,writable:true,value:function(){let resolve,reject;const promise=new this((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}}})}catch{}}
+ const B=root.Blob;
+ if(B&&B.prototype&&typeof B.prototype.arrayBuffer!=='function'){B.prototype.arrayBuffer=function(){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsArrayBuffer(this)})}}
+}
+/* What this browser can do. Missing pieces → friendly message + type the details. */
+function capabilities(){
+ const has=x=>{try{return!!x()}catch{return false}};
+ const canvas=has(()=>document.createElement('canvas').getContext('2d'));
+ const base=has(()=>root.Promise&&root.Uint8Array&&root.File&&root.Blob&&root.URL)&&canvas;
+ const worker=has(()=>root.Worker);
+ const wasm=has(()=>typeof root.WebAssembly==='object'&&typeof root.WebAssembly.instantiate==='function');
+ const missing=[];if(!base)missing.push('canvas');if(!worker)missing.push('workers');if(!wasm)missing.push('WebAssembly');
+ return{pdf:base&&worker,image:base&&worker&&wasm,missing};
+}
+class ScanError extends Error{constructor(msg,cause){super(msg);this.name='ScanError';this.friendly=true;this.cause=cause}}
+const MANUAL='';/* callers add what to do next (nurse: type it; verifier: check by eye) */
+/* Never show a raw JS error to a user: map anything to plain words (raw goes to the console only). */
+function friendlyError(e,what='this document'){
+ if(e&&e.friendly)return e.message;
+ const m=String((e&&e.message)||e||'');
+ try{console.warn('[Veridun] document reader:',m)}catch{}
+ if(/password/i.test(m))return`${what[0].toUpperCase()+what.slice(1)} is password-protected, so it can't be read here.`+MANUAL;
+ if(/Invalid PDF|corrupt|bad XRef|FormatError|Missing PDF/i.test(m))return`${what[0].toUpperCase()+what.slice(1)} looks damaged or isn't a normal PDF, so it couldn't be read here.`+MANUAL;
+ if(/Could not download|Signed link|Failed to fetch|NetworkError|Load failed|network/i.test(m))return'The document could not be downloaded right now. Check your connection and try again.'+MANUAL;
+ if(/Could not load the document reader|import|module|dynamically imported/i.test(m))return'The document reader could not start in this browser.'+MANUAL;
+ return`This browser couldn't read ${what} automatically.`+MANUAL;
+}
 let pdfjsP=null;
-function pdfjs(){if(!pdfjsP)pdfjsP=import(abs(VENDOR+'pdfjs-6.4.299/pdf.min.mjs')).then(m=>{m.GlobalWorkerOptions.workerSrc=abs(VENDOR+'pdfjs-6.4.299/pdf.worker.min.mjs');return m}).catch(e=>{pdfjsP=null;throw e});return pdfjsP}
+function pdfjs(){polyfill();if(!pdfjsP)pdfjsP=import(abs(VENDOR+'pdfjs-6.4.299-legacy/pdf.min.mjs')).then(m=>{m.GlobalWorkerOptions.workerSrc=abs(VENDOR+'pdfjs-6.4.299-legacy/pdf.worker.min.mjs');return m}).catch(e=>{pdfjsP=null;throw new ScanError('The PDF reader could not start in this browser.'+MANUAL,e)});return pdfjsP}
 let workerP=null;
 async function ocrWorker(onProgress){
  if(!workerP)workerP=(async()=>{
@@ -406,17 +446,34 @@ async function ocr(c){
  (r.data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(wd=>{const t=String(wd.text||'').toLowerCase().replace(/[^a-z0-9]/g,'');if(t)words[t]=Math.max(words[t]||0,(wd.confidence||0)/100)}))));
  return{text:r.data.text||'',conf:r.data.confidence,words};
 }
+/* Read the text layer with an explicit reader loop (no for-await over a ReadableStream). */
+async function textItems(page){
+ if(typeof page.streamTextContent==='function'){
+  const reader=page.streamTextContent().getReader(),items=[];
+  try{for(;;){const{value,done}=await reader.read();if(done)break;if(value&&value.items)for(let i=0;i<value.items.length;i++)items.push(value.items[i])}}
+  finally{try{reader.releaseLock()}catch{}}
+  return items;
+ }
+ return(await page.getTextContent()).items;
+}
 async function pdfText(page){
- const tc=await page.getTextContent();const rows=[];
- for(const it of tc.items){if(!it.str||!it.str.trim())continue;const y=it.transform[5],x=it.transform[4];let row=rows.find(r=>Math.abs(r.y-y)<Math.max(2,(it.height||8)*0.45));if(!row){row={y,items:[]};rows.push(row)}row.items.push({x,s:it.str,w:it.width||0})}
+ const items=await textItems(page);const rows=[];
+ for(const it of items){if(!it.str||!it.str.trim())continue;const y=it.transform[5],x=it.transform[4];let row=rows.find(r=>Math.abs(r.y-y)<Math.max(2,(it.height||8)*0.45));if(!row){row={y,items:[]};rows.push(row)}row.items.push({x,s:it.str,w:it.width||0})}
  rows.sort((a,b)=>b.y-a.y);
  return rows.map(r=>{r.items.sort((a,b)=>a.x-b.x);let out='',end=null;for(const i of r.items){if(end!=null)out+=(i.x-end>12?'   ':(i.x-end>1.5?' ':''));out+=i.s;end=i.x+i.w}return out}).join('\n');
 }
 /* extractFromFile(file,{onProgress,profileName}) → result (see parseCardText) */
-async function extractFromFile(file,{onProgress=()=>{},profileName='',kind:credKind='CERT_BLS',debug=false}={}){
+async function extractFromFile(file,opts={}){
+ polyfill();
+ const cap=capabilities();
+ try{return await extractInner(file,opts,cap)}
+ catch(e){if(e&&e.friendly)throw e;throw new ScanError(friendlyError(e),e)}
+}
+async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind='CERT_BLS',debug=false}={},cap=capabilities()){
  let lastText='';
  const t0=performance.now();DocExtract._progress=(s,p)=>onProgress({stage:'ocr',label:s,progress:p});
  const kind=await sniff(file);const P={kind:credKind,profileName};
+ if((kind==='pdf'&&!cap.pdf)||(kind==='image'&&!cap.image))return{supported:false,unsupportedReason:'browser',ms:Math.round(performance.now()-t0),fields:{},found:[],missing:(PROFILE_REQUIRED[profileFor(credKind)]||[]).slice(),profile:profileFor(credKind),kind:credKind,fieldsWanted:(PROFILE_FIELDS[profileFor(credKind)]||[]).slice(),warnings:['This browser can\'t read documents on the device (it is missing '+cap.missing.join(', ')+').']};
  if(kind==='other')return{supported:false,ms:Math.round(performance.now()-t0),fields:{},found:[],missing:(PROFILE_REQUIRED[profileFor(credKind)]||[]).slice(),profile:profileFor(credKind),kind:credKind,warnings:['Scanning works on PDF, PNG and JPEG files. Word documents can still be uploaded, but their details have to be typed.']};
  let res=null,rotated=false,canvas=null,qr=null;
  if(kind==='pdf'){
@@ -450,7 +507,7 @@ async function extractFromFile(file,{onProgress=()=>{},profileName='',kind:credK
 }
 async function terminate(){if(workerP){try{(await workerP).terminate()}catch{}workerP=null}}
 
-const DocExtract={FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
+const DocExtract={capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
 root.DocExtract=DocExtract;
 if(typeof module!=='undefined'&&module.exports)module.exports=DocExtract;
 })(typeof window!=='undefined'?window:globalThis);

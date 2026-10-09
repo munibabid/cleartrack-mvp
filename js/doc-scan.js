@@ -66,9 +66,9 @@ function scanBoxHtml(target){
  if(s.status==='scanning')return`<div class="scan-v14" id="acctScanBoxV14" data-state="scanning"><div class="scan-head-v14"><b>Reading your document on this device…</b></div>
   <div class="scan-bar-v14"><div style="width:${Math.round((s.progress||0)*100)}%"></div></div><div class="small" id="acctScanLabelV14">${ec(s.label||'Starting')}</div>
   <div class="small">Nothing is uploaded for this step and no AI service sees the file. The first scan downloads the reader (about 6 MB, cached afterwards).</div></div>`;
- if(s.status==='error')return`<div class="scan-v14" id="acctScanBoxV14" data-state="error"><b>The document couldn't be read.</b><div class="small">${ec(s.error||'')} You can still type the details and save.</div></div>`;
+ if(s.status==='error')return`<div class="scan-v14" id="acctScanBoxV14" data-state="error"><b>The document couldn't be read.</b><div class="small">${ec(s.error||'')} You can still type the details yourself and save; a verifier will check the document.</div></div>`;
  if(!r)return'';
- if(!r.supported)return`<div class="scan-v14" id="acctScanBoxV14" data-state="unsupported"><div class="small">${ec(r.warnings[0]||'This file type cannot be read.')}</div></div>`;
+ if(!r.supported)return`<div class="scan-v14" id="acctScanBoxV14" data-state="unsupported"><div class="small">${ec(r.warnings[0]||'This file type cannot be read.')}${r.unsupportedReason==='browser'?' Type the details yourself and save; a verifier will check the document.':''}</div></div>`;
  const fields=r.fieldsWanted,priv=r.profile==='dates_only';
  const exp=scanDocExpiry();
  const confirmedNote=s.confirmed?`<div class="small scan-status-v14" id="acctScanStatusV14"><span class="badge PENDING">${ec(SCAN_STATUS_TEXT.toUpperCase())}</span></div>`:'';
@@ -107,7 +107,7 @@ async function scanStart(target,file,kind){
   my.res=res;my.status='done';my.doneAt=Date.now();
   for(const k of res.fieldsWanted||[]){my.values[k]=res.fields[k]?.value||'';my.orig[k]=my.values[k]}
   scanPaint();
- }catch(e){if(acctScan!==my)return;my.status='error';my.error=String(e.message||e);scanPaint()}
+ }catch(e){if(acctScan!==my)return;my.status='error';my.error=DocExtract.friendlyError(e);scanPaint()}
 }
 /* What gets saved / logged once the nurse confirms. */
 function scanSummary(){
@@ -164,7 +164,7 @@ async function scanRescan(credId){
   const r=await fetch(url);if(!r.ok)throw new Error('Could not download your document ('+r.status+').');
   const blob=await r.blob();const name=(c.source_document_path||'document').split('/').pop();
   await scanStart(credId,new File([blob],name,{type:blob.type||''}),c.kind);
- }catch(e){acctScan={target:credId,status:'error',error:String(e.message||e)};scanPaint()}
+ }catch(e){acctScan={target:credId,status:'error',error:DocExtract.friendlyError(e,'your document')};scanPaint()}
 }
 /* Status shown on a saved credential. */
 function scanCredInfo(c){
