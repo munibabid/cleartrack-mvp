@@ -18,7 +18,7 @@ function eligibleAssignments(n=DEMO_NURSES[0]){return getAssignments().filter(a=
 /* Assignments the clinician is actively pursuing: started completing one, or
    shared the Passport for it. */
 function pursuedAssignmentIds(ev=eventsSinceSeed()){const s=new Set(ev.filter(e=>e.event_type==='ASSIGNMENT_INTEREST').map(e=>e.assignment_id));loadShares().forEach(x=>s.add(x.assignmentId));return s}
-const BLOCKING=['MISSING','EXPIRES_BEFORE_END','NOT_RECENT'];
+const BLOCKING=['MISSING','EXPIRES_BEFORE_END','NOT_RECENT','LEVEL_TOO_LOW'];
 /* Task Center sections (handoff §39). */
 function taskSections(){
  const elig=eligibleAssignments(),blockers=new Map();

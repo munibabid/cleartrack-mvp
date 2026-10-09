@@ -11,8 +11,8 @@ const fs=require('fs'),path=require('path'),vm=require('vm');
 const root=path.resolve(__dirname,'../..');
 const store={};const ctx={console,Date,Math,JSON,localStorage:{getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>{delete store[k]}},document:{getElementById:()=>null}};
 vm.createContext(ctx);
-for(const f of ['credential-model','specialties','credential-catalog','requirements','assignments','demo-data'])vm.runInContext(fs.readFileSync(path.join(root,'js',f+'.js'),'utf8'),ctx,{filename:f});
-vm.runInContext('globalThis.__x={US_JURISDICTIONS,SPECIALTY_LIST:SPECIALTIES,SPECIALTY_PREFERRED,CREDENTIAL_CATALOG,CATALOG_AS_OF,WORK_TYPE_BASES,SPECIALTY_MODULES,SPECIALTIES:typeof SPECIALTIES!=="undefined"?SPECIALTIES:[],ORGANIZATIONS:typeof ORGANIZATIONS!=="undefined"?ORGANIZATIONS:[],ASSIGNMENT_DEFS:typeof ASSIGNMENT_DEFS!=="undefined"?ASSIGNMENT_DEFS:[],DEMO_SEED:typeof DEMO_SEED!=="undefined"?DEMO_SEED:[],DEMO_NURSES:typeof DEMO_NURSES!=="undefined"?DEMO_NURSES:[],DEMO_PROFILE:typeof DEMO_PROFILE!=="undefined"?DEMO_PROFILE:null,issuerFor,credentialDisplayName,credentialTypeCode,specialtyName}',ctx);
+for(const f of ['credential-model','specialties','credential-catalog','verification-registry','requirements','assignments','demo-data'])vm.runInContext(fs.readFileSync(path.join(root,'js',f+'.js'),'utf8'),ctx,{filename:f});
+vm.runInContext('globalThis.__x={VERIFICATION_SOURCES,kindFloor,sourceLevel,REGISTRY_AS_OF,POLICY_VERSIONS,US_JURISDICTIONS,SPECIALTY_LIST:SPECIALTIES,SPECIALTY_PREFERRED,CREDENTIAL_CATALOG,CATALOG_AS_OF,WORK_TYPE_BASES,SPECIALTY_MODULES,SPECIALTIES:typeof SPECIALTIES!=="undefined"?SPECIALTIES:[],ORGANIZATIONS:typeof ORGANIZATIONS!=="undefined"?ORGANIZATIONS:[],ASSIGNMENT_DEFS:typeof ASSIGNMENT_DEFS!=="undefined"?ASSIGNMENT_DEFS:[],DEMO_SEED:typeof DEMO_SEED!=="undefined"?DEMO_SEED:[],DEMO_NURSES:typeof DEMO_NURSES!=="undefined"?DEMO_NURSES:[],DEMO_PROFILE:typeof DEMO_PROFILE!=="undefined"?DEMO_PROFILE:null,issuerFor,credentialDisplayName,credentialTypeCode,specialtyName}',ctx);
 const X=ctx.__x;
 const q=v=>v==null||v===''?'null':typeof v==='number'||typeof v==='boolean'?String(v):`'${String(v).replace(/'/g,"''")}'`;
 const id=s=>`md5('veridun:${s}')::uuid`;
@@ -49,6 +49,27 @@ r+=`insert into public.requirements (requirement_set_id, is_rn_authorization, ki
  ...J.map(j=>` ((select id from public.requirement_sets where owner_org_id is null and layer = 'STATE' and key = ${q(j.code)}), true, null, ${q(j.code)}, 'ADD', null, null, false, 'Single-state license here, or a multistate license whose privilege is honored here (NLC)')`)
 ].join(',\n')+`;\n\ncommit;\n`;
 fs.writeFileSync(path.join(root,'backend/supabase/seed/01_reference.sql'),r);
+
+/* ---------- verification source registry (PR 13) ---------- */
+const legacyMethod=s=>s.id==='nursys-enotify'?'PRIMARY_SOURCE_API':s.method==='EMPLOYER'?'EMPLOYER_ATTESTATION':s.method==='SELF_ATTESTED'?'CLINICIAN_ATTESTATION':'MANUAL_DOCUMENT_REVIEW';
+const arr=a=>`array[${(a||[]).map(q).join(',')}]::text[]`;
+let v=head('Verification Source Registry (js/verification-registry.js), catalog verification floors, and policy metadata for platform templates. Safe to re-run.');
+v+=`\nbegin;\n\ninsert into public.verification_sources (name, method, is_simulated, notes, lookup_url, slug, source_type, jurisdiction_code, covered_jurisdictions, credential_kinds, source_method, grants_level, api_available, api_requirements, status, monitoring, nursys_participating, as_of) values\n`+
+ X.VERIFICATION_SOURCES.map(s=>` (${q(s.name)}, ${q(legacyMethod(s))}, false, ${q(s.notes)}, ${q(s.lookupUrl)}, ${q(s.id)}, ${q(s.type)}, ${s.type==='LICENSING_BOARD'?q(s.jurisdiction):'null'}, ${arr(s.jurisdictions)}, ${arr(s.kinds)}, ${q(s.method)}, ${q(X.sourceLevel(s))}, ${!!s.api.available}, ${q(s.api.requirements)}, ${q(s.status)}, ${!!s.monitoring}, ${s.type==='LICENSING_BOARD'?String(!!s.nursys):'null'}, ${q(X.REGISTRY_AS_OF)})`).join(',\n')+
+ `\non conflict (name) do update set method = excluded.method, is_simulated = false, notes = excluded.notes, lookup_url = excluded.lookup_url, slug = excluded.slug, source_type = excluded.source_type, jurisdiction_code = excluded.jurisdiction_code, covered_jurisdictions = excluded.covered_jurisdictions, credential_kinds = excluded.credential_kinds, source_method = excluded.source_method, grants_level = excluded.grants_level, api_available = excluded.api_available, api_requirements = excluded.api_requirements, status = excluded.status, monitoring = excluded.monitoring, nursys_participating = excluded.nursys_participating, as_of = excluded.as_of;\n`;
+v+=`update public.verification_sources set status = 'UNAPPROVED' where slug is null;\n`;
+v+=`\nupdate public.credential_catalog c set min_verification_level = x.lvl, level_floor_locked = x.locked, level_basis = x.basis from (values\n`+X.CREDENTIAL_CATALOG.map(k=>{const f=X.kindFloor(k.kind);return` (${q(k.kind)}, ${q(f.level)}, ${f.locked}, ${q(f.basis)})`}).join(',\n')+`\n) as x(kind, lvl, locked, basis) where c.kind = x.kind;\n`;
+v+=`\nupdate public.requirement_sets set policy_code = 'VDN-' || key || '-BASE', policy_version = ${q(X.POLICY_VERSIONS.WORK_TYPE.version)}, effective_on = ${q(X.POLICY_VERSIONS.WORK_TYPE.effective)}, required_by = authority where owner_org_id is null and layer = 'WORK_TYPE';\n`;
+v+=`update public.requirement_sets set policy_code = 'VDN-SPEC-' || key, policy_version = ${q(X.POLICY_VERSIONS.SPECIALTY.version)}, effective_on = ${q(X.POLICY_VERSIONS.SPECIALTY.effective)}, required_by = authority where owner_org_id is null and layer = 'SPECIALTY';\n`;
+v+=`update public.requirement_sets set policy_code = 'STATE-' || replace(key, 'US-', '') || '-RN-AUTH', policy_version = ${q(X.CATALOG_AS_OF)}, required_by = authority where owner_org_id is null and layer = 'STATE';\n`;
+v+=`update public.requirements r set min_verification_level = case when r.is_rn_authorization then 'PRIMARY_SOURCE_VERIFIED' else c.min_verification_level end,
+  validity_rule = case when r.is_rn_authorization then 'Must authorize RN practice in the assignment state and stay active through the assignment end'
+    when r.recency_months is not null then 'At least ' || coalesce(r.min_months, r.recency_months) || ' months of this specialty in the ' || r.recency_months || ' months before the start date'
+    else 'Must stay valid through the assignment end' end
+from public.requirement_sets s, public.credential_catalog c
+where s.id = r.requirement_set_id and s.owner_org_id is null and (c.kind = r.kind or (r.is_rn_authorization and c.kind = 'RN_LICENSE'));\n`;
+v+=`\ncommit;\n`;
+fs.writeFileSync(path.join(root,'backend/supabase/seed/03_verification_registry.sql'),v);
 
 /* ---------- demo seed ---------- */
 let d=head('DEMO DATA ONLY (fictional people, agencies and facilities). For local/dev databases — do not load into production.\n-- Creates demo auth users with no password (cannot sign in until you set one in the Supabase dashboard).\n-- Dates are relative to current_date, like the browser demo.');

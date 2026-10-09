@@ -43,33 +43,60 @@ async function acctLoadVerifyQueue(){
 function acctVerifyListHtml(){
  const rows=acctVerifyRows||[];
  if(!rows.length)return'<div class="small">No credentials to review.</div>';
- return rows.map(c=>`<button type="button" class="acct-item-v10 acct-verify-pick-v12" data-act="verify-pick" data-id="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(c.clinicians?.full_name||'Clinician')} · ${ec(c.kind)} · ${ec(c.status)}</div></div></button>`).join('');
+ return rows.map(c=>`<button type="button" class="acct-item-v10 acct-verify-pick-v12" data-act="verify-pick" data-id="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(c.clinicians?.full_name||'Clinician')} · ${ec(c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''} · ${ec(c.status)}${c.verification_level?' · '+ec(levelLabel(c.verification_level)):''}</div></div></button>`).join('');
 }
 function acctRenderVerify(){
  const el=$('acctVerifyV12');if(!el)return;
  const a=acct();
  if(!a.hasVerifiedFactor()||a.needsMfaChallenge()){el.innerHTML='<div class="notice alert-v81"><b>Set up two-factor first.</b><div class="small">Open Security, add an authenticator app, and enter a code. Recording an issuer check stays off until then.</div></div>';return}
  const c=(acctVerifyRows||[]).find(x=>x.id===acctVerifyId);
- const look=c?lookupForKind(c.kind):null;
- el.innerHTML=`<div class="panel-v81"><div class="ph">Record an issuer check</div><div class="pb">
- <p class="small">You check the official lookup, then record what it said. That record is the source of truth. Anchoring it on XRPL Testnet afterwards only shows it was not changed later. It does not contact the issuer, and readiness ignores the ledger.</p>
+ const srcs=c?sourcesForCredential(c.kind,c.jurisdiction_code):[];
+ const route=c?primaryRouteFor(c.kind,c.jurisdiction_code):null;
+ const look=c?lookupForKind(c.kind):null,lic=c&&RN_LICENSE_KINDS.includes(c.kind);
+ const floor=c?kindFloor(c.kind):null;
+ el.innerHTML=`<div class="panel-v81"><div class="ph">Record a source check</div><div class="pb">
+ <p class="small">Open the official lookup, check the credential there, then record exactly what the source said. That record is the source of truth. The level comes from the <b>Verification Source Registry</b>, not from you: a state board or Nursys gives <b>Primary Source Verified</b>, an issuer gives <b>Issuer Verified</b>. Anchoring on XRPL Testnet afterwards only shows the record was not changed later.</p>
  <div id="acctVerifyListV12">${acctVerifyRows?acctVerifyListHtml():'<div class="small">Loading…</div>'}</div>
- ${c?`<form id="acctVerifyFormV12" class="acct-form-v10" style="margin-top:12px">
+ ${c&&srcs.length&&acct().serverV13!==false?`<form id="acctVerifyFormV12" class="acct-form-v10 psv-form-v13" style="margin-top:12px" data-mode="registry">
+ <div class="small"><b>${ec(c.display_name)}</b> · ${ec(c.clinicians?.full_name||'')}${c.jurisdiction_code?' · '+ec(jurisdictionName(c.jurisdiction_code)):''} · needs at least ${ec(levelLabel(floor.level))}${floor.locked?' (locked floor)':''}</div>
+ <label>Source (Verification Source Registry)<select id="acctVerifySourceIdV13" required>${srcs.map(s=>`<option value="${ec(s.id)}"${route&&route.id===s.id?' selected':''}>${ec(s.name)} — ${ec(VERIFICATION_METHODS[s.method].label)} → ${ec(levelLabel(sourceLevel(s)))}</option>`).join('')}</select></label>
+ <div class="small" id="acctVerifySourceInfoV13"></div>
+ <div class="grid2-v83"><label>Result<select id="acctVerifyResultV12" required><option value="VERIFIED">Verified — the source confirmed it</option><option value="FAILED">Failed — the source did not confirm it</option></select></label>
+ <label>Status shown by the source<select id="acctVerifyStatusV13" required>${[['ACTIVE','Active'],['INACTIVE','Inactive / lapsed'],['EXPIRED','Expired'],['PROBATION','On probation'],['SUSPENDED','Suspended'],['REVOKED','Revoked'],['NOT_FOUND','Not found']].map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></label></div>
+ <div class="grid2-v83"><label>Expiration shown by the source${lic?'':' (if any)'}<input type="date" id="acctVerifyExpV13" value="${ec(c.expires_on||'')}"${lic?' required':''}></label>
+ <label>Date you checked<input type="date" id="acctVerifyDateV12" required value="${acctToday()}" max="${acctToday()}"></label></div>
+ <label>Reference or confirmation number<input id="acctVerifyRefV12" required maxlength="120" placeholder="${lic?'License number / Nursys report or board confirmation':'From the source page'}. Stored off-chain only." autocomplete="off"></label>
+ <label>Monitoring after this check<select id="acctVerifyMonV13"><option value="MANUAL_RECHECK">Re-check by hand before each submission</option><option value="NOT_ENROLLED">Not monitored</option><option value="ENROLLED" disabled>Enrolled in Nursys e-Notify (not connected yet)</option></select></label>
+ <button class="pri" type="submit" id="acctVerifySaveV12">Record source check</button>
+ <p class="small">Continuous monitoring needs Nursys e-Notify, which needs an institution account and NCSBN API credentials Veridun does not have yet. Nothing here is fetched automatically, and no result is ever filled in for you.</p></form>`
+ :c?`<form id="acctVerifyFormV12" class="acct-form-v10" style="margin-top:12px" data-mode="legacy">
  <div class="small"><b>${ec(c.display_name)}</b> · ${ec(c.clinicians?.full_name||'')}</div>
- ${look?`<p class="small">Official lookup: <a id="acctLookupLinkV12" href="${ec(look.url)}" target="_blank" rel="noopener">${ec(look.name)}</a><br>${ec(look.note)}</p>`:'<p class="small">No public lookup page is on file for this kind. Use the issuer’s own verification process and type that source name. Do not invent a URL.</p>'}
+ <p class="small">${acct().serverV13===false?'The database has not been upgraded to the PR 13 Verification Source Registry yet, so this check is recorded the PR 12 way.':'No approved source in the Verification Source Registry covers this credential yet.'} You can still record what you checked, but it counts only as <b>Document Reviewed</b>, which is below the ${ec(levelLabel(floor.level))} this credential needs for readiness.</p>
+ ${look?`<p class="small">Official lookup: <a id="acctLookupLinkV12" href="${ec(look.url)}" target="_blank" rel="noopener">${ec(look.name)}</a></p>`:''}
  <label>Result<select id="acctVerifyResultV12" required><option value="VERIFIED">Verified — the issuer confirmed it</option><option value="FAILED">Failed — the issuer did not confirm it</option></select></label>
  <label>Verification source<input id="acctVerifySourceV12" required maxlength="200" value="${ec(look?.name||'')}"></label>
  <label>Date you checked<input type="date" id="acctVerifyDateV12" required value="${acctToday()}" max="${acctToday()}"></label>
  <label>Reference or confirmation number<input id="acctVerifyRefV12" required maxlength="120" placeholder="From the issuer page. Stored off-chain only." autocomplete="off"></label>
- <button class="pri" type="submit" id="acctVerifySaveV12">Record issuer check</button></form>`:''}
- ${acctLastRecord?`<div class="notice" id="acctVerifyDoneV12"><b>Recorded as ${ec(acctLastRecord.result)}.</b><div class="small">Commitment ${ec(acctLastRecord.commitment.slice(0,16))}… is ready to anchor. Nothing personal is written on the ledger: only this fingerprint.</div>
+ <button class="pri" type="submit" id="acctVerifySaveV12">Record check</button></form>`:''}
+ ${acctLastRecord?`<div class="notice" id="acctVerifyDoneV12"><b>Recorded as ${ec(acctLastRecord.result)}${acctLastRecord.level?' · '+ec(levelLabel(acctLastRecord.level)):''}.</b>${acctLastRecord.source_name?`<div class="small" id="acctVerifyProvV13">${ec(levelLabel(acctLastRecord.level).toUpperCase()||acctLastRecord.result)} · Source: ${ec(acctLastRecord.source_name)} · Checked: ${ec(acctLastRecord.checked_on)}${acctLastRecord.status_at_source?' · Status: '+ec(acctLastRecord.status_at_source):''}${acctLastRecord.expires_on?' · Expires: '+ec(acctLastRecord.expires_on):''}</div>`:''}<div class="small">Commitment ${ec(acctLastRecord.commitment.slice(0,16))}… is ready to anchor. Nothing personal is written on the ledger: only this fingerprint.</div>
  <button class="pri" type="button" data-act="anchor-now" id="acctAnchorNowV12">Anchor on XRPL Testnet</button></div>`:''}
  </div></div>`;
+ acctSyncSourceInfo();
+ const sel=$('acctVerifySourceIdV13');if(sel)sel.onchange=acctSyncSourceInfo;
+ const res=$('acctVerifyResultV12'),st=$('acctVerifyStatusV13');if(res&&st){res.onchange=()=>{if(res.value==='VERIFIED')st.value='ACTIVE';else if(st.value==='ACTIVE')st.value='INACTIVE'};st.onchange=()=>{res.value=st.value==='ACTIVE'?'VERIFIED':'FAILED'}}
  if(!acctVerifyRows)acctLoadVerifyQueue().catch(acctErr);
 }
+function acctSyncSourceInfo(){
+ const sel=$('acctVerifySourceIdV13'),box=$('acctVerifySourceInfoV13');if(!sel||!box)return;
+ const s=verificationSource(sel.value);if(!s){box.innerHTML='';return}
+ const nq=verificationSource('nursys-quickconfirm');
+ box.innerHTML=`${s.lookupUrl?`Official lookup: <a id="acctLookupLinkV12" href="${ec(s.lookupUrl)}" target="_blank" rel="noopener">${ec(s.name)}</a>`:`No confirmed lookup page for ${ec(s.name)}.${s.nursys?` Use <a id="acctLookupLinkV12" href="${ec(nq.lookupUrl)}" target="_blank" rel="noopener">Nursys QuickConfirm</a> (this board sends its data there), or request a written verification.`:' Request a written verification from the source.'}`}<br>${ec(SOURCE_TYPES[s.type])} · ${ec(VERIFICATION_METHODS[s.method].label)} → <b>${ec(levelLabel(sourceLevel(s)))}</b>. ${ec(s.notes||'')}`;
+}
 async function acctSubmitVerification(){
- const reference=$('acctVerifyRefV12').value.trim();
- const rec=await acct().recordVerification({credentialId:acctVerifyId,result:$('acctVerifyResultV12').value,sourceName:$('acctVerifySourceV12').value.trim(),reference,checkedOn:$('acctVerifyDateV12').value});
+ const reference=$('acctVerifyRefV12').value.trim(),form=$('acctVerifyFormV12');
+ let rec;
+ if(form?.dataset.mode==='registry')rec=await acct().recordSourceCheck({credentialId:acctVerifyId,sourceId:$('acctVerifySourceIdV13').value,result:$('acctVerifyResultV12').value,statusAtSource:$('acctVerifyStatusV13').value,sourceExpiresOn:$('acctVerifyExpV13').value||null,reference,checkedOn:$('acctVerifyDateV12').value,monitoring:$('acctVerifyMonV13').value});
+ else rec=await acct().recordVerification({credentialId:acctVerifyId,result:$('acctVerifyResultV12').value,sourceName:$('acctVerifySourceV12').value.trim(),reference,checkedOn:$('acctVerifyDateV12').value});
  acctLastRecord=rec;acctVerifyRows=null;
 }
 async function acctAnchorLast(){
@@ -98,7 +125,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const id=e.target.id;
   if(id==='acctMfaGateFormV12'){e.preventDefault();acctDo(async()=>{const f=(acct().mfa?.totp||[]).find(x=>x.status==='verified');if(!f)throw new Error('No authenticator is enrolled.');await acct().verifyTotp(f.id,$('acctMfaCodeV12').value);acctLanded=false},'Code accepted.');}
   if(id==='acctMfaConfirmV12'){e.preventDefault();acctDo(async()=>{await acct().verifyTotp(acct().pendingFactor?.id,$('acctMfaFirstV12').value)},'Two-factor sign-in is on. Next time, the email link will ask for a code before opening your account.');}
-  if(id==='acctVerifyFormV12'){e.preventDefault();acctDo(acctSubmitVerification,'Issuer check recorded. Anchor it if you want a tamper-evident fingerprint.');}
+  if(id==='acctVerifyFormV12'){e.preventDefault();acctDo(acctSubmitVerification,'Source check recorded. Anchor it if you want a tamper-evident fingerprint.');}
  });
  document.body.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;

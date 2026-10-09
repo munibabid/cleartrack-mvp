@@ -21,7 +21,7 @@ function userChain(c){if(c.privateOnly)return 'PRIVATE';if(c.chain==='ACCEPTED')
    in this demo is a demo seed or a simulated check, so VERIFIED reads
    "VERIFIED · DEMO". The optional XRPL proof is a quiet secondary label. */
 function verificationBadge(c){
- if(c.primary==='VERIFIED'&&c.prov?.active)return{cls:'VERIFIED',text:'VERIFIED · DEMO'};
+ if(c.primary==='VERIFIED'&&c.prov?.active){const l=typeof credentialLevel==='function'?credentialLevel(c):null;return{cls:'VERIFIED',text:(l?levelLabel(l).toUpperCase():'VERIFIED')+' · DEMO'}}
  if(c.primary==='VERIFIED')return{cls:'PENDING',text:'NEEDS RE-VERIFICATION'};
  if(c.primary==='VERIFYING')return{cls:'PENDING',text:'PENDING VERIFICATION'};
  if(c.primary==='REVOKED')return{cls:'REVOKED',text:'REVOKED BY ISSUER · DEMO'};
