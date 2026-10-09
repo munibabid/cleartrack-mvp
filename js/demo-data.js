@@ -6,7 +6,7 @@
    is not yet in effect, so the Arizona compact license is not honored there).
    Expiration dates are offsets (days) from the demo anchor, so they stay valid
    through every demo assignment. */
-const DEMO_SEED_VERSION='5';
+const DEMO_SEED_VERSION='6';
 const DEMO_SEED_VERSION_KEY='veridun_demo_seed_version';
 const DEMO_PROFILE={name:'Alex Morgan',credentials:'RN, BSN, CCRN',specialty:'ICU',secondarySpecialties:['PCU'],homeState:'US-AZ'};
 /* [kind, jurisdiction, expiresInDays|null, requiredForOnboardingBaseline, extra]
@@ -41,15 +41,19 @@ const DEMO_NURSES=[
   ['SCREEN_DRUG_CURRENT','',230],['SCREEN_BACKGROUND_CURRENT','',230]]}
 ];
 function experienceFields(x,anchor){return x&&x.years!=null?{years:x.years,lastWorked:isoDay(addDays(anchor,x.lastWorkedDays||0))}:x?.recentMonths!=null?{recentMonths:x.recentMonths,lastWorked:isoDay(addDays(anchor,x.lastWorkedDays||0))}:{}}
+/* v14.4: skills checklists carry a completion date, not an expiration (the seed's day count
+   is still the suggested redo point, 12 months after completion). */
+function seedExpiry(kind,days,anchor){return days==null||/^SKILLS_/.test(kind)?'':isoDay(addDays(anchor,days))}
+function skillsFields(kind,days,anchor){return /^SKILLS_/.test(kind)&&days!=null?{completed:isoDay(addDays(anchor,days-365))}:{}}
 function demoNurse(id){return DEMO_NURSES.find(n=>n.id===id)||DEMO_NURSES[0]}
 function nurseCreds(n){
  if(!n||n.live)return creds;
  const anchor=demoAnchor();
- return n.seed.map(([kind,jur,days,x],i)=>({id:`${n.id}-${i}`,name:x?.name||credentialDisplayName(kind,jur),kind,jurisdiction:jur,...experienceFields(x,anchor),primary:'VERIFIED',expiration:days==null?'':isoDay(addDays(anchor,days)),prov:{source:issuerFor(kind,jur)+' (demo seed)',active:true}}));
+ return n.seed.map(([kind,jur,days,x],i)=>({id:`${n.id}-${i}`,name:x?.name||credentialDisplayName(kind,jur),kind,jurisdiction:jur,...experienceFields(x,anchor),...skillsFields(kind,days,anchor),primary:'VERIFIED',expiration:seedExpiry(kind,days,anchor),prov:{source:issuerFor(kind,jur)+' (demo seed)',active:true}}));
 }
 function demoSeedCredentials(){
  const anchor=demoAnchor(),verifiedAt=addDays(anchor,-1).toISOString(),now=new Date().toISOString();
- return DEMO_SEED.map(([kind,jur,days,required,x],i)=>v81Normalize({id:Date.now()+i,name:x?.name||credentialDisplayName(kind,jur),...experienceFields(x,anchor),kind,type:credentialTypeCode(kind,jur),jurisdiction:jur,section:catalogKind(kind).section,required,primary:'VERIFIED',chain:'NOT ISSUED',expiration:days==null?'':isoDay(addDays(anchor,days)),file:'',prov:{source:issuerFor(kind,jur)+' (demo seed)',method:'Demo verification',verifier:'DEMO SEED (not a real verification)',verifiedAt,active:true,lastMonitored:now}}));
+ return DEMO_SEED.map(([kind,jur,days,required,x],i)=>v81Normalize({id:Date.now()+i,name:x?.name||credentialDisplayName(kind,jur),...experienceFields(x,anchor),...skillsFields(kind,days,anchor),kind,type:credentialTypeCode(kind,jur),jurisdiction:jur,section:catalogKind(kind).section,required,primary:'VERIFIED',chain:'NOT ISSUED',expiration:seedExpiry(kind,days,anchor),file:'',prov:{source:issuerFor(kind,jur)+' (demo seed)',method:'Demo verification',verifier:'DEMO SEED (not a real verification)',verifiedAt,active:true,lastMonitored:now}}));
 }
 /* Loads saved demo data; (re)seeds on first run, on Reset Demo Data, or when
    the stored data predates the current demo seed version. Never called

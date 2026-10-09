@@ -29,7 +29,7 @@ function renderOpportunities(){
  if(sel&&!sel.options.length){sel.innerHTML=DEMO_NURSES.map(n=>`<option value="${n.id}">${ec(n.name)} — ${ec(specialtyShort(n.specialty))}${n.live?' (your live Passport)':' (demo nurse, read-only)'}</option>`).join('');sel.onchange=()=>{oppNurseId=sel.value;renderOpportunities()}}
  if(sel)sel.value=oppNurseId;
  const n=demoNurse(oppNurseId),all=getAssignments(),elig=all.filter(a=>matchedSpecialty(a,n)),other=all.filter(a=>!matchedSpecialty(a,n));
- if($('oppNurseNoteV84'))$('oppNurseNoteV84').innerHTML=`Specialty from profile: <b>${ec(specialtyName(n.specialty))}</b>${(n.secondarySpecialties||[]).length?' · also '+ec(n.secondarySpecialties.map(specialtyShort).join(', '))+' (used when the opportunity accepts it)':''} · home state ${ec(jurisdictionName(n.homeState))}${nlcCanIssueMultistate(n.homeState)?' (compact — a multistate license issued here covers every compact state)':''}. Opportunities that accept ${ec(specialtyShort(n.specialty))} are evaluated with the <b>${ec(specialtyShort(n.specialty))} module</b>.${n.live?'':' <span class="demo-tag-v81">DEMO NURSE · READ-ONLY</span>'}`;
+ if($('oppNurseNoteV84'))$('oppNurseNoteV84').innerHTML=`Specialty from profile: <b>${ec(specialtyName(n.specialty))}</b>${(n.secondarySpecialties||[]).length?' · also '+ec(n.secondarySpecialties.map(specialtyShort).join(', '))+' (used when the opportunity accepts it)':''} · primary state of residence ${ec(jurisdictionName(n.homeState))}${nlcCanIssueMultistate(n.homeState)?' (compact — a multistate license issued here covers every compact state)':''}. Opportunities that accept ${ec(specialtyShort(n.specialty))} are evaluated with the <b>${ec(specialtyShort(n.specialty))} module</b>.${n.live?'':' <span class="demo-tag-v81">DEMO NURSE · READ-ONLY</span>'}`;
  $('oppListV82').innerHTML=elig.map(a=>{
   const r=v81Assignment(a,n),next=r.items.find(i=>['MISSING','EXPIRES_BEFORE_END','NOT_RECENT'].includes(i.status)),pend=r.items.some(i=>i.status==='PENDING_VERIFICATION');
   const org=organization(a.orgId);
@@ -58,18 +58,19 @@ function openAddForm(pre={}){
  $('addContextV82').innerHTML=pre.context||'';$('addContextV82').classList.toggle('hidden',!pre.context);
  v81SyncAddForm();$('add').showModal();
 }
-function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','dt','fl'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
+function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','dt','fl','skillsDoneV144'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
 function v81SyncAddForm(){
  const k=resolveCatalogKind($('kindSearchV82').value);
  const needsJur=!!k?.jurisdiction,list=k?.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;
  $('jurisdictionRowV81').classList.toggle('hidden',!needsJur);
  $('otherRowV81').classList.toggle('hidden',k?.kind!=='OTHER');
- if(needsJur){fillDatalist('jurListV82',list.map(jurisdictionOptionLabel));$('jurLabelV82').textContent=k.jurisdiction==='NLC_HOME'?'NLC home state (primary state of residence)':'License jurisdiction (US state or territory)'}
+ if(needsJur){fillDatalist('jurListV82',list.map(jurisdictionOptionLabel));$('jurLabelV82').textContent=k.jurisdiction==='NLC_HOME'?'Primary state of residence (NLC)':'License jurisdiction (US state or territory)'}
  const j=needsJur?resolveJurisdiction($('jurSearchV82').value,list):null;
  $('jurHintV82').textContent=!needsJur?'':j?`${j.name}: ${nlcStatusLabel(j.code)} · issuer: ${j.issuer}${licenseHomeStateHint(k.kind,j.code,DEMO_PROFILE.homeState)}`:k.jurisdiction==='NLC_HOME'?`Only the ${list.length} NLC states that issue multistate licenses are listed.`:`Type to search all ${list.length} US states and territories.`;
  let note='Choose a credential type to see how it will be handled.';
  const expHelp=k?.experience?experienceHelpText(k.kind):'';$('experienceHelpV11').classList.toggle('hidden',!expHelp);$('experienceHelpV11').innerHTML=expHelp;
  const expRow=$('experienceRowV11');if(expRow){expRow.classList.toggle('hidden',!k?.experience);if(!k?.experience){$('expYearsV11').value='';$('expLastV11').value='';$('expRecentV11').value=''}}
+ const skV=!!k&&isSkillsKind(k.kind);$('dtRowV144')?.classList.toggle('hidden',!!(k?.experience||skV));$('skillsRowV144')?.classList.toggle('hidden',!skV);
  if(k){const priv=catalogPrivacy(k.kind)==='PRIVATE';
   note=`<b>Classification:</b> ${ec(k.kind)}${j?' · '+ec(j.code):''}<br><b>Source document:</b> always private — never shared or put on-chain.<br><b>Verified result:</b> ${priv?'private — shared only as a status when an assignment requires it; never on-chain.':'can be shared selectively; optional XRPL Devnet proof.'}${k.readiness===false?'<br><b>Assignment readiness:</b> listed as an Additional Professional Qualification; does not affect RN readiness unless an organization requires it.':''}<br><b>Verification:</b> simulated check against ${ec(k.jurisdiction?licensePrimarySource(k.kind,j?.code):(k.issuer||'the issuer'))} (DEMO).`}
  $('privacyNoteV82').innerHTML=note;
@@ -77,11 +78,11 @@ function v81SyncAddForm(){
 function addCredentialFromForm(){
  const k=resolveCatalogKind($('kindSearchV82').value);if(!k){alert('Choose a credential type from the list.');return}
  let jur='';
- if(k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS,j=resolveJurisdiction($('jurSearchV82').value,list);if(!j){alert(k.jurisdiction==='NLC_HOME'?'Choose your NLC home state from the list (only states that issue multistate licenses).':'Choose the license jurisdiction from the list (any US state or territory).');return}jur=j.code}
+ if(k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS,j=resolveJurisdiction($('jurSearchV82').value,list);if(!j){alert(k.jurisdiction==='NLC_HOME'?'Choose your primary state of residence from the list (only states that issue multistate licenses).':'Choose the license jurisdiction from the list (any US state or territory).');return}jur=j.code}
  const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur);if(!name){alert('Enter a credential name.');return}
  const type=k.kind==='OTHER'?('CUSTOM_'+(($('nm').value||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL')):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
   const exp=k.experience?{years:$('expYearsV11').value!==''?+ $('expYearsV11').value:undefined,recentMonths:$('expRecentV11').value!==''?+$('expRecentV11').value:undefined,lastWorked:$('expLastV11').value||''}:{};
- const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:$('dt').value,file:f?f.name:'',...exp,prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
+ const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',expiration:(k.experience||isSkillsKind(k.kind))?'':$('dt').value,...(isSkillsKind(k.kind)&&$('skillsDoneV144')?.value?{completed:$('skillsDoneV144').value}:{}),file:f?f.name:'',...exp,prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
  const old=renewalTargetV85!=null?creds.find(x=>x.id===renewalTargetV85&&x.kind===c.kind&&(x.jurisdiction||'')===(jur||'')):null;if(old)c.renews=old.id;renewalTargetV85=null;
  creds.push(c);save();
  v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION',detail:{document:f?'PRIVATE_FILENAME_ONLY':'NONE',...(c.renews?{renews:c.renews}:{})}});
@@ -203,11 +204,20 @@ const PASSPORT_GROUPS=[
  {title:'Health & Screening',cats:['Employee Health','Background & Screening'],note:'Private: organizations only ever see “Requirement Satisfied”.'},
  {title:'Additional Professional Qualifications',cats:['Additional Professional Qualifications']}
 ];
-function passportRowHtml(c){const d=daysUntil(credExpiry(c));return`<div class="passport-item-v7"><div><b>✓ ${ec(c.name)}</b><div class="small prov-line-v13">Source: ${ec((c.prov?.source||'Verified source').replace(' — simulated lookup (DEMO)',' (simulated)'))}${c.prov?.verifiedAt?' · Checked: '+ec(String(c.prov.verifiedAt).slice(0,10)):''}${credExpiry(c)?' · expires '+fd(credExpiry(c))+(d!=null&&d<=90?` <span class="exp-chip-v85">expires in ${d}d</span>`:''):''}</div></div><div class="pass-badges-v84">${verificationBadgeHtml(c)} ${proofLabelHtml(c)} <button class="mini details" data-id="${c.id}">View</button></div></div>`}
+/* v14.4: NIHSS summary — completion date, module and test group as recorded; no computed expiration */
+function nihssSummaryText(c){return(c.completed?' · completed '+fd(c.completed):'')+(c.nihssModule?' · '+ec(c.nihssModule)+' module':'')+(c.testGroup?' · Group '+ec(c.testGroup):c.completed?' · test group not recorded':'')+(!credExpiry(c)?' · expiration not shown':'')}
+/* v14.4: experience shows a calculated "counts as recent until"; skills checklists show completion +
+   a calculated suggested redo date. Neither is an expiration; facility rules are final. */
+function calcDatesText(c){
+ if(catalogKind(c.kind)?.experience&&c.lastWorked)return' · counts as recent until '+fd(experienceRecentUntil(c.lastWorked,catalogKind(c.kind)?.recencyMonths))+' (calculated)';
+ if(isSkillsKind(c.kind))return(c.completed?' · completed '+fd(c.completed)+' · suggested redo by '+fd(skillsRedoBy(c.completed))+' (calculated)':' · completion date not recorded')+' · self-attested';
+ return'';
+}
+function passportRowHtml(c){const d=daysUntil(credExpiry(c));return`<div class="passport-item-v7"><div><b>${isSkillsKind(c.kind)?'✎':'✓'} ${ec(c.name)}</b><div class="small prov-line-v13">Source: ${ec((c.prov?.source||'Verified source').replace(' — simulated lookup (DEMO)',' (simulated)'))}${c.prov?.verifiedAt?' · Checked: '+ec(String(c.prov.verifiedAt).slice(0,10)):''}${credExpiry(c)?' · expires '+fd(credExpiry(c))+(d!=null&&d<=90?` <span class="exp-chip-v85">expires in ${d}d</span>`:''):''}${c.kind==='CERT_NIHSS'?nihssSummaryText(c):''}${calcDatesText(c)}</div></div><div class="pass-badges-v84">${verificationBadgeHtml(c)} ${proofLabelHtml(c)} <button class="mini details" data-id="${c.id}">View</button></div></div>`}
 function renderPassportView(){
  if(!$('v7PassportSections'))return;
  const live=creds.filter(isCurrentVerified),auth=practiceAuthorization(),soon=live.filter(c=>{const d=daysUntil(credExpiry(c));return d!=null&&d<=90}).length;
- if($('v7PassportHeroV85'))$('v7PassportHeroV85').innerHTML=`<b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · ${ec(specialtyName(DEMO_PROFILE.specialty))}${(DEMO_PROFILE.secondarySpecialties||[]).length?' · also '+ec(DEMO_PROFILE.secondarySpecialties.map(specialtyShort).join(', ')):' '} · home state ${ec(jurisdictionName(DEMO_PROFILE.homeState))} (${ec(nlcStatusLabel(DEMO_PROFILE.homeState))})`;
+ if($('v7PassportHeroV85'))$('v7PassportHeroV85').innerHTML=`<b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · ${ec(specialtyName(DEMO_PROFILE.specialty))}${(DEMO_PROFILE.secondarySpecialties||[]).length?' · also '+ec(DEMO_PROFILE.secondarySpecialties.map(specialtyShort).join(', ')):' '} · primary state of residence ${ec(jurisdictionName(DEMO_PROFILE.homeState))} (${ec(nlcStatusLabel(DEMO_PROFILE.homeState))})`;
  if($('v7PassportLicV13'))$('v7PassportLicV13').innerHTML=passportLicenseLine();
  $('v7PassportSummaryV85').innerHTML=`<span class="chip">${live.length} verified &amp; current</span><span class="chip">Authorized to practice in ${auth.size} jurisdictions</span><span class="chip">${soon} expiring ≤90 days</span><span class="chip">${live.filter(c=>c.privateOnly).length} private</span><span class="demo-tag-v81">DEMO DATA</span>`;
  const lic=[...auth.entries()],single=lic.filter(x=>x[1]==='single-state license').map(x=>x[0]),ms=lic.find(x=>x[1]==='multistate home');
@@ -230,7 +240,7 @@ function renderTaskCenter(){
   sec('taskRenewV85','Renewal Recommended','Expires in 31–90 days.',t.renew.map(x=>taskRow(x.c.name,`${cat(x.c)} · expires ${fd(credExpiry(x.c))} (${x.d} days)${x.renewing?' · renewal submitted — awaiting verification':''}`,x.renewing?'<span class="badge PENDING">RENEWAL PENDING</span>':`<button class="mini" onclick="openRenewal(${x.c.id})">Renew</button>`)),'No renewals due in the next 90 days.'),
   sec('taskAwaitV85','Awaiting Verification','In the Verification Console queue (simulated checks).',t.awaiting.map(c=>taskRow(c.name,`${cat(c)} · ${ec(verificationBadge(c).text)}${c.renews?' · renewal — replaces the current record once verified':''}`,`<button class="mini details" data-id="${c.id}">Open</button>`)),'Nothing is waiting for verification.'),
   sec('taskMissingV85','Missing','Onboarding-baseline items not on your Passport, and credentials that need replacing.',t.missing.map(m=>m.c?taskRow(m.c.name,`${cat(m.c)} · ${ec(m.reason)}`,`<button class="mini pri" onclick="openRenewal(${m.c.id})">Replace</button>`):taskRow(catalogKind(m.kind)?.label||m.kind,ec(m.reason),`<button class="mini pri" onclick="openAddForm({kind:'${m.kind}'})">Add</button>`)),'Nothing missing from your onboarding baseline.'),
-  sec('taskCompleteV85','Complete','Verified and current — reusable across assignments.',t.complete.map(c=>taskRow('✓ '+c.name,`${cat(c)}${credExpiry(c)?' · expires '+fd(credExpiry(c)):''} · ${ec(verificationBadge(c).text)}`,`<button class="mini details" data-id="${c.id}">View</button>`)),'No completed items yet.',false)
+  sec('taskCompleteV85','Complete','Verified and current — reusable across assignments.',t.complete.map(c=>taskRow('✓ '+c.name,`${cat(c)}${calcDatesText(c)}${credExpiry(c)?' · expires '+fd(credExpiry(c)):''} · ${ec(verificationBadge(c).text)}`,`<button class="mini details" data-id="${c.id}">View</button>`)),'No completed items yet.',false)
  ].join('');
 }
 /* ---- Clinician dashboard (handoff §37) ---- */

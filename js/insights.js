@@ -39,7 +39,7 @@ function mismatchAlerts(){
  const out=[],home=DEMO_PROFILE.homeState;
  creds.forEach(c=>{
   if(['REVOKED','REJECTED'].includes(c.primary))return;
-  if(c.kind==='RN_LICENSE_MULTISTATE'&&home&&c.jurisdiction&&c.jurisdiction!==home)out.push({c,rule:'NLC_HOME_STATE',severity:'HIGH',text:`Multistate license issued by ${jurisdictionName(c.jurisdiction)}, but the profile's primary state of residence is ${jurisdictionName(home)}. Under the NLC, a multistate license must come from the home state.`});
+  if(c.kind==='RN_LICENSE_MULTISTATE'&&home&&c.jurisdiction&&c.jurisdiction!==home)out.push({c,rule:'NLC_HOME_STATE',severity:'HIGH',text:`Multistate license issued by ${jurisdictionName(c.jurisdiction)}, but the profile's primary state of residence is ${jurisdictionName(home)}. Under the NLC, a multistate license must be issued by your primary state of residence.`});
   const d=daysUntil(credExpiry(c));
   if(c.primary==='VERIFIED'&&d!=null&&d<0)out.push({c,rule:'VERIFIED_BUT_EXPIRED',severity:'HIGH',text:`Status is VERIFIED but the credential expired ${fd(credExpiry(c))}.`});
   if(['VERIFYING','UNVERIFIED'].includes(c.primary)&&d!=null&&d<0)out.push({c,rule:'EXPIRED_AT_SUBMISSION',severity:'MEDIUM',text:`Submitted with an expiration date in the past (${fd(credExpiry(c))}).`});
