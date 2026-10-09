@@ -1,6 +1,6 @@
 # On-device extraction benchmark (PR 14)
 
-Generated 2026-10-09T06:17:00.366Z by `backend/tests/p14-benchmark.js`. Synthetic documents with fake names and IDs (backend/tests/p14-fixtures.js): AHA-style BLS/ACLS/PALS eCards plus NIHSS, TNCC, ENPC, RN license, CCRN, CEN and a TB record. Measured in headless Chrome with the same on-device reader the site uses, with the profile name supplied as on the site. Real documents may differ.
+Generated 2026-10-09T07:16:23.786Z by `backend/tests/p14-benchmark.js`. Synthetic documents with fake names and IDs (backend/tests/p14-fixtures.js): AHA-style BLS/ACLS/PALS eCards plus NIHSS, TNCC, ENPC, RN license, CCRN, CEN and a TB record. Measured in headless Chrome with the same on-device reader the site uses, with the profile name supplied as on the site. Real documents may differ.
 
 **70 of 72** documents had every field the kind needs read correctly with no correction (training center is optional and not counted).
 
@@ -25,11 +25,11 @@ Generated 2026-10-09T06:17:00.366Z by `backend/tests/p14-benchmark.js`. Syntheti
 | BLS (AHA) | 18 | 18/18 | 105/108 | 97.2% | 1.0 s |
 | ACLS (AHA) | 12 | 12/12 | 70/72 | 97.2% | 1.0 s |
 | PALS (AHA) | 6 | 6/6 | 35/36 | 97.2% | 1.0 s |
-| NIHSS (APEX) | 8 | 8/8 | 40/40 | 100.0% | 0.7 s |
+| NIHSS (APEX) | 8 | 8/8 | 40/40 | 100.0% | 0.8 s |
 | TNCC (ENA) | 4 | 4/4 | 20/20 | 100.0% | 0.7 s |
 | ENPC (ENA) | 4 | 4/4 | 20/20 | 100.0% | 0.7 s |
 | RN license | 4 | 3/4 | 23/24 | 95.8% | 0.8 s |
-| RN license, multistate | 4 | 4/4 | 24/24 | 100.0% | 0.6 s |
+| RN license, multistate | 4 | 4/4 | 24/24 | 100.0% | 0.7 s |
 | CCRN (AACN) | 4 | 4/4 | 20/20 | 100.0% | 0.6 s |
 | CEN (BCEN) | 4 | 4/4 | 20/20 | 100.0% | 0.7 s |
 | TB record (private, dates only) | 4 | 3/4 | 7/8 | 87.5% | 0.6 s |
@@ -43,7 +43,7 @@ Generated 2026-10-09T06:17:00.366Z by `backend/tests/p14-benchmark.js`. Syntheti
 | PNG (clean) | 15 | 15/15 | 80/80 | 100.0% | 0.7 s |
 | JPEG (skewed, noisy) | 15 | 15/15 | 79/80 | 98.8% | 1.0 s |
 | JPEG (low quality) | 15 | 13/15 | 75/80 | 93.8% | 0.8 s |
-| JPEG (turned 90°) | 6 | 6/6 | 36/36 | 100.0% | 4.1 s |
+| JPEG (turned 90°) | 6 | 6/6 | 36/36 | 100.0% | 3.8 s |
 
 ## Confidence (v14.2)
 
@@ -57,12 +57,12 @@ Each field’s confidence now comes from the OCR words it was read from, not fro
 | | v14.1 (before) | v14.2 (now) |
 |---|---|---|
 | Documents with every needed field right | 70/72 | — see top |
-| Fields shown as high (≥90%) | 185 (185 right, 100%) | 284 (284 right, 100.0%) |
-| Fields shown as "check it" (70–89%) | 133 (128 right, 96.2%) | 66 (66 right, 100.0%) |
+| Fields shown as high (≥90%) | 185 (185 right, 100%) | 282 (282 right, 100.0%) |
+| Fields shown as "check it" (70–89%) | 133 (128 right, 96.2%) | 68 (68 right, 100.0%) |
 | Fields shown as low (<70%) | 70 (69 right, 98.6%) | 39 (34 right, 87.2%) |
-| Mean confidence, right / wrong fields | 0.836 / 0.767 | 0.895 / 0.541 |
-| AUROC (right fields score above wrong ones) | 0.692 | 0.949 |
-| Median confidence, scanned PDF / image OCR | 0.729 / 0.81 | 0.943 / 0.950 |
+| Mean confidence, right / wrong fields | 0.836 / 0.767 | 0.894 / 0.538 |
+| AUROC (right fields score above wrong ones) | 0.692 | 0.948 |
+| Median confidence, scanned PDF / image OCR | 0.729 / 0.81 | 0.940 / 0.950 |
 | OCR median: issue date / renewal / course | 0.72 / 0.73 / 0.75 | 0.940 / 0.970 / 0.970 |
 
 No field shown as high was wrong in this run (5 wrong reads, all below 90%). Real documents may differ.

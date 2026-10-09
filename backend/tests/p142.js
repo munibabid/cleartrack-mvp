@@ -61,6 +61,21 @@ function partA() {
   ok('A16 text-layer PDF stays near-certain (≥0.98)', ['issued_on', 'renew_by', 'course', 'credential_id', 'holder_name'].every(k => txt[k] && txt[k].conf >= 0.98), JSON.stringify(Object.fromEntries(Object.entries(txt).map(([k, x]) => [k, x.conf]))));
   const nlText = 'AMERICAN HEART ASSOCIATION\nBLS Provider\nMunib Fakename\nhas successfully completed the course\nExample Program\n06/03/2026\nExample Program\n06/2028';
   const nolab = P('', { method: 'PDF_OCR', ocrConf: 87, ocrLines: words(nlText, 0.95) }).fields;
+  // v14.3: two-column card, label above value, read by word positions (synthetic boxes)
+  const G = [];
+  const put = (t, x, y, c = 0.95) => { let cx = x; for (const w of t.split(' ')) { G.push({ t: w, c, x0: cx, x1: cx + w.length * 9, y0: y, y1: y + 20 }); cx += w.length * 9 + 8; } };
+  put('BLS Provider', 140, 160); put('Testa Fakename', 350, 290); put('has successfully completed the cognitive and skills evaluations', 160, 320);
+  put('Issue Date', 190, 410); put('Renew By', 525, 410); put('6/3/2026', 205, 440, 0.92); put('06/2028', 540, 440);
+  put('Training Center Name', 150, 470); put('Instructor Name', 500, 478); put('Example Permanente Education', 152, 500); put('Example Teacher', 515, 508);
+  put('Instructor ID', 515, 538); put('Training Center ID', 163, 548); put('24000000017', 525, 560); put('CA00002', 205, 572);
+  put('eCard Code', 520, 586); put('Training Center City, State', 132, 596); put('271100000056', 522, 608); put('Nowhere, CA', 190, 620);
+  /* OCR line order on such a card is scrambled: hand the parser the lines as OCR grouped them */
+  const lines2 = []; const byLine = {}; G.forEach(w => { const k = Math.round(w.y0 / 10); (byLine[k] = byLine[k] || []).push(w); }); Object.keys(byLine).sort((a, b) => a - b).forEach(k => lines2.push(byLine[k].sort((a, b) => a.x0 - b.x0)));
+  const two = P('', { method: 'PDF_OCR', ocrConf: 88, ocrLines: lines2 });
+  const tf = k => two.fields[k] && two.fields[k].value;
+  ok('A18 two-column card (label above value): eCard code, TC ID = CA-pattern, Instructor ID kept out, TC name not merged with the instructor', tf('credential_id') === '271100000056' && tf('training_center_id') === 'CA00002' && tf('training_center') === 'Example Permanente Education' && !JSON.stringify(two.fields).includes('24000000017'), JSON.stringify({ code: tf('credential_id'), tc: tf('training_center_id'), name: tf('training_center') }));
+  const y27 = D.compareToEntered({ credential_id: '271100000056', issued_on: '2026-06-03', renew_by: '2028-06' }, { kind: 'CERT_BLS', expires_on: '2028-06-30', issuer: 'AHA' });
+  ok('A19 a 2026 card whose eCard code starts with 27 is not flagged (real cards do this)', !y27.some(m => m.field === 'credential_id') && !two.warnings.some(w => /issue year/.test(w)), JSON.stringify(y27));
   ok('A17 the same date without its label scores lower than with it', nolab.issued_on && nolab.issued_on.conf < hi.issued_on.conf, JSON.stringify({ nolabel: nolab.issued_on && nolab.issued_on.conf, label: hi.issued_on.conf }));
 }
 
@@ -77,7 +92,7 @@ async function partB(browser) {
       return { m: res.method, src: res.source && res.source.id, notes: res.notes, f: Object.fromEntries(Object.entries(res.fields).map(([k, x]) => [k, { v: x.value, c: x.conf }])) };
     }, fs.readFileSync(c.file).toString('base64'), c.id, c.mime);
     const got = k => r.f[k] && r.f[k].v;
-    const right = ['holder_name', 'course', 'issued_on', 'renew_by', 'training_center_id', 'credential_id'].every(k => (got(k) || null) === c.truth[k]);
+    const right = ['holder_name', 'course', 'issued_on', 'renew_by', 'training_center_id', 'credential_id', ...(c.truth.training_center ? ['training_center'] : [])].every(k => (got(k) || null) === c.truth[k]);
     const neverTc = got('credential_id') !== c.tcId && got('credential_id') !== c.instrId;
     const highDates = !c.clean || (r.f.issued_on && r.f.issued_on.c >= 0.9 && r.f.renew_by && r.f.renew_by.c >= 0.9 && r.f.course && r.f.course.c >= 0.9);
     const msg = c.code ? true : (r.notes && /eCard code not found/.test(r.notes.credential_id || ''));

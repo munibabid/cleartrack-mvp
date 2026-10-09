@@ -77,6 +77,14 @@ The entry screen has a **Your account · staging** card under the three demo wor
 
 ### On-device document reading (PR 14)
 
+**v14.3: two-column AHA cards (eCard code, TC ID and Instructor ID kept apart).** On the two-column BLS layout (Training Center info on the left, Instructor info on the right, a centered label above each value), v14.2 showed "eCard code not found" and put the Instructor ID in the Training Center ID field. The scanner now reads these cards by position instead of by OCR line order:
+
+- Each label (eCard Code, Training Center ID, Training Center Name, Instructor Name, Instructor ID, …) is matched with the value beside it or directly under it, using the word boxes from OCR or the PDF text layer. Values are never taken across the column gap.
+- The Instructor ID is recognized as its own label, so it never fills the Training Center ID or the eCard code. The TC ID must match the AHA pattern (2 letters + 5 digits), and the Training Center name stops at the column edge, so it isn't merged with the instructor's name.
+- If the eCard code under its label is hidden by the grey watermark, the scanner re-reads just that strip, enlarged and whitened, on the device.
+- 2026 cards can have eCard codes starting with 27, so codes are no longer checked against the issue year.
+- New synthetic fixture `tc-2col` (text PDF, scanned PDF, clean PNG, phone photo) in the p142 suite. All values are fake.
+
 **v14.2: the eCard code is never the Training Center ID, and confidence means something.** The fix came from Munib's RQI BLS card: the scanner showed `CA0…xx`, the AHA **Training Center ID**, as the eCard code, and clear dates scored only 78%.
 - **eCard code:** read only from its own label ("eCard Code", "RQI code", "Certificate ID"), with the value taken from the same cell, the next cell, or the cell under the label in a header row. A value shaped like a TC ID (2 letters + 5 digits) or printed as the Training Center ID / Instructor ID is never used. Standard AHA codes are 12 digits (issue year + course + 7 digits, verified at heart.org/cpr/mycards); codes with letters are RQI codes (heart.org/RQIverify) and are kept exactly as printed. If no code is found the field stays empty with "eCard code not found. Type it from your card; it's needed for AHA verification."
 - **Training Center ID** is read as its own field, shown to the nurse and the verifier as "who ran the class, not used for verification". It is not saved or logged. The verifier's assisted AHA lookup (reference + Copy) uses the eCard code only.
