@@ -1,6 +1,6 @@
 # On-device extraction benchmark (PR 14)
 
-Generated 2026-10-09T03:27:38.237Z by `backend/tests/p14-benchmark.js`. Synthetic documents with fake names and IDs (backend/tests/p14-fixtures.js): AHA-style BLS/ACLS/PALS eCards plus NIHSS, TNCC, ENPC, RN license, CCRN, CEN and a TB record. Measured in headless Chrome with the same on-device reader the site uses, with the profile name supplied as on the site. Real documents may differ.
+Generated 2026-10-09T04:12:56.530Z by `backend/tests/p14-benchmark.js`. Synthetic documents with fake names and IDs (backend/tests/p14-fixtures.js): AHA-style BLS/ACLS/PALS eCards plus NIHSS, TNCC, ENPC, RN license, CCRN, CEN and a TB record. Measured in headless Chrome with the same on-device reader the site uses, with the profile name supplied as on the site. Real documents may differ.
 
 **70 of 72** documents had every field the kind needs read correctly with no correction (training center is optional and not counted).
 
@@ -23,7 +23,7 @@ Generated 2026-10-09T03:27:38.237Z by `backend/tests/p14-benchmark.js`. Syntheti
 | Kind | Documents | All fields right | Fields right | Accuracy | Median time |
 |---|---|---|---|---|---|
 | BLS (AHA) | 18 | 18/18 | 105/108 | 97.2% | 1.0 s |
-| ACLS (AHA) | 12 | 12/12 | 70/72 | 97.2% | 1.1 s |
+| ACLS (AHA) | 12 | 12/12 | 70/72 | 97.2% | 1.0 s |
 | PALS (AHA) | 6 | 6/6 | 33/36 | 91.7% | 1.0 s |
 | NIHSS (APEX) | 8 | 8/8 | 40/40 | 100.0% | 0.7 s |
 | TNCC (ENA) | 4 | 4/4 | 20/20 | 100.0% | 0.7 s |
@@ -39,7 +39,7 @@ Generated 2026-10-09T03:27:38.237Z by `backend/tests/p14-benchmark.js`. Syntheti
 | Variant | Documents | All fields right | Fields right | Accuracy | Median time |
 |---|---|---|---|---|---|
 | PDF (text) | 15 | 15/15 | 80/80 | 100.0% | 0.5 s |
-| PDF (scanned, no text) | 6 | 6/6 | 33/36 | 91.7% | 1.6 s |
+| PDF (scanned, no text) | 6 | 6/6 | 33/36 | 91.7% | 1.5 s |
 | PNG (clean) | 15 | 15/15 | 80/80 | 100.0% | 0.7 s |
 | JPEG (skewed, noisy) | 15 | 15/15 | 78/80 | 97.5% | 1.0 s |
 | JPEG (low quality) | 15 | 13/15 | 75/80 | 93.8% | 0.8 s |

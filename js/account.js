@@ -371,6 +371,7 @@ function acctWire(){
  ws.addEventListener('submit',e=>{
   const id=e.target.id;if(!/V10$/.test(id))return;e.preventDefault();
   if(id==='acctProfileFormV10')acctDo(async()=>{const sec=[...document.querySelectorAll('.acctSecSpecV10:checked')].map(x=>x.value);await acct().saveProfile({full_name:$('acctNameV10').value,post_nominals:$('acctPostV10').value,specialty:$('acctSpecV10').value,secondary_specialties:sec,home_jurisdiction:$('acctHomeV10').value});acctEditingProfile=false},'Profile saved to your account.');
+  if(id==='acctAddFormV10'){const block=typeof scanAddBlocker==='function'?scanAddBlocker():null;if(block){acctMsg(block,'err');return}}
   if(id==='acctAddFormV10')acctDo(async()=>{acctLastScanResult=null;const n=await acctSubmitCredential();return n}).then(n=>{if(!n)return;const sr=acctLastScanResult;acctMsg(sr?(sr.mismatch?`${n} saved. Credential mismatch detected: it goes to the verifier's review queue, flagged. Status: ${SCAN_STATUS_TEXT}.`:`${n} saved. Status: ${SCAN_STATUS_TEXT}.`):`${n} saved to your account. Status: Submitted, not verified.`,sr?.mismatch?'err':'ok')});
   if(id==='acctShareFormV10')acctDo(acctSubmitShare,'Share created. Copy the link or code now.');
   if(id==='acctOrgCreateFormV10')acctDo(async()=>{const o=await acct().createOrganization($('acctOrgNameV10').value);acctOrgId=o.id;acctOrgShares=null},'Organization created. You are its owner.');
@@ -445,10 +446,10 @@ function acctPassportLicenseNote(){
  return`<div class="small" id="acctPassLicV13"><b>Passport RN license:</b> ${ok?'primary-source verified ✓':'added — the Passport counts as complete once a verifier confirms it with the board or Nursys'}. A license for another state becomes <b>Required</b> when an assignment there isn't covered by your home or compact license.</div>`;
 }
 
-/* PR 14: the confirmed document details on a credential row (owner only). */
+/* PR 14: what was confirmed from the document. Only field names and flags
+   are stored; the values themselves never leave the device that read them. */
 function acctDocDetailsHtml(c){
- const d=c.metadata?.doc;if(!d||!d.fields)return'';
- const order=['holder_name','credential_id','course','issued_on','renew_by','expires_on','jurisdiction','multistate','training_center'];
- const rows=order.filter(k=>d.fields[k]).map(k=>[k==='credential_id'?(d.profile==='aha_resus'?'eCard code':d.profile==='license'?'License number':'ID'):(DocExtract.FIELD_LABEL[k]||k),d.fields[k]]);
- return`<details class="why-v13 acct-docdet-v14"><summary>Details from the document${d.mismatch?' · <span class="badge REVOKED">MISMATCH</span>':''}</summary><div class="why-grid-v13">${rows.map(([k,v])=>`<div>${ec(k)}</div><div>${ec(v)}</div>`).join('')}${d.document_expires_on?`<div>Expiration (document)</div><div>${ec(fd(d.document_expires_on))}</div>`:''}</div>${(d.mismatches||[]).length?`<div class="small">Mismatch: ${d.mismatches.map(m=>ec(m.field.replace('_',' '))).join(', ')}</div>`:''}<div class="small">Read on your device and confirmed by you on ${ec(fmtDT(d.read_at))}. Not verified.</div></details>`;
+ const d=c.metadata?.doc;if(!d||!d.confirmed)return'';
+ const nm=k=>(DocExtract.FIELD_LABEL[k]||k).toLowerCase();
+ return`<div class="small acct-docdet-v14">Document read on this device ${ec(fmtDT(d.read_at))}: ${ec((d.fields_confirmed||[]).map(nm).join(', ')||'no fields')} confirmed${(d.corrected||[]).length?` (${ec(d.corrected.map(nm).join(', '))} corrected)`:''}.${d.mismatch?` <span class="badge REVOKED">MISMATCH</span> ${ec((d.mismatch_fields||[]).map(nm).join(', '))}`:''} The values stay on your device; the verifier reads the document again.</div>`;
 }

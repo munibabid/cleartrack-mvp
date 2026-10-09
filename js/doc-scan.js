@@ -74,7 +74,7 @@ function scanBoxHtml(target){
  const confirmedNote=s.confirmed?`<div class="small scan-status-v14" id="acctScanStatusV14"><span class="badge PENDING">${ec(SCAN_STATUS_TEXT.toUpperCase())}</span></div>`:'';
  return`<div class="scan-v14" id="acctScanBoxV14" data-state="done" data-profile="${ec(r.profile)}">
  <div class="scan-head-v14"><b>Read from your document</b> <span class="small">· ${ec(({PDF_TEXT:'PDF text',PDF_OCR:'scanned PDF (OCR)',IMAGE_OCR:'image (OCR)'})[r.method]||r.method)}${r.rotated?` · turned ${r.rotated}°`:''}${r.qrFound?' · QR code read':''} · ${(r.ms/1000).toFixed(1)} s</span></div>
- <div class="small">Check each detail against your document and correct anything wrong. ${priv?'This is a private record: only the dates are used, and only the expiration date is saved. Nothing else from it is stored.':'Only the details you confirm are saved, privately, for the verifier. Organizations never see them.'}</div>
+ <div class="small">Check each detail against your document and correct anything wrong. ${priv?'This is a private record: only the dates are used, and only the expiration date is saved. Nothing else from it is stored.':'The values stay on this device: Veridun saves only which fields you confirmed and any mismatch flag. The verifier reads the document again on their side.'}</div>
  <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}</label>`}).join('')}</div>
  ${exp?`<div class="small scan-interp-v14" id="acctScanInterpV14">${ec(exp.text)}</div>`:''}
  ${r.warnings.length?`<div class="small notice">${r.warnings.map(ec).join('<br>')}</div>`:''}
@@ -118,8 +118,10 @@ function scanSummary(){
  const exp=scanDocExpiry();
  return{corrected,ms,confidence,exp,
   event:{kind:scanContext().kind,profile:r.profile,method:r.method,source_slug:r.source?.id||null,fields_expected:fields,fields_found:fields.filter(k=>r.fields[k]),fields_corrected:corrected,mismatches:ms.map(m=>m.field),confidence,qr_found:!!r.qrFound,rotated:r.rotated||0,scan_ms:r.ms,confirm_ms:Math.max(0,Date.now()-(s.doneAt||Date.now()))},
-  doc:{v:1,profile:r.profile,read_at:new Date().toISOString(),method:r.method,fields:Object.fromEntries(fields.filter(k=>s.values[k]).map(k=>[k,s.values[k]])),confidence,corrected,
-   mismatches:ms.map(m=>({field:m.field,document:m.document??null,entered:m.entered??null})),mismatch:ms.length>0,issuer:r.issuer||null,source_suggested:r.source?.id||null,document_expires_on:exp?.value||null,confirmed:true,status:'DETAILS_CAPTURED'}};
+  /* Stored on the credential: field NAMES and flags only. The values stay
+     on this device (extracted values are kept off the server by design). */
+  doc:{v:1,profile:r.profile,read_at:new Date().toISOString(),method:r.method,fields_found:fields.filter(k=>r.fields[k]),fields_confirmed:fields.filter(k=>s.values[k]),confidence,corrected,
+   mismatch_fields:ms.map(m=>m.field),mismatch:ms.length>0,issuer:r.issuer||null,source_suggested:r.source?.id||null,confirmed:true,status:'DETAILS_CAPTURED'}};
 }
 async function scanAfterSave(credId,sum,{applied=false}={}){
  const a=acct();
@@ -129,6 +131,13 @@ async function scanAfterSave(credId,sum,{applied=false}={}){
  if(applied)await a.log('DOCUMENT_DATE_APPLIED',{credential_id:credId,result:'EXPIRES_ON_FROM_DOCUMENT',detail:{kind:sum.event.kind}});
  await a.logExtraction({event:'CONFIRM',credential_id:credId,...sum.event});
  await a.hydrate();
+}
+/* Checked before saving so a refusal doesn't re-render (and wipe) the form. */
+function scanAddBlocker(){
+ if(!acctScan||acctScan.target!=='add')return null;
+ if(acctScan.status==='scanning')return'Wait for the document to finish reading (or remove the file).';
+ if(acctScan.status==='done'&&acctScan.res?.supported&&!$('acctScanConfirmV14')?.checked)return'Check the details read from your document and tick “I checked these details against my document” (correct anything that is wrong).';
+ return null;
 }
 /* Add form: called from acctSubmitCredential. Returns {metaDoc, sum} or null. */
 function scanForAdd(){

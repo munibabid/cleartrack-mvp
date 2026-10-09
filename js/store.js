@@ -242,6 +242,11 @@ class SupabaseAdapter{
   const c=this.need();const cred=this.cache.credentials.find(x=>x.id===credentialId);if(!cred?.source_document_path)throw new Error('No document uploaded.');
   const{data,error}=await c.storage.from('source-documents').createSignedUrl(cred.source_document_path,seconds);if(error)throw new Error('Signed link: '+error.message);return data.signedUrl;
  }
+ /* Verifier: a short signed link to a nurse's document (storage RLS lets verifiers read). */
+ async verifierDocumentUrl(path,seconds=60){
+  const c=this.need();if(!path)throw new Error('No document uploaded.');
+  const{data,error}=await c.storage.from('source-documents').createSignedUrl(path,seconds);if(error)throw new Error('Signed link: '+error.message);return data.signedUrl;
+ }
  async deleteCredential(credentialId){
   const c=this.need();const cred=this.cache.credentials.find(x=>x.id===credentialId);if(!cred)return;
   await this.run(c.from('credentials').delete().eq('id',credentialId),'Delete credential');

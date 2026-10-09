@@ -106,7 +106,7 @@ async function partA(browser) {
   const boards = await pg.evaluate(() => document.querySelectorAll('.reg-row-v13').length);
   await pg.select('#regTypeV13', ''); await pg.type('#regSearchV13', 'nursys'); await W(300);
   const nurs = await pg.evaluate(() => [...document.querySelectorAll('.reg-row-v13')].map(r => r.dataset.source));
-  ok('Verification Sources tab lists 70, filters 56 boards, searches Nursys', rows === 70 && boards === 56 && nurs.includes('nursys-quickconfirm') && nurs.includes('nursys-enotify'), JSON.stringify([rows, boards, nurs.length]));
+  ok('Verification Sources tab lists 115, filters 56 boards, searches Nursys', rows === 115 && boards === 56 && nurs.includes('nursys-quickconfirm') && nurs.includes('nursys-enotify'), JSON.stringify([rows, boards, nurs.length]));
   ok('no sideways scroll at 390px (registry)', await noSideScroll());
   await shot('04-registry.png', '#verifySourcesBodyV13');
 

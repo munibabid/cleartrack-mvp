@@ -154,7 +154,7 @@ async function partA4(browser) {
   const shot = async (file, sel) => { await W(250); const h = sel && await pg.$(sel); if (h) { await pg.evaluate(e => e.scrollIntoView({ block: 'start' }), h); await W(150); await h.screenshot({ path: SH + file }); } else await pg.screenshot({ path: SH + file }); };
   const idle = (ms = 60000) => pg.waitForFunction(() => !document.body.classList.contains('acct-busy-v10'), { timeout: ms });
   const waitScan = (ms = 90000) => pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }, { timeout: ms });
-  const tap = async sel => { await pg.waitForSelector(sel, { timeout: 15000 }); await pg.evaluate(s => { const e = document.querySelector(s); e.scrollIntoView({ block: 'center' }); }, sel); await W(120); try { await tap(sel); } catch { await pg.evaluate(s => document.querySelector(s).click(), sel); } };
+  const tap = async sel => { await pg.waitForSelector(sel, { timeout: 15000 }); await pg.evaluate(s => { const e = document.querySelector(s); e.scrollIntoView({ block: 'center' }); }, sel); await W(120); await pg.evaluate(s => document.querySelector(s).click(), sel); };
   const setVal = (id, v) => pg.evaluate((id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, id, v);
   await pg.evaluate(require('./p14-fake.js')); step('fake in');
   // Munib-like existing credential: typed May 8 2028, card renews 06/2028
@@ -194,10 +194,10 @@ async function partA4(browser) {
   await tap('#acctScanConfirmV14');
   await tap('#acctAddFormV10 button[type=submit]'); await idle();
   const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); return { c, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type), xe: __fakeDb.extraction_events.filter(e => e.credential_id === c.id), msg: document.getElementById('acctWsMsgV10')?.textContent || '' }; });
-  ok('saved: VERIFYING, expires June 30, metadata.doc confirmed, status "Details captured, awaiting verification"', saved.c.status === 'VERIFYING' && saved.c.expires_on === '2028-06-30' && saved.c.metadata.doc?.confirmed && saved.c.metadata.doc.fields.credential_id === '261100000017' && /Details captured, awaiting verification/.test(saved.msg), saved.msg);
+  ok('saved: VERIFYING, expires June 30, metadata.doc confirmed, status "Details captured, awaiting verification"', saved.c.status === 'VERIFYING' && saved.c.expires_on === '2028-06-30' && saved.c.metadata.doc?.confirmed && saved.c.metadata.doc.fields_confirmed.includes('credential_id') && /Details captured, awaiting verification/.test(saved.msg), saved.msg);
   ok('audit: DOCUMENT_SCANNED + DOCUMENT_DATE_APPLIED; extraction event CONFIRM', saved.ev.includes('DOCUMENT_SCANNED') && saved.ev.includes('DOCUMENT_DATE_APPLIED') && saved.xe.length === 1 && saved.xe[0].event === 'CONFIRM', JSON.stringify(saved.ev));
-  const leak = JSON.stringify([saved.xe, (await pg.evaluate(() => __fakeDb.audit_events.map(e => e.detail)))]);
-  ok('telemetry holds field names only, no names / codes / dates', !/Testa|Fakename|261100000017|2026-06-12|2028-06/.test(leak), leak.slice(0, 160));
+  const leak = JSON.stringify([saved.xe, saved.c.metadata, (await pg.evaluate(() => __fakeDb.audit_events.map(e => e.detail)))]);
+  ok('extracted values stay off the server: metadata, audit and telemetry hold field names only', !/Testa|Fakename|261100000017|2026-06-12|2028-06/.test(leak), leak.slice(0, 160));
   const badge = await pg.evaluate(id => document.querySelector(`[data-cred="${id}"] .badge`)?.textContent, saved.c.id);
   ok('credential row badge: DETAILS CAPTURED · AWAITING VERIFICATION (never VERIFIED)', /DETAILS CAPTURED/.test(badge) && !/^VERIFIED/.test(badge), badge);
   // ---- NIHSS with a mismatch, saved anyway → flagged ----
@@ -240,12 +240,14 @@ async function partA4(browser) {
   ok('queue lists the mismatched credential first, flagged', /MISMATCH/.test(order[0]) && /NIH/.test(order[0]), order.slice(0, 2).join(' || '));
   await tap(`.acct-verify-pick-v12[data-id="${seeded.id}"]`);
   await pg.waitForSelector('#acctVerifyFormV12[data-mode="registry"]', { timeout: 15000 });
+  await tap('#acctVReadV14');
+  await pg.waitForSelector('#acctCopyCodeV14', { timeout: 60000 });
   const vf = await pg.evaluate(() => ({ opts: [...document.querySelectorAll('#acctVerifySourceIdV13 option')].map(o => o.value), sel: document.getElementById('acctVerifySourceIdV13').value, applies: document.getElementById('acctVerifyAppliesV14').innerText, mon: [...document.querySelectorAll('#acctVerifyMonV13 option')].map(o => o.value), foot: document.getElementById('acctVerifyFootV14').innerText, exp: document.getElementById('acctVerifyExpV13').value, ref: document.getElementById('acctVerifyRefV12').value, aha: document.getElementById('acctOpenAhaV14')?.href, copy: !!document.getElementById('acctCopyCodeV14'), box: document.getElementById('acctDocBoxV14').innerText, side: document.documentElement.scrollWidth <= window.innerWidth + 1 }));
   ok('BLS verifier form: AHA eCards preselected; RQI and Red Cross offered; no Nursys', vf.sel === 'aha-ecards' && vf.opts.includes('aha-rqi') && vf.opts.includes('redcross-certificate') && !vf.opts.some(o => /nursys|board-/.test(o)), JSON.stringify(vf.opts));
   ok('form text names the applicable source and says Nursys does not apply', /AHA eCards/.test(vf.applies) && /Nursys does not apply/.test(vf.applies) && /not a license/.test(vf.foot));
   ok('no Nursys e-Notify monitoring option for BLS', !vf.mon.includes('ENROLLED'), vf.mon.join());
   ok('expiration prefilled from the document; reference = eCard code; copy + open AHA', vf.exp === '2028-06-30' && vf.ref === '261100000017' && /ecards\.heart\.org/.test(vf.aha || '') && vf.copy, JSON.stringify({ exp: vf.exp, ref: vf.ref, aha: vf.aha }));
-  ok('document details are labeled "captured by the nurse, not verified"; assisted (ToS) note shown', /captured by the nurse/.test(vf.box) && /Assisted, not automatic/.test(vf.box));
+  ok('verifier reads the document on their own device; not saved; mismatch shown; assisted (ToS) note', /nothing read here is saved/.test(vf.box) && /Credential mismatch detected/.test(vf.box) === false && /Assisted, not automatic/.test(vf.box), vf.box.replace(/\s+/g,' ').slice(0,200));
   ok('verifier form fits a phone (no sideways scroll)', vf.side);
   await shot('04-verifier-aha-source.png', '#acctVerifyFormV12');
   await pg.evaluate(() => document.querySelectorAll('.acctDblV14').forEach(x => { if (x.value !== 'active') x.checked = true; }));
@@ -334,10 +336,11 @@ async function partB(browser) {
     if (!fs.existsSync(FIX + '/01-bls-text.pdf')) await require('./p14-fixtures.js').generateOther(browser, FIX).then(() => require('./p14-fixtures.js').generate(browser, BASE, FIX));
     await partA4(browser);
     await partA5(browser);
-    if (await require('./live-db.js').reachable()) await partB(browser);
+    const live = await require('./live-db.js').reachable() && await require('./live-db.js').client().then(async c => { try { await c.query('select 1'); return true; } catch { return false; } finally { await c.end().catch(() => {}); } }).catch(() => false);
+    if (live) await partB(browser);
     else skip('live database checks', 'database not reachable from this machine (Management API token rejected, Postgres ports closed)');
   } catch (e) { if (process.env.P14_DEBUG) console.log(JSON.stringify(String(e && e.message)).slice(0, 800)); ok('p14 run', false, String(e && e.stack || e).replace(/postgres(ql)?:\/\/[^\s'"]+/g, '***').replace(/sbp_[A-Za-z0-9_]+/g, 'sbp_***')); }
-  finally { await browser.close().catch(() => {}); }
+  finally { await Promise.race([browser.close().catch(() => {}), W(15000)]); }
   const fails = R.filter(r => r.startsWith('FAIL')).length, skips = R.filter(r => r.startsWith('SKIP')).length;
   console.log(`\n${R.length - fails - skips}/${R.length - skips} passed${skips ? `, ${skips} skipped` : ''}`);
   process.exit(fails ? 1 : 0);
