@@ -46,7 +46,7 @@ function scanValuesForCompare(){
 function scanMismatches(){
  if(!acctScan||acctScan.status!=='done'||!acctScan.res?.supported)return[];
  const ctx=scanContext();
- return DocExtract.compareToEntered(scanValuesForCompare(),{kind:ctx.kind,expires_on:ctx.expires_on||null,profileName:ctx.profileName,issuer:acctScan.res.issuer,jurisdiction:ctx.jurisdiction});
+ return DocExtract.compareToEntered(scanValuesForCompare(),{kind:ctx.kind,expires_on:ctx.expires_on||null,profileName:ctx.profileName,issuer:acctScan.res.issuer,jurisdiction:ctx.jurisdiction,trainingCenterId:acctScan.res.fields?.training_center_id?.value||null});
 }
 function scanDocExpiry(){
  if(!acctScan?.res)return null;const v=scanValuesForCompare();
@@ -75,7 +75,7 @@ function scanBoxHtml(target){
  return`<div class="scan-v14" id="acctScanBoxV14" data-state="done" data-profile="${ec(r.profile)}">
  <div class="scan-head-v14"><b>Read from your document</b> <span class="small">· ${ec(({PDF_TEXT:'PDF text',PDF_OCR:'scanned PDF (OCR)',IMAGE_OCR:'image (OCR)'})[r.method]||r.method)}${r.rotated?` · turned ${r.rotated}°`:''}${r.qrFound?' · QR code read':''} · ${(r.ms/1000).toFixed(1)} s</span></div>
  <div class="small">Check each detail against your document and correct anything wrong. ${priv?'This is a private record: only the dates are used, and only the expiration date is saved. Nothing else from it is stored.':'The values stay on this device: Veridun saves only which fields you confirmed and any mismatch flag. The verifier reads the document again on their side.'}</div>
- <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}</label>`}).join('')}</div>
+ <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile|swapped/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}${!f&&r.notes?.[k]?`<span class="small scan-note-v142" id="acctScanNote-${k}">${ec(r.notes[k])}</span>`:''}</label>`}).join('')}${(r.infoFields||[]).filter(k=>r.fields[k]).map(k=>`<div class="scan-row-v14 scan-info-v142" data-info-field="${k}" id="acctScanInfo-${k}"><span class="scan-lbl-v14">${ec(DocExtract.FIELD_LABEL[k]||k)}</span><span class="scan-info-val-v142">${ec(r.fields[k].value)}</span><span class="small">${ec(DocExtract.TC_ID_NOTE)}</span></div>`).join('')}</div>
  ${exp?`<div class="small scan-interp-v14" id="acctScanInterpV14">${ec(exp.text)}</div>`:''}
  ${r.warnings.length?`<div class="small notice">${r.warnings.map(ec).join('<br>')}</div>`:''}
  <div id="acctScanMismatchBoxV14">${scanMismatchHtml()}</div>

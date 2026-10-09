@@ -294,3 +294,6 @@ select optgroup{font-weight:700}
 /* v14.1: verifier expiration note shows both dates */
 .expboth-v14{display:flex;flex-wrap:wrap;gap:4px 12px;margin:4px 0}
 .expboth-v14>span{white-space:nowrap}
+/* v14.2: Training Center ID shown for context only; eCard-code-not-found note */
+.scan-info-v142{opacity:.95}.scan-info-val-v142{font-size:15px;padding:6px 2px;word-break:break-all}
+.scan-note-v142{color:#92400e}

@@ -77,6 +77,11 @@ The entry screen has a **Your account · staging** card under the three demo wor
 
 ### On-device document reading (PR 14)
 
+**v14.2: the eCard code is never the Training Center ID, and confidence means something.** The fix came from Munib's RQI BLS card: the scanner showed `CA0…xx`, the AHA **Training Center ID**, as the eCard code, and clear dates scored only 78%.
+- **eCard code:** read only from its own label ("eCard Code", "RQI code", "Certificate ID"), with the value taken from the same cell, the next cell, or the cell under the label in a header row. A value shaped like a TC ID (2 letters + 5 digits) or printed as the Training Center ID / Instructor ID is never used. Standard AHA codes are 12 digits (issue year + course + 7 digits, verified at heart.org/cpr/mycards); codes with letters are RQI codes (heart.org/RQIverify) and are kept exactly as printed. If no code is found the field stays empty with "eCard code not found. Type it from your card; it's needed for AHA verification."
+- **Training Center ID** is read as its own field, shown to the nurse and the verifier as "who ran the class, not used for verification". It is not saved or logged. The verifier's assisted AHA lookup (reference + Copy) uses the eCard code only.
+- **Confidence:** each field's score now comes from Tesseract's per-word confidence for the words it was read from, plus a label bonus, instead of a page-wide cap plus a date penalty. Formula and before/after numbers: [docs/EXTRACTION-BENCHMARK.md](docs/EXTRACTION-BENCHMARK.md). Tests: `backend/tests/p142.js` and a TC-ID card in `xbrowser.js`.
+
 **v14.1: works in every browser.** The fix came from an iPhone report: on Safari, "Re-scan document" and the verifier's "Read the document on this device" both failed with `undefined is not a function (near '...t of e...')`.
 - **Cause:** pdf.js reads PDF text with `for await` over a `ReadableStream`, which older Safari and iOS can't do.
 - **Fix:**
