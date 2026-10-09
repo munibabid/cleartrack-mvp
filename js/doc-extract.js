@@ -14,7 +14,11 @@
 (function(root){
 'use strict';
 const FIELDS=['holder_name','credential_id','course','issued_on','renew_by','expires_on','training_center','jurisdiction','multistate'];
-const FIELD_LABEL={holder_name:'Name on the document',credential_id:'Certificate / card ID',course:'Credential on the document',issued_on:'Issue / completion date',renew_by:'Recommended renewal (month/year)',expires_on:'Expiration date',training_center:'Training center',jurisdiction:'State',multistate:'Multistate (compact)'};
+/* v14.2: read but informational only (never used for verification, never logged as a field). */
+const INFO_FIELDS=['training_center_id'];
+const FIELD_LABEL={holder_name:'Name on the document',credential_id:'Certificate / card ID',course:'Credential on the document',issued_on:'Issue / completion date',renew_by:'Recommended renewal (month/year)',expires_on:'Expiration date',training_center:'Training center',jurisdiction:'State',multistate:'Multistate (compact)',training_center_id:'Training Center ID'};
+const ECARD_NOT_FOUND="eCard code not found. Type it from your card; it's needed for AHA verification.";
+const TC_ID_NOTE='Who ran the class. Not used for verification.';
 const REQUIRED_FIELDS=['holder_name','credential_id','course','issued_on','renew_by'];
 const MONTHS=['january','february','march','april','may','june','july','august','september','october','november','december'];
 const MON_RE='(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
@@ -44,8 +48,8 @@ function normCode(raw){
  if(!s)return null;
  const digits=(s.match(/\d/g)||[]).length;
  const fx=fixDigits(s);if(/^\d{12}$/.test(fx))return{code:fx,type:'AHA'};
- if(digits>=9){const f=fx.replace(/\D/g,'');if(f.length===12)return{code:f,type:'AHA'};if(f.length>=10&&f.length<=14)return{code:f,type:'AHA',odd:true}}
- if(/^[A-Z0-9]{6,20}$/.test(s)&&/[A-Z]/.test(s)&&/\d/.test(s))return{code:s,type:'ALNUM'};
+ if(digits>=9&&s.length-digits<=3){const f=fx.replace(/\D/g,'');if(f.length===12)return{code:f,type:'AHA'};if(f.length>=10&&f.length<=14)return{code:f,type:'AHA',odd:true}}
+ if(/^[A-Z0-9]{6,30}$/.test(s)&&/[A-Z]/.test(s)&&/\d/.test(s))return{code:s,type:'ALNUM'};
  return null;
 }
 function codeFromQr(payload){
@@ -74,7 +78,7 @@ function findDates(lines){
  lines.forEach((line,li)=>{
   let rest=line;
   const reNum=/(?<!\d)(0?[1-9]|1[0-2])\s*[\/\-.]\s*(0?[1-9]|[12]\d|3[01])\s*[\/\-.]\s*((?:19|20)\d{2})(?!\d)/g;let m;
-  while((m=reNum.exec(line))){const y=+m[3],mo=+m[1],d=+m[2];if(validDate(y,mo,d))full.push({li,pos:m.index,iso:iso(y,mo,d),raw:m[0]});rest=rest.replace(m[0],' '.repeat(m[0].length))}
+  while((m=reNum.exec(line))){const y=+m[3],mo=+m[1],d=+m[2];if(validDate(y,mo,d))full.push({li,pos:m.index,iso:iso(y,mo,d),raw:m[0],numeric:true,dayFirstPossible:d<=12&&d!==mo,monthFirstProven:d>12});rest=rest.replace(m[0],' '.repeat(m[0].length))}
   const reTxt=new RegExp(MON_RE+'\\.?\\s+(\\d{1,2}),?\\s+((?:19|20)\\d{2})','ig');
   while((m=reTxt.exec(line))){const y=+m[3],mo=monthIndex(m[1]),d=+m[2];if(validDate(y,mo,d))full.push({li,pos:m.index,iso:iso(y,mo,d),raw:m[0]});rest=rest.replace(m[0],' '.repeat(m[0].length))}
   const reTxt2=new RegExp('(\\d{1,2})\\s+'+MON_RE+'\\.?,?\\s+((?:19|20)\\d{2})','ig');
@@ -182,8 +186,8 @@ function findId(lines,flat,reLbl,{allowBare12=false,aha=false}={}){
   for(const c of [after,lines[i+1]||'',lines[i-1]||'']){
    const tok=(/([A-Za-z]{0,4}[\s\-]?[0-9][A-Za-z0-9\-]{2,24})/.exec(c)||[])[1];if(!tok)continue;
    const raw=tok.replace(/\s+/g,'').toUpperCase();
-   if(!aha&&/^[A-Z]{0,4}-?\d{4,14}[A-Z0-9-]*$/.test(raw))return{code:raw,type:/^\d+$/.test(raw)?'NUM':'ALNUM',how:'label'};
-   const n=normCode(tok);if(n)return{...n,how:'label'};
+   if(!aha&&/^[A-Z]{0,4}-?\d{4,14}[A-Z0-9-]*$/.test(raw))return{code:raw,type:/^\d+$/.test(raw)?'NUM':'ALNUM',how:'label',raw:tok,li:c===after?i:c===lines[i+1]?i+1:i-1};
+   const n=normCode(tok);if(n)return{...n,how:'label',raw:tok,li:i};
   }
  }
  if(allowBare12){const m=/(?<![\dA-Za-z])(\d{12})(?![\dA-Za-z])/.exec(flat.replace(/(\d{4}) (\d{4}) (\d{4})/g,'$1$2$3'));if(m)return{code:m[1],type:'AHA',how:'pattern'}}
@@ -219,17 +223,169 @@ function findJurisdiction(flat,jurisdictions){
  return best;
 }
 
-/* The parser. `words` (optional) maps OCR tokens → confidence 0..1. */
-function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=null,words=null,profileName='',catalog=null,sources=null,jurisdictions=null}={}){
- const lines=toLines(text),flat=lines.join('\n'),profile=profileFor(kind,catalog);
+/* ---- v14.2: AHA card labels → values (table rows, header rows, label: value) ----
+   AHA eCards print "Training Center Name / Training Center ID / TC City, State /
+   TC Phone / Training Site Name / Instructor Name / Instructor ID / eCard Code".
+   Each label's value is read from the same cell ("eCard Code: 2611…"), the next
+   cell on the same row (a table), or the cell under it on the next line (a header
+   row with the values beneath). The eCard code is taken ONLY from the eCard-code
+   label (or the QR code, or a bare 12-digit AHA code), never from the Training
+   Center ID or Instructor ID. */
+const AHA_LABELS=[
+ ['tc_id',/\b(?:tr\w{1,4}ing\s*(?:c\w{2,4}r|centre)|TC)\s*(?:ID|I\.D\.?|No\.?|Number|#)(?![A-Za-z])\s*#?/ig],
+ ['instructor_id',/\binstructor\s*(?:ID|I\.D\.?|No\.?|Number|#)(?![A-Za-z])\s*#?/ig],
+ ['ecard',/\be\s*-?\s*card\s*(?:code|c0de|cod|#|no\.?|number)(?![A-Za-z])\s*#?|\b(?:RQI|eCredential)\s*(?:code|ID|#)(?![A-Za-z])|\bcertificate\s*(?:id|#|number|no\.?|code)(?![A-Za-z])|\bcert(?:ificate)?\s*code(?![A-Za-z])|\bcard\s*(?:code|id)(?![A-Za-z])/ig],
+ ['tc_info',/\b(?:TC|tr\w{1,4}ing\s*(?:c\w{2,4}r|centre))\s*(?:info|phone|city(?:\s*,?\s*state)?|location|address|e-?mail)(?![A-Za-z])/ig],
+ ['site',/\btr\w{1,4}ing\s*site(?:\s*na\w{1,2}e)?(?![A-Za-z])/ig],
+ ['tc_name',/\btr\w{1,4}ing\s*(?:c\w{2,4}r|centre)(?:\s*na\w{1,2}e)?(?![A-Za-z])/ig],
+ ['instructor',/\binstructor(?:\s*na\w{1,2}e)?(?![A-Za-z])/ig],
+ ['location',/\bcourse\s*location(?![A-Za-z])/ig],
+ ['issue',/\bissue\s*date(?![A-Za-z])|\bdate\s*issued(?![A-Za-z])/ig],
+ ['renew',/\b(?:recommended\s*)?renew(?:al)?\s*(?:date|by)(?![A-Za-z])/ig],
+ ['qr',/\bQR\s*code(?![A-Za-z])/ig]
+];
+const ID_LABEL_KINDS=['tc_id','instructor_id','ecard'];
+function labelHits(line){
+ let hits=[];
+ for(const [kind,re] of AHA_LABELS){re.lastIndex=0;let m;while((m=re.exec(line))){const h={kind,start:m.index,end:m.index+m[0].length};if(!hits.some(x=>x.start<h.end&&h.start<x.end))hits.push(h);if(!m[0].length)re.lastIndex++}}
+ hits.sort((a,b)=>a.start-b.start);
+ /* A word like "Training Center" inside a value ("Example Valley Training Center") is
+    not a label: name-type labels count only at the start of a cell or right after
+    another label; ID/code labels count anywhere. */
+ const out=[];
+ for(const h of hits){
+  const before=line.slice(0,h.start);
+  const cellStart=!before.trim()||/\s{2,}$/.test(before)||/[:|]\s*$/.test(before);
+  const afterLabel=out.length&&!line.slice(out[out.length-1].end,h.start).trim();
+  if(ID_LABEL_KINDS.includes(h.kind)||cellStart||afterLabel)out.push(h);
+ }
+ return out;
+}
+function cellsOf(line){const out=[];const re=/\S+(?: \S+)*/g;let m;while((m=re.exec(line)))out.push({t:m[0],s:m.index,e:m.index+m[0].length});return out}
+function tokensOf(line){const out=[];const re=/\S+/g;let m;while((m=re.exec(line)))out.push({t:m[0],s:m.index,e:m.index+m[0].length});return out}
+/* kind → [{value, li, how}] in reading order */
+function ahaLabelValues(lines){
+ const out={};const push=(k,v)=>{(out[k]=out[k]||[]).push(v)};
+ const hitsAt=lines.map(labelHits);
+ for(let li=0;li<lines.length;li++){
+  const line=lines[li],hits=hitsAt[li];if(!hits.length)continue;
+  const empty=[];
+  hits.forEach((h,j)=>{
+   const stop=j+1<hits.length?hits[j+1].start:line.length;
+   const after=line.slice(h.end,stop).replace(/^[\s:#.\-–]+/,'');
+   const cell=after.split(/\s{2,}/)[0].replace(/[\s,;:|]+$/,'').trim();
+   if(cell)push(h.kind,{value:cell,li,how:'label',s:h.end+line.slice(h.end,stop).indexOf(cell)});else empty.push({h,j});
+  });
+  if(!empty.length)continue;
+  /* header row: the values sit on the next line (or the line above), under their labels */
+  for(const d of [1,-1]){
+   const vl=lines[li+d];if(vl==null||hitsAt[li+d].length)continue;
+   const cells=cellsOf(vl),toks=tokensOf(vl);
+   const pickFrom=(list,h,j)=>{
+    if(list.length===hits.length)return list[j];
+    if(hits.length===1&&list.length===1)return list[0];
+    const c=(h.start+h.end)/2/Math.max(1,line.length);
+    return list.slice().sort((a,b)=>Math.abs((a.s+a.e)/2/Math.max(1,vl.length)-c)-Math.abs((b.s+b.e)/2/Math.max(1,vl.length)-c))[0];
+   };
+   for(const {h,j} of empty){
+    const list=cells.length===hits.length?cells:toks.length===hits.length?toks:cells.length>1?cells:toks;
+    const v=list.length?pickFrom(list,h,j):null;
+    if(v)push(h.kind,{value:v.t,li:li+d,how:d===1?'value under the label':'value above the label',s:v.s,aligned:list.length===hits.length||hits.length===1});
+   }
+   break;
+  }
+ }
+ return out;
+}
+const TC_ID_SHAPE=/^[A-Z]{2}\d{5}$/;
+function tcIdFrom(v){
+ for(const t of String(v||'').split(/\s+/)){
+  const u=t.toUpperCase().replace(/[^A-Z0-9]/g,'');if(u.length<4||u.length>12)continue;
+  const fx=/^[A-Z]{2}[0-9OIlSBZ]{5}$/.test(u)?u.slice(0,2)+fixDigits(u.slice(2)):u;
+  if(/\d/.test(fx))return{code:fx,raw:t};
+ }
+ return null;
+}
+/* The eCard code from its own label only. `exclude` holds TC ID / Instructor ID values. */
+function ahaCode(lines,flat,labels,{exclude=new Set(),issueYY=null,redCross=false}={}){
+ const bad=c=>!c||exclude.has(c.code)||(!redCross&&TC_ID_SHAPE.test(c.code));
+ const cands=[];
+ for(const v of labels.ecard||[]){
+  const whole=normCode(v.value);
+  if(whole&&!bad(whole)&&(whole.type==='AHA'&&!whole.odd||!/\s/.test(v.value.trim())))cands.push({...whole,raw:v.value,li:v.li,how:v.how});
+  else for(const t of v.value.split(/\s+/)){const n=normCode(t);if(n&&!bad(n)){cands.push({...n,raw:t,li:v.li,how:v.how});break}}
+ }
+ const score=c=>(c.type==='AHA'&&!c.odd?3:c.type==='ALNUM'&&c.code.length>=8?2:1)+(c.how==='label'?0.5:0)+(issueYY&&c.type==='AHA'&&c.code.slice(0,2)===issueYY?0.5:0);
+ cands.sort((a,b)=>score(b)-score(a));
+ if(cands.length)return cands[0];
+ /* No label: a bare 12-digit AHA code (YY + course + 7 digits) not printed as a TC/Instructor ID. */
+ const re=/(?<![\dA-Za-z])(\d{4} ?\d{4} ?\d{4})(?![\dA-Za-z])/g;let m;
+ for(let li=0;li<lines.length;li++){re.lastIndex=0;while((m=re.exec(lines[li]))){const code=m[1].replace(/ /g,'');if(exclude.has(code))continue;const near=labelHits(lines[li]).some(h=>h.kind==='tc_id'||h.kind==='instructor_id'||h.kind==='tc_info');if(near)continue;return{code,type:'AHA',how:'pattern',raw:m[1],li}}}
+ return null;
+}
+
+/* ---- v14.2 confidence: from the OCR words that make up each field ----
+   OCR route: wordConf = ½·mean + ½·min of Tesseract's per-word confidence for the
+   words the value was read from (words on the field's own line are preferred).
+   Then: +0.03 when the value sits next to its label, ×0.85 when it was found
+   without a label; field-specific factors (damaged date ×0.6, possible day/month
+   swap ×0.85, abbreviation-only course ×0.9, …). Capped at 0.97 for OCR.
+   Text-layer PDFs start at 0.98 (the text is exact). See docs/EXTRACTION-BENCHMARK.md. */
+const LABEL_BONUS=0.03,NO_LABEL=0.85,OCR_CAP=0.97;
+const nz=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function buildOcr(ocrLines){
+ /* one text line per OCR line; a wide gap between words becomes a column break ("  ") */
+ const lines=[],spans=[];
+ for(const ws of ocrLines||[]){
+  const words=(ws||[]).filter(w=>w&&String(w.t||'').trim());if(!words.length)continue;
+  const hs=words.map(w=>w.h||0).filter(Boolean).sort((a,b)=>a-b),hMed=hs.length?hs[Math.floor(hs.length/2)]:0;
+  let line='';const sp=[];
+  words.forEach((w,i)=>{
+   const t=String(w.t).replace(/\s+/g,'');
+   if(i){const p=words[i-1];const gap=(w.x0!=null&&p.x1!=null&&hMed)?w.x0-p.x1:0;line+=gap>hMed*1.6?'  ':' '}
+   sp.push({s:line.length,e:line.length+t.length,c:Math.max(0,Math.min(1,+w.c||0)),n:nz(t)});line+=t;
+  });
+  lines.push(line);spans.push(sp);
+ }
+ return{lines,spans};
+}
+/* The parser. OCR input: `ocrLines` (per line: [{t,c,x0,x1,h}], c = 0..1) or the
+   older `words` map (token → confidence). */
+function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=null,words=null,ocrLines=null,profileName='',catalog=null,sources=null,jurisdictions=null}={}){
+ const built=method!=='PDF_TEXT'&&ocrLines&&ocrLines.length?buildOcr(ocrLines):null;
+ const lines=built?built.lines:toLines(text),flat=lines.join('\n'),profile=profileFor(kind,catalog);
+ const spans=built?built.spans:null;
  const base=method==='PDF_TEXT'?0.98:clamp((ocrConf==null?80:ocrConf)/100,0.3,0.97);
+ /* legacy token-map confidence (unit tests and callers without word positions) */
  const tokConf=v=>{
   if(method==='PDF_TEXT'||!words)return base;
-  const toks=String(v).toLowerCase().split(/[\s\/\-]+/).map(t=>t.replace(/[^a-z0-9]/g,'')).filter(Boolean);
-  const cs=toks.map(t=>words[t]).filter(x=>x!=null);
-  return cs.length?clamp(cs.reduce((a,b)=>a+b,0)/cs.length,0.2,0.97):base*0.9;
+  const toks=String(v).toLowerCase().split(/\s+/).map(nz).filter(Boolean);
+  const keys=Object.keys(words);
+  const cs=toks.map(t=>words[t]!=null?words[t]:(()=>{const k=keys.find(k=>k.length>=2&&(k.includes(t)||t.includes(k)));return k?words[k]:null})()).filter(x=>x!=null);
+  return cs.length?clamp(0.5*cs.reduce((a,b)=>a+b,0)/cs.length+0.5*Math.min(...cs),0.2,OCR_CAP):base*0.9;
  };
- const f={};const warnings=[];const want=PROFILE_FIELDS[profile];
+ /* word-level confidence for a value read from line `li` */
+ const wordConf=(raw,li)=>{
+  if(!spans)return null;
+  const toks=String(raw||'').split(/\s+/).map(nz).filter(Boolean);if(!toks.length)return null;
+  const order=[];if(li!=null)for(const d of [0,1,-1,2,-2])if(spans[li+d])order.push(li+d);for(let i=0;i<spans.length;i++)if(!order.includes(i))order.push(i);
+  const used=new Set(),cs=[];
+  for(const t of toks){
+   let hit=null;
+   for(const L of order){hit=spans[L].find(w=>!used.has(w)&&w.n===t);if(hit)break}
+   if(!hit)for(const L of order){hit=spans[L].find(w=>!used.has(w)&&w.n.length>=2&&t.length>=2&&(w.n.includes(t)||t.includes(w.n)));if(hit)break}
+   if(hit){used.add(hit);cs.push(hit.c)}else cs.push(Math.min(base,0.6));
+  }
+  return 0.5*cs.reduce((a,b)=>a+b,0)/cs.length+0.5*Math.min(...cs);
+ };
+ /* field confidence: words (or text layer) × label match × field factors */
+ const C=(raw,li,{label=true,factor=1}={})=>{
+  if(method==='PDF_TEXT')return clamp(base*(label?1:NO_LABEL)*factor);
+  const wc=wordConf(raw,li);const w=wc==null?tokConf(raw):wc;
+  return clamp(Math.min(OCR_CAP,w+(label?LABEL_BONUS:0))*(label?1:NO_LABEL)*factor,0,OCR_CAP);
+ };
+ const lineOf=s=>{const t=nz(s);if(!t)return null;const i=lines.findIndex(l=>nz(l).includes(t));return i<0?null:i};
+ const f={};const warnings=[];const notes={};const want=PROFILE_FIELDS[profile];
  // ---- issuer / suggested registry source ----
  let issuer=null,source=null;
  if(profile==='aha_resus'){
@@ -238,69 +394,95 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
  // ---- which credential the document is ----
  if(profile==='aha_resus'){
   const title=/\b(BLS|ACLS|PALS)\s*(Provider|Instructor)\b/i.exec(flat);
-  let course=null,courseHow='';
-  if(title){course=title[1].toUpperCase();courseHow=title[0]}
-  else{const longs=[[/basic\s+l\w{2,4}\s+su\w*port/i,'BLS'],[/advanced\s+cardio\w*\s+life/i,'ACLS'],[/pediatric\s+advanced\s+l\w{2,4}|\b[a-z]{3,9}i[ct]\s+advanced\s+l\w{2,4}\s+su/i,'PALS'],[/advanced\s+life\s+support/i,'ACLS']].map(([re,c],ix)=>({c,i:flat.search(re),generic:ix===3})).filter(x=>x.i>=0).sort((a,b)=>(a.generic-b.generic)||(a.i-b.i));
-   if(longs.length){course=longs[0].c;courseHow='full course name'}else{const ab=/\b(BLS|ACLS|PALS)\b/.exec(flat);if(ab){course=ab[1];courseHow='abbreviation'}}}
-  if(course){const instr=/instructor/i.test(courseHow);f.course={value:course+(instr?' Instructor':' Provider'),conf:clamp(tokConf(course)*(courseHow==='abbreviation'?0.85:1)),how:courseHow};if(instr)warnings.push('This looks like an instructor card, not a provider card.')}
+  let course=null,courseHow='',courseRaw='';
+  if(title){course=title[1].toUpperCase();courseHow=title[0];courseRaw=title[0]}
+  else{const longs=[[/basic\s+l\w{2,4}\s+su\w*port/i,'BLS'],[/advanced\s+cardio\w*\s+life/i,'ACLS'],[/pediatric\s+advanced\s+l\w{2,4}|\b[a-z]{3,9}i[ct]\s+advanced\s+l\w{2,4}\s+su/i,'PALS'],[/advanced\s+life\s+support/i,'ACLS']].map(([re,c],ix)=>({c,m:re.exec(flat),generic:ix===3})).filter(x=>x.m).map(x=>({...x,i:x.m.index})).sort((a,b)=>(a.generic-b.generic)||(a.i-b.i));
+   if(longs.length){course=longs[0].c;courseHow='full course name';courseRaw=longs[0].m[0]}else{const ab=/\b(BLS|ACLS|PALS)\b/.exec(flat);if(ab){course=ab[1];courseHow='abbreviation';courseRaw=ab[0]}}}
+  if(course){const instr=/instructor/i.test(courseHow);f.course={value:course+(instr?' Instructor':' Provider'),conf:C(courseRaw,lineOf(courseRaw),{factor:courseHow==='abbreviation'?0.9:1}),how:courseHow};if(instr)warnings.push('This looks like an instructor card, not a provider card.')}
  }else if(profile==='cert'){
   const found=detectKinds(flat,catalog);const self=found.find(x=>x.kind===kind);const top=self||found[0];
-  if(top){const cat=(catalog||_globals().catalog).find(k=>k.kind===top.kind);f.course={value:cat?.short||top.short,conf:clamp(tokConf(top.short)*(self?1:0.9)),how:self?'names this credential':'names a different credential',kind:top.kind}}
+  if(top){const cat=(catalog||_globals().catalog).find(k=>k.kind===top.kind);const re=cat&&kindPattern(cat);const mm=re&&re.exec(flat);const raw=mm?mm[0]:top.short;f.course={value:cat?.short||top.short,conf:C(raw,lineOf(raw),{factor:self?1:0.9}),how:self?'names this credential':'names a different credential',kind:top.kind}}
  }
  // ---- dates ----
  const {issue,exp,renewMy}=pickDates(lines,{monthYearOk:profile==='aha_resus'||profile==='cert'});
- if(issue&&want.includes('issued_on'))f.issued_on={value:issue.iso,conf:clamp(tokConf(issue.raw)*(labelNear(lines,issue.li,RE_ISSUE)!=null?1:0.85)*(issue.garbled?0.6:1)),how:issue.garbled?'date (damaged print, check it)':'date'};
+ /* Day/month order: AHA prints MM/DD/YYYY (documented card format); elsewhere a
+    numeric date like 04/05/2026 is ambiguous unless another date on the same
+    document has a day above 12 in the same position. */
+ const allNum=findDates(lines).full.filter(d=>d.numeric);
+ const orderProven=profile==='aha_resus'||allNum.some(d=>d.monthFirstProven);
+ const ambig=d=>d&&d.numeric&&d.dayFirstPossible&&!orderProven;
+ const dateConf=(d,re)=>C(d.raw,d.li,{label:labelNear(lines,d.li,re)!=null,factor:(d.garbled?0.6:1)*(ambig(d)?0.85:1)});
+ const dateHow=d=>d.garbled?'date (damaged print, check it)':ambig(d)?'date (day and month could be swapped, check it)':'date';
+ if(issue&&want.includes('issued_on'))f.issued_on={value:issue.iso,conf:dateConf(issue,RE_ISSUE),how:dateHow(issue)};
  if(profile==='aha_resus'){
-  if(renewMy)f.renew_by={value:renewMy.ym,conf:clamp(tokConf(renewMy.raw)*(labelNear(lines,renewMy.li,RE_EXP)!=null?1:0.85)),how:'month/year'};
-  else if(exp&&exp!==issue)f.renew_by={value:exp.iso.slice(0,7),conf:clamp(tokConf(exp.raw)*0.95),how:'full date',exact:exp.iso};
+  if(renewMy)f.renew_by={value:renewMy.ym,conf:C(renewMy.raw,renewMy.li,{label:labelNear(lines,renewMy.li,RE_EXP)!=null}),how:'month/year'};
+  else if(exp&&exp!==issue)f.renew_by={value:exp.iso.slice(0,7),conf:dateConf(exp,RE_EXP)*0.95,how:'full date',exact:exp.iso};
   if(f.issued_on&&f.renew_by&&issuer!=='RED_CROSS'){
    const w2=addMonths(f.issued_on.value,24);
-   if(w2===f.renew_by.value){f.issued_on.conf=clamp(f.issued_on.conf+0.03);f.renew_by.conf=clamp(f.renew_by.conf+0.03)}
+   if(w2===f.renew_by.value){f.issued_on.conf=clamp(f.issued_on.conf+0.03,0,method==='PDF_TEXT'?0.995:OCR_CAP);f.renew_by.conf=clamp(f.renew_by.conf+0.03,0,method==='PDF_TEXT'?0.995:OCR_CAP)}
    else{f.issued_on.conf*=0.8;f.renew_by.conf*=0.8;warnings.push(`The renewal month (${f.renew_by.value}) is not two years after the issue date (${f.issued_on.value}). AHA cards renew two years after issue.`)}
   }
- }else if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:clamp(tokConf(exp.raw)*(labelNear(lines,exp.li,RE_EXP)!=null?1:0.85)*(exp.garbled?0.6:1)),how:exp.garbled?'date (damaged print, check it)':'date'};
- else if(renewMy&&profile==='cert')f.expires_on={value:renewToExpiry(renewMy.ym),conf:clamp(tokConf(renewMy.raw)*0.9),how:'month/year → end of month',monthOnly:renewMy.ym};
+ }else if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp)};
+ else if(renewMy&&profile==='cert')f.expires_on={value:renewToExpiry(renewMy.ym),conf:C(renewMy.raw,renewMy.li,{factor:0.9}),how:'month/year → end of month',monthOnly:renewMy.ym};
  if(f.issued_on&&f.expires_on&&f.expires_on.value<=f.issued_on.value){warnings.push('The expiration date is not after the issue date.');f.expires_on.conf*=0.7}
+ // ---- AHA labels: Training Center ID, Instructor ID, eCard code ----
+ const labels=profile==='aha_resus'?ahaLabelValues(lines):{};
+ const exclude=new Set();
+ if(profile==='aha_resus'){
+  for(const v of labels.tc_id||[]){const t=tcIdFrom(v.value);if(t){exclude.add(t.code);if(!f.training_center_id)f.training_center_id={value:t.code,conf:C(t.raw,v.li,{factor:v.how==='label'||v.aligned?1:0.9}),how:'Training Center ID label',info:true}}}
+  for(const v of labels.instructor_id||[])for(const t of v.value.split(/\s+/)){const u=t.toUpperCase().replace(/[^A-Z0-9]/g,'');if(u.length>=4){exclude.add(u);exclude.add(fixDigits(u))}}
+  for(const v of labels.tc_info||[])for(const t of v.value.split(/\s+/)){const u=t.replace(/\D/g,'');if(u.length>=7)exclude.add(u)}
+ }
  // ---- credential ID ----
  if(want.includes('credential_id')){
-  const reLbl=profile==='license'?/(license|licence|lic\.?|registration|certificate)\s*(number|no\.?|#|num)|\bRN\s*(#|no\.?|number)/i
-   :profile==='aha_resus'?/e\s*-?\s*card\s*(?:code|c0de)|certificate\s*(?:id|#|number|no\.?)|cert(?:ificate)?\s*code|card\s*(?:code|id)/i
-   :/(e\s*-?\s*card|cert\w*|card|test|credential|verification|member|candidate|course\s*completion)\s*(id|#|number|no\.?|code|num)/i;
-  let code=findId(lines,flat,reLbl,{allowBare12:profile==='aha_resus',aha:profile==='aha_resus'});
-  if(!code&&profile==='license'){const m=/\b(RN|R\.N\.)\s*[-#:]?\s*(\d{5,10})\b/.exec(flat);if(m)code={code:'RN'+m[2],type:'ALNUM',how:'pattern'}}
-  const q=codeFromQr(qr);
+  let code;
+  if(profile==='aha_resus')code=ahaCode(lines,flat,labels,{exclude,issueYY:f.issued_on?f.issued_on.value.slice(2,4):null,redCross:issuer==='RED_CROSS'});
+  else{
+   const reLbl=profile==='license'?/(license|licence|lic\.?|registration|certificate)\s*(number|no\.?|#|num)|\bRN\s*(#|no\.?|number)/i
+    :/(e\s*-?\s*card|cert\w*|card|test|credential|verification|member|candidate|course\s*completion)\s*(id|#|number|no\.?|code|num)/i;
+   code=findId(lines,flat,reLbl,{});
+   if(!code&&profile==='license'){const m=/\b(RN|R\.N\.)\s*[-#:]?\s*(\d{5,10})\b/.exec(flat);if(m)code={code:'RN'+m[2],type:'ALNUM',how:'pattern',raw:m[0]}}
+  }
+  let q=codeFromQr(qr);if(q&&profile==='aha_resus'&&(exclude.has(q.code)||(issuer!=='RED_CROSS'&&TC_ID_SHAPE.test(q.code))))q=null;
   if(code||q){
-   let conf=code?tokConf(code.code)*(code.how==='label'?1:0.8):0.97;let how=code?code.how:'qr';
+   let conf=code?C(code.raw||code.code,code.li!=null?code.li:lineOf(code.raw||code.code),{label:code.how!=='pattern',factor:code.how==='pattern'?0.94:1}):0.97;let how=code?code.how:'qr';
    if(code&&code.odd&&profile==='aha_resus'){conf*=0.6;warnings.push(`The eCard code read as ${code.code.length} digits; AHA codes have 12.`)}
    if(code&&q){if(q.code===code.code)conf=0.995;else if(profile==='aha_resus'){warnings.push('The code printed on the card and the code in its QR code differ. The QR code was used.');code=q;conf=0.9;how='qr'}}
    else if(!code){code=q}
-   if(profile==='aha_resus'&&code.type==='AHA'&&code.code.length===12&&f.issued_on){if(code.code.slice(0,2)===f.issued_on.value.slice(2,4))conf=clamp(conf+0.02);else{conf*=0.85;warnings.push(`The eCard code starts with ${code.code.slice(0,2)}, but AHA codes start with the last two digits of the issue year (${f.issued_on.value.slice(2,4)}).`)}}
+   if(profile==='aha_resus'&&code.type==='AHA'&&code.code.length===12&&f.issued_on){if(code.code.slice(0,2)===f.issued_on.value.slice(2,4))conf=clamp(conf+0.02,0,how==='qr'||method==='PDF_TEXT'?0.995:OCR_CAP);else{conf*=0.85;warnings.push(`The eCard code starts with ${code.code.slice(0,2)}, but AHA codes start with the last two digits of the issue year (${f.issued_on.value.slice(2,4)}).`)}}
    if(profile==='aha_resus'&&code.type==='ALNUM'&&issuer==='AHA')issuer='AHA_RQI';
    f.credential_id={value:code.code,conf:clamp(conf),how};
-  }
+  }else if(profile==='aha_resus'&&issuer!=='RED_CROSS')notes.credential_id=ECARD_NOT_FOUND;
  }
  // ---- license specifics ----
  if(profile==='license'){
-  const j=findJurisdiction(flat,jurisdictions);if(j)f.jurisdiction={value:j.code,conf:clamp(tokConf(j.name)*(j.weak?0.75:1)),how:j.weak?'state name':'issuing board'};
-  if(/(not|non)[\s-]*(valid\s+for\s+)?multi-?\s?state|single[\s-]*state/i.test(flat))f.multistate={value:'single-state',conf:clamp(base*0.95),how:'wording'};
-  else if(/multi-?\s?state|compact\s+(license|privilege)|\bNLC\b/i.test(flat))f.multistate={value:'multistate',conf:clamp(base*0.95),how:'wording'};
+  const j=findJurisdiction(flat,jurisdictions);if(j)f.jurisdiction={value:j.code,conf:C(j.name,lineOf(j.name),{label:!j.weak,factor:j.weak?0.9:1}),how:j.weak?'state name':'issuing board'};
+  const single=/(not|non)[\s-]*(valid\s+for\s+)?multi-?\s?state|single[\s-]*state/i.exec(flat),multi=!single&&/multi-?\s?state|compact\s+(license|privilege)|\bNLC\b/i.exec(flat);
+  if(single)f.multistate={value:'single-state',conf:C(single[0],lineOf(single[0]),{factor:0.95}),how:'wording'};
+  else if(multi)f.multistate={value:'multistate',conf:C(multi[0],lineOf(multi[0]),{factor:0.95}),how:'wording'};
  }
  // ---- holder name ----
- if(want.includes('holder_name')){const n=findName(lines,flat,{profileName});if(n)f.holder_name={value:n.name,conf:clamp(tokConf(n.name)*(n.how==='label'||n.how.startsWith('before')?1:0.85)),how:n.how}}
- // ---- training center (AHA) ----
- if(want.includes('training_center'))for(let i=0;i<lines.length;i++){
-  const m=/tr\w{1,4}ing\s*(?:c\w{2,4}r|centre|site)(?:\s*na\w{1,2}e)?\s*[:#\-]?\s*(.*)$/i.exec(lines[i]);if(!m)continue;
-  const clean=s=>String(s||'').replace(/\b(TC\s*ID|TC\s*Info|Course\s*Location|Instructor.*|eCard.*|Phone.*|ID\s*#?).*$/i,'').split(/\s*[\[\]=|{}<>©®«»*_~]|\s{3,}/)[0].replace(/^[\s:#\-]+|[\s,;:#\-.]+$/g,'').trim();
-  let v=clean(m[1]);if(v.length<3||/^(name|id|info)$/i.test(v))v=clean(lines[i+1]);
-  v=v.split(' ').filter((w,ix,a)=>!(ix===a.length-1&&w.length<=2&&!/^[A-Z]{2}$/.test(w))).join(' ');
-  if(v.length>=3&&/[A-Za-z]{3,}/.test(v)&&!/^(TC|ID|Instructor|Course)/i.test(v)){f.training_center={value:v.slice(0,90),conf:clamp(tokConf(v)*0.92),how:'label'};break}
+ if(want.includes('holder_name')){const n=findName(lines,flat,{profileName});if(n)f.holder_name={value:n.name,conf:C(n.name,lineOf(n.name),{label:n.how==='label'||n.how.startsWith('before')}),how:n.how}}
+ // ---- training center (AHA): its own label, never the TC ID / city / site ----
+ if(want.includes('training_center')){
+  const okName=v=>v&&v.length>=3&&/[A-Za-z]{3,}/.test(v)&&!/^(TC|ID|Instructor|Course|Name|Info)\b/i.test(v)&&!labelHits(v).length;
+  const tn=(labels.tc_name||[]).map(v=>({...v,value:v.value.replace(/^na\w{1,2}e\b\s*/i,'').trim()})).find(v=>okName(v.value));
+  if(tn)f.training_center={value:tn.value.slice(0,90),conf:C(tn.value,tn.li,{factor:0.95}),how:'label'};
+  else for(let i=0;i<lines.length;i++){
+   const m=/tr\w{1,4}ing\s*(?:c\w{2,4}r|centre|site)(?:\s*na\w{1,2}e)?\s*[:#\-]?\s*(.*)$/i.exec(lines[i]);if(!m)continue;
+   if(/^\s*(ID|I\.D|#|No\b|Number)/i.test(m[1]))continue;
+   const clean=s=>String(s||'').replace(/\b(TC\s*ID|TC\s*Info|Course\s*Location|Instructor.*|eCard.*|Phone.*|ID\s*#?).*$/i,'').split(/\s*[\[\]=|{}<>©®«»*_~]|\s{2,}/)[0].replace(/^[\s:#\-]+|[\s,;:#\-.]+$/g,'').trim();
+   let v=clean(m[1]);if(v.length<3||/^(name|id|info)$/i.test(v))v=clean(lines[i+1]);
+   v=v.split(' ').filter((w,ix,a)=>!(ix===a.length-1&&w.length<=2&&!/^[A-Z]{2}$/.test(w))).join(' ');
+   if(okName(v)){f.training_center={value:v.slice(0,90),conf:C(v,i,{factor:0.92}),how:'label'};break}
+  }
  }
  const fieldsFound=FIELDS.filter(k=>f[k]);
  const required=PROFILE_REQUIRED[profile];
  const missing=required.filter(k=>!f[k]&&!(k==='expires_on'&&f.renew_by));
  if(!source&&profile==='aha_resus'){const sid=suggestedSource(kind,issuer,f.credential_id?.value);source=sid?{id:sid,how:'issuer on the document'}:null}
  if(!source&&profile!=='dates_only'){const r=_routeFor(kind,f.jurisdiction?.value,sources);if(r)source={id:r.id,name:r.name,how:'registry route for this credential type'}}
- return{fields:f,issuer,source,profile,kind,method,warnings,found:fieldsFound,missing,score:fieldsFound.filter(k=>required.includes(k)||k==='credential_id').length,qrFound:!!codeFromQr(qr),textChars:flat.length,fieldsWanted:want,required};
+ return{fields:f,issuer,source,profile,kind,method,warnings,notes,found:fieldsFound,missing,score:fieldsFound.filter(k=>required.includes(k)||k==='credential_id').length,qrFound:!!codeFromQr(qr),textChars:flat.length,fieldsWanted:want,infoFields:profile==='aha_resus'?INFO_FIELDS.slice():[],required};
 }
 function _routeFor(kind,jur,sources){
  if(!sources&&typeof primaryRouteFor==='function'){try{return primaryRouteFor(kind,jur||'')}catch{return null}}
@@ -327,8 +509,10 @@ const _fmtD=iso=>{if(!iso)return'';const [y,m,d]=String(iso).split('-').map(Numb
 /* Compare what the document says with what was entered. Works for every
    kind: dates for all, then name / credential / state / multistate where
    the kind's profile reads them. */
-function compareToEntered(values,{kind,expires_on,profileName,issuer,jurisdiction,catalog=null}={}){
+function compareToEntered(values,{kind,expires_on,profileName,issuer,jurisdiction,trainingCenterId=null,catalog=null}={}){
  const out=[];const profile=profileFor(kind,catalog);
+ /* v14.2: a Training Center ID typed (or read) as the eCard code can't verify anything */
+ if(profile==='aha_resus'&&issuer!=='RED_CROSS'&&values.credential_id){const c=String(values.credential_id).toUpperCase().replace(/[\s\-]/g,'');const tc=String(trainingCenterId||values.training_center_id||'').toUpperCase();if(TC_ID_SHAPE.test(c)||(tc&&c===tc))out.push({field:'credential_id',severity:'info',document:null,entered:values.credential_id,text:`${values.credential_id} looks like the Training Center ID (who ran the class), not the eCard code. AHA verification needs the eCard code printed on the card.`})}
  const exp=documentExpiry({expires_on:values.expires_on?{value:values.expires_on,monthOnly:values.expires_month_only||null}:null,renew_by:values.renew_by?{value:values.renew_by,exact:values.renew_exact}:null},issuer);
  if(exp&&expires_on&&exp.value!==expires_on){
   const days=Math.round((Date.parse(expires_on)-Date.parse(exp.value))/864e5);
@@ -442,9 +626,15 @@ async function decodeQr(c){
 async function ocr(c){
  const w=await ocrWorker();
  const r=await w.recognize(c,{},{text:true,blocks:true});
- const words={};
- (r.data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(wd=>{const t=String(wd.text||'').toLowerCase().replace(/[^a-z0-9]/g,'');if(t)words[t]=Math.max(words[t]||0,(wd.confidence||0)/100)}))));
- return{text:r.data.text||'',conf:r.data.confidence,words};
+ const words={},lines=[];
+ /* v14.2: keep each word with its own confidence and position, line by line, so a
+    field's confidence comes from the words it was read from */
+ (r.data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>{
+  const ws=[];
+  (l.words||[]).forEach(wd=>{const raw=String(wd.text||'').trim();if(!raw)return;const c=(wd.confidence||0)/100,bb=wd.bbox||{};ws.push({t:raw,c,x0:bb.x0,x1:bb.x1,h:bb.y1!=null&&bb.y0!=null?bb.y1-bb.y0:0});const t=raw.toLowerCase().replace(/[^a-z0-9]/g,'');if(t)words[t]=Math.max(words[t]||0,c)});
+  if(ws.length)lines.push(ws);
+ })));
+ return{text:r.data.text||'',conf:r.data.confidence,words,lines};
 }
 /* Read the text layer with an explicit reader loop (no for-await over a ReadableStream). */
 async function textItems(page){
@@ -487,7 +677,7 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
   await page.render({canvasContext:ctx,canvas,viewport:vp}).promise;
   qr=await decodeQr(canvas);
   if(text.replace(/\s/g,'').length>=40){res=parseCardText(text,{...P,method:'PDF_TEXT',qr});lastText=text}
-  else{onProgress({stage:'ocr',label:'This PDF is a scan. Reading it with OCR',progress:0.5});const o=await ocr(canvas);lastText=o.text;res=parseCardText(o.text,{...P,method:'PDF_OCR',qr,ocrConf:o.conf,words:o.words})}
+  else{onProgress({stage:'ocr',label:'This PDF is a scan. Reading it with OCR',progress:0.5});const o=await ocr(canvas);lastText=o.text;res=parseCardText(o.text,{...P,method:'PDF_OCR',qr,ocrConf:o.conf,words:o.words,ocrLines:o.lines})}
   try{doc.destroy()}catch{}
  }else{
   onProgress({stage:'load',label:'Opening the image on this device',progress:0.05});
@@ -495,9 +685,9 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
   onProgress({stage:'qr',label:'Looking for the QR code',progress:0.15});
   qr=await decodeQr(canvas);
   onProgress({stage:'ocr',label:'Reading the text (OCR)',progress:0.2});
-  const o=await ocr(canvas);lastText=o.text;res=parseCardText(o.text,{...P,method:'IMAGE_OCR',qr,ocrConf:o.conf,words:o.words});
+  const o=await ocr(canvas);lastText=o.text;res=parseCardText(o.text,{...P,method:'IMAGE_OCR',qr,ocrConf:o.conf,words:o.words,ocrLines:o.lines});
   const good=r=>r.found.filter(k=>r.fieldsWanted.includes(k)).length;const enough=Math.min(3,res.fieldsWanted.length);
-  if(good(res)<enough){for(const deg of [90,270,180]){onProgress({stage:'ocr',label:`Trying the image turned ${deg}°`,progress:0.6});const c2=rotate(canvas,deg);const o2=await ocr(c2);const r2=parseCardText(o2.text,{...P,method:'IMAGE_OCR',qr,ocrConf:o2.conf,words:o2.words});if(good(r2)>good(res)){res=r2;rotated=deg;lastText=o2.text}if(good(res)>=res.fieldsWanted.length-1)break}}
+  if(good(res)<enough){for(const deg of [90,270,180]){onProgress({stage:'ocr',label:`Trying the image turned ${deg}°`,progress:0.6});const c2=rotate(canvas,deg);const o2=await ocr(c2);const r2=parseCardText(o2.text,{...P,method:'IMAGE_OCR',qr,ocrConf:o2.conf,words:o2.words,ocrLines:o2.lines});if(good(r2)>good(res)){res=r2;rotated=deg;lastText=o2.text}if(good(res)>=res.fieldsWanted.length-1)break}}
  }
  onProgress({stage:'done',label:'Checking the details',progress:1});
  if(debug)res.text=lastText;/* debug only: raw text is never stored or sent */
@@ -507,7 +697,7 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
 }
 async function terminate(){if(workerP){try{(await workerP).terminate()}catch{}workerP=null}}
 
-const DocExtract={capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
+const DocExtract={INFO_FIELDS,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
 root.DocExtract=DocExtract;
 if(typeof module!=='undefined'&&module.exports)module.exports=DocExtract;
 })(typeof window!=='undefined'?window:globalThis);

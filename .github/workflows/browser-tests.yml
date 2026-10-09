@@ -1,6 +1,7 @@
 name: Document reader (Chromium, WebKit, Firefox)
 # v14.1: every PR reads a synthetic PDF and image on-device in all three engines,
 # phone + desktop, with and without the newer APIs older Safari lacks.
+# v14.2: also an AHA card where the Training Center ID sits next to the eCard code.
 on:
   pull_request:
   push:
