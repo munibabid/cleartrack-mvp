@@ -37,6 +37,7 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  /* ---------- schema ---------- */
  const tables=['users','clinicians','organizations','organization_members','credential_catalog','jurisdictions','issuers','credentials','credential_verifications','verification_sources','requirement_sets','requirements','assignments','assignment_requirements','share_grants','share_grant_assertions','share_access_events','extension_requests','monitoring_events','audit_events','proofs','analytics_events','specialties'];
  ok('schema: all 23 required tables exist',await n(`select count(*) from pg_tables where schemaname='public' and tablename = any($1)`,[tables])===23);
+ ok('schema: API roles have no TRUNCATE (bypasses RLS) on any public table',await n(`select count(*) from information_schema.role_table_grants where table_schema='public' and grantee in ('anon','authenticated') and privilege_type='TRUNCATE'`)===0);
  ok('schema: RLS enabled on every public table',await n(`select count(*) from pg_class c join pg_namespace s on s.oid=c.relnamespace where s.nspname='public' and c.relkind='r' and not c.relrowsecurity`)===0);
  ok('schema: private helper schema is not granted to anon',!(await one(`select has_schema_privilege('anon','private','USAGE') u`)).u);
  ok('schema: only the owner can run private.sweep_expired_grants()',!(await one(`select has_function_privilege('authenticated','private.sweep_expired_grants()','EXECUTE') a`)).a&&!(await one(`select has_function_privilege('anon','private.sweep_expired_grants()','EXECUTE') a`)).a);
@@ -255,6 +256,20 @@ const sha=t=>crypto.createHash('sha256').update(t,'utf8').digest('hex');
  const cr=await one(`select status::text, verification_level, monitoring_state, expires_on::text exp from credentials where id=$1`,[jCa.id]);
  const cv=await one(`select source_slug, status_at_source, verification_level, verifier_label, policy_ref, reference_code from credential_verifications where id=$1`,[ck.verification_id]);
  ok('pr13: board check records PRIMARY_SOURCE_VERIFIED with source, status, expiration and monitoring',ck.level==='PRIMARY_SOURCE_VERIFIED'&&cr.status==='VERIFIED'&&cr.verification_level==='PRIMARY_SOURCE_VERIFIED'&&cr.monitoring_state==='MANUAL_RECHECK'&&cr.exp==='2028-01-31'&&cv.source_slug==='board-US-CA'&&cv.status_at_source==='ACTIVE'&&!!cv.verifier_label&&/board-US-CA/.test(cv.policy_ref),JSON.stringify({ck:ck.level,cr,cv:{...cv,reference_code:undefined}}));
+ // Share assertions carry the level + source so an org sees "Primary Source Verified", not a bare VERIFIED.
+ const lvTok='tok-pr13-level-share-0001';
+ const jPriv=(await one(`select c.id from credentials c join credential_catalog k on k.kind=c.kind where c.clinician_id=$1 and k.privacy='PRIVATE' and c.status='VERIFIED' limit 1`,[uid('clinician:jordan')])).id;
+ await db.query(`insert into credential_verifications (credential_id,method,outcome,source_name,checked_on) values ($1,'MANUAL_DOCUMENT_REVIEW','SUCCEEDED','Occupational Health Lab X',current_date)`,[jPriv]);
+ const jPend=(await one(`select c.id from credentials c join credential_catalog k on k.kind=c.kind where c.clinician_id=$1 and k.privacy<>'PRIVATE' and c.status='VERIFIED' and c.id<>$2 and c.kind not like 'RN_LICENSE%' limit 1`,[uid('clinician:jordan'),jCa.id])).id;
+ await db.query(`update credentials set status='VERIFYING' where id=$1`,[jPend]);
+ await as('jordan',async()=>{const g=(await db.query(`insert into share_grants (clinician_id,org_id,token_hash,duration,expires_at) values ($1,$2,$3,'D7',now()+interval '7 days') returning id`,[uid('clinician:jordan'),uid('org:northstar'),sha(lvTok)])).rows[0].id;
+   await db.query(`insert into share_grant_assertions (grant_id,credential_id,requirement_label,mode) values ($1,$2,'California RN License','VERIFIED_CREDENTIAL'),($1,$3,'Health record','REQUIREMENT_SATISFIED'),($1,$4,'Pending cert','VERIFIED_CREDENTIAL')`,[g,jCa.id,jPriv,jPend]);return g},true);
+ const lvAll=await rows('recruiter-northstar',`select * from access_share_by_token($1)`,[lvTok]);
+ const lv=lvAll.find(x=>x.requirement_label==='California RN License')||{},lvP=lvAll.find(x=>x.requirement_label==='Health record')||{},lvQ=lvAll.find(x=>x.requirement_label==='Pending cert')||{};
+ ok('pr13: share assertions return the verification level, source and check date to the org',lvAll.length===3&&lv.status==='VERIFIED'&&lv.verification_level==='PRIMARY_SOURCE_VERIFIED'&&lv.verification_source==='California Board of Registered Nursing'&&!!lv.source_checked_on,JSON.stringify({n:lvAll.length,s:lv.status,l:lv.verification_level,src:lv.verification_source}));
+ ok('pr13: an item that is not currently verified carries no level or source',lvQ.status==='PENDING_VERIFICATION'&&lvQ.verification_level==null&&lvQ.verification_source==null,JSON.stringify(lvQ));
+ ok('pr13: a private (Requirement satisfied) item shows its level but never the source',lvP.status==='REQUIREMENT_SATISFIED'&&lvP.verification_level==='DOCUMENT_REVIEWED'&&lvP.verification_source==null&&lvP.source_checked_on==null,JSON.stringify(lvP));
+ await db.query(`update credentials set status='VERIFIED' where id=$1`,[jPend]);
  const an=await one(`select commitment, salt from verification_anchors where verification_id=$1`,[ck.verification_id]);
  const cn=await one(`select private.verification_canonical($1::uuid,'RN_LICENSE',$2::uuid,'VERIFIED','California Board of Registered Nursing',to_char(current_date,'YYYY-MM-DD'),'2028-01-31',$3) t`,[jCa.id,jCa.clinician_id,an.salt]);
  ok('pr13: commitment uses the source name and source expiration, never the reference',an.commitment===sha(cn.t)&&!cn.t.includes('BRN-REF-123'));

@@ -1,13 +1,13 @@
 /* PR 13: Verification Source Registry, verification levels, policy "Why",
    provenance, assignment-driven licenses, and the manual PSV route.
    Part A (always): demo regression in a headless phone browser.
-   Part B (when the database is reachable): account verifier records a real
+   Part B (when staging is reachable: SUPABASE_DB_URL over 5432/6543, or a scoped
+   SUPABASE_ACCESS_TOKEN over the Management API, see tests/live-db.js): account verifier records a real
    board check through record_source_check() on staging; throwaway users are
    created in SQL and deleted; Munib's account is checked unchanged.
    Run: BASE=http://localhost:8765/ node backend/tests/p13.js
         BASE=https://munibabid.github.io/cleartrack-mvp/ node backend/tests/p13.js */
 const fs = require('fs');
-const net = require('net');
 const crypto = require('crypto');
 const puppeteer = require('puppeteer-core');
 const BASE = process.env.BASE || 'http://localhost:8765/';
@@ -118,17 +118,13 @@ async function partA(browser) {
   await ctx.close();
 }
 
-async function dbReachable() {
-  if (!process.env.SUPABASE_DB_URL) return false;
-  let host, port;
-  try { const u = new URL(process.env.SUPABASE_DB_URL.replace(/\[|\]/g, '')); host = u.hostname; port = +u.port || 5432; } catch { return false; }
-  return new Promise(r => { const s = net.connect({ host, port, timeout: 8000 }); s.on('connect', () => { s.destroy(); r(true); }); s.on('timeout', () => { s.destroy(); r(false); }); s.on('error', () => r(false)); });
-}
+async function dbReachable() { return require('./live-db.js').reachable(); }
 
 async function partB(browser) {
-  const { client, mask } = require('./db-connect.js');
+  const { client, mask, mode } = require('./live-db.js');
   const { generateSync } = require('otplib');
   const db = await client();
+  console.log('staging DB via ' + await mode());
   const PREFIX = 'veridun-pr13-';
   let ids = [];
   const munibBefore = async () => (await db.query(`select u.role::text role,

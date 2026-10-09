@@ -4,11 +4,11 @@ const fs = require('fs');
 const crypto = require('crypto');
 const puppeteer = require('puppeteer-core');
 const { generateSync } = require('otplib');
-const { client, mask } = require('/workspace/pr10/db.js');
+const { client, mask, mode } = require('./live-db.js');
 
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr12-shots/';
-const PDF = fs.readFileSync('/workspace/pr10/test-license.pdf');
+const PDF = fs.existsSync('/workspace/pr10/test-license.pdf') ? fs.readFileSync('/workspace/pr10/test-license.pdf') : Buffer.from('%PDF-1.4\n% Veridun test document, not a real license\n%%EOF\n');
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => {
@@ -16,6 +16,8 @@ const ok = (n, c, i = '') => {
   R.push(l);
   console.log(l);
 };
+const skip = (n, why) => { const l = 'SKIP ' + n + ' — ' + why; R.push(l); console.log(l); };
+const ledgerReachable = () => new Promise(r => { const so = require('net').connect({ host: 's.altnet.rippletest.net', port: 51233, timeout: 8000 }); so.on('connect', () => { so.destroy(); r(true); }); so.on('timeout', () => { so.destroy(); r(false); }); so.on('error', () => r(false)); });
 const today = () => new Date().toISOString().slice(0, 10);
 const REF = 'PR12-LOOKUP-REF';
 const NURSE_NAME = 'PR12 Test Nurse';
@@ -34,8 +36,6 @@ async function makeUsers(db) {
       [u.id, u.email, u.password]);
     await db.query(`insert into auth.identities (provider_id,user_id,identity_data,provider,last_sign_in_at,created_at,updated_at) values ($1::text,$3::uuid,jsonb_build_object($4::text,$1::text,$5::text,$2::text,$6::text,true),$7::text,now(),now(),now())`,
       [u.id, u.email, u.id, 'sub', 'email', 'email_verified', 'email']);
-    const row = await db.query('select count(*)::int n from public.users where id=$1', [u.id]);
-    if (!row.rows[0].n) throw new Error('public user row missing for ' + label);
     return u;
   };
   await db.query('begin');
@@ -44,6 +44,11 @@ async function makeUsers(db) {
   const org = await make('org');
   await db.query(`update public.users set role='verifier' where id=$1`, [verifier.id]);
   await db.query('commit');
+  // checked after commit: inside a Management-API transaction reads return nothing
+  for (const u of [nurse, verifier, org]) {
+    const row = await db.query('select count(*)::int n, max(role::text) r from public.users where id=$1', [u.id]);
+    if (!row.rows[0].n) throw new Error('public user row missing for ' + u.label);
+  }
   return { nurse, verifier, org };
 }
 
@@ -120,6 +125,7 @@ async function cleanup(db, users, extraIds = []) {
 (async () => {
   fs.mkdirSync(SH, { recursive: true });
   const db = await client();
+  console.log('staging DB via ' + await mode());
   let users = null;
   let browser = null;
   const state = {};
@@ -319,6 +325,9 @@ async function cleanup(db, users, extraIds = []) {
     }));
     ok('verifier records VERIFIED and gets a 64-hex commitment', recorded.result === 'VERIFIED' && /^[0-9a-f]{64}$/.test(recorded.commitment || ''), recorded.commitment);
 
+    const LEDGER = await ledgerReachable();
+    if (!LEDGER) skip('XRPL anchor, memo, Matches ledger / Mismatch, activity-log anchor', 'XRPL Testnet/Devnet port 51233 is not reachable from this machine');
+    if (LEDGER) {
     await ver.pg.click('#acctAnchorNowV12');
     await idle(ver.pg, 180000);
     state.anchor = await ver.pg.evaluate(() => ({
@@ -344,8 +353,20 @@ async function cleanup(db, users, extraIds = []) {
       JSON.stringify(memo.memos.map(m => m.type + ':' + (m.data || '').slice(0, 16))));
     ok('memo has no reference, name, or email', !blob.includes(REF) && !blob.includes(NURSE_NAME) && !/mailinator|@/.test(blob) && /^r/.test(memo.account));
 
+    }
     await orgP.pg.evaluate(async (token) => { acctOrgResult = await store.account.openShare(token); acctRenderOrg(); }, state.share.token);
-    await orgP.pg.waitForSelector('#acctXrplCheckV12');
+    await orgP.pg.waitForSelector('.acct-result-v10 .passrow');
+    const lvl = await orgP.pg.evaluate(() => {
+      const a = (acctOrgResult.assertions || [])[0] || {};
+      const b = document.querySelector('.acct-result-v10 .passrow .badge');
+      const p = document.querySelector('.acct-result-v10 .acct-assert-prov-v13');
+      return { level: a.verification_level, source: a.verification_source, checked: a.source_checked_on, badge: b ? b.textContent : '', dl: b ? b.dataset.level : '', prov: p ? p.textContent : '' };
+    });
+    ok('org share view shows the verification level and source, not a bare VERIFIED',
+      !!lvl.level && lvl.dl === lvl.level && lvl.badge !== 'VERIFIED' && /VERIFIED|REVIEWED/.test(lvl.badge) && /Source: /.test(lvl.prov) && !!lvl.source, JSON.stringify(lvl));
+    await orgP.pg.evaluate(() => document.querySelector('.acct-result-v10 .passrow').scrollIntoView({ block: 'center' }));
+    await shot(orgP.pg, '06-org-share-level.png', '.acct-result-v10 .passrow');
+    if (LEDGER) {
     await orgP.pg.evaluate(() => document.getElementById('acctXrplCheckV12').click());
     await idle(orgP.pg, 90000);
     await orgP.pg.waitForSelector('[data-xrpl="match"]', { timeout: 20000 });
@@ -376,6 +397,7 @@ async function cleanup(db, users, extraIds = []) {
       ok('activity-log anchor (optional)', false, mask(e.message).slice(0, 180));
     }
 
+    }
     const pageErrs = [...nurse.errs, ...ver.errs, ...orgP.errs].filter(e => !/favicon/i.test(e));
     ok('no page errors', pageErrs.length === 0, pageErrs.slice(0, 3).join(' | '));
   } catch (e) {
@@ -386,7 +408,7 @@ async function cleanup(db, users, extraIds = []) {
     catch (e) { console.log('CLEANUP FAIL ' + mask(e.message)); }
     await db.end().catch(() => {});
   }
-  const fails = R.filter(r => r.startsWith('FAIL')).length;
-  console.log(`\n${R.length - fails}/${R.length} passed`);
+  const fails = R.filter(r => r.startsWith('FAIL')).length, skips = R.filter(r => r.startsWith('SKIP')).length;
+  console.log(`\n${R.length - fails - skips}/${R.length - skips} passed${skips ? `, ${skips} skipped` : ''}`);
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(mask(e.stack || e.message || e)); process.exit(1); });

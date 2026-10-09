@@ -363,3 +363,96 @@ revoke all on function private.verifications_set_level() from public;
 drop trigger if exists verifications_set_level on public.credential_verifications;
 create trigger verifications_set_level before insert on public.credential_verifications
   for each row execute function private.verifications_set_level();
+
+-- ---------- share assertions carry the verification level + source ----------
+-- An organization viewing a real share sees "Primary Source Verified · Source:
+-- California BRN · checked <date>" instead of a bare VERIFIED. The level is
+-- returned only while the item is currently VERIFIED. For REQUIREMENT_SATISFIED
+-- (private) items the level is returned but the source name and date are not,
+-- so a private record's vendor is not disclosed. New columns are appended last;
+-- access_share_by_token() is recreated to match.
+drop function if exists public.access_share_by_token(text);
+drop function if exists public.get_share_assertions(uuid);
+create function public.get_share_assertions(p_grant uuid)
+returns table (requirement_label text, label text, mode public.assertion_mode, status text,
+               expires_on date, issuer text, jurisdiction_code text, kind text,
+               verification_level text, verification_source text, source_checked_on date)
+language plpgsql volatile security definer set search_path = '' as $$
+declare g public.share_grants; v_outcome public.access_outcome; v_n int := 0; v_is_owner boolean;
+begin
+  select * into g from public.share_grants where id = p_grant;
+  if not found then raise exception 'share not found' using errcode = 'P0002'; end if;
+  v_is_owner := private.owns_grant(p_grant);
+  if not (v_is_owner or private.is_org_member(g.org_id)) then
+    raise exception 'not authorized for this share' using errcode = '42501';
+  end if;
+  v_outcome := case
+    when g.status = 'REVOKED' or g.revoked_at is not null then 'REFUSED_REVOKED'
+    when g.duration = 'ONE_TIME' and g.used_at is not null then 'REFUSED_USED'
+    when g.status = 'EXPIRED' or (g.expires_at is not null and g.expires_at <= now()) then 'REFUSED_EXPIRED'
+    else 'GRANTED' end;
+  if v_outcome = 'GRANTED' then
+    return query
+      select x.requirement_label, x.label, x.mode, x.status, x.expires_on, x.issuer, x.jurisdiction_code, x.kind,
+             case when x.status in ('VERIFIED','REQUIREMENT_SATISFIED') then x.lvl end,
+             case when x.status = 'VERIFIED' and x.mode <> 'REQUIREMENT_SATISFIED' then x.src end,
+             case when x.status = 'VERIFIED' and x.mode <> 'REQUIREMENT_SATISFIED' then x.chk end
+      from (
+        select a.requirement_label,
+               case when a.mode = 'REQUIREMENT_SATISFIED' then coalesce(a.requirement_label, k.short_label, k.label) else c.display_name end as label,
+               a.mode,
+               case when c.status = 'VERIFIED' and (c.expires_on is null or c.expires_on >= current_date)
+                    then (case when a.mode = 'REQUIREMENT_SATISFIED' then 'REQUIREMENT_SATISFIED' else 'VERIFIED' end)
+                    when c.status in ('UNVERIFIED','VERIFYING') and (c.expires_on is null or c.expires_on >= current_date)
+                    then 'PENDING_VERIFICATION'
+                    else 'NOT_CURRENT' end as status,
+               case when a.mode = 'REQUIREMENT_SATISFIED' then null else c.expires_on end as expires_on,
+               case when a.mode = 'REQUIREMENT_SATISFIED' then null else i.name end as issuer,
+               case when a.mode = 'REQUIREMENT_SATISFIED' then null else c.jurisdiction_code end as jurisdiction_code,
+               case when a.mode = 'REQUIREMENT_SATISFIED' then null else c.kind end as kind,
+               c.verification_level as lvl, v.source_name as src, v.checked_on as chk
+        from public.share_grant_assertions a
+        join public.credentials c on c.id = a.credential_id
+        join public.credential_catalog k on k.kind = c.kind
+        left join public.issuers i on i.id = c.issuer_id
+        left join lateral (
+          select cv.source_name, cv.checked_on from public.credential_verifications cv
+          where cv.credential_id = c.id and cv.outcome = 'SUCCEEDED'
+          order by cv.completed_at desc, cv.id limit 1
+        ) v on true
+        where a.grant_id = p_grant
+      ) x
+      order by x.requirement_label nulls last;
+    get diagnostics v_n = row_count;
+    if g.duration = 'ONE_TIME' and not v_is_owner then
+      update public.share_grants set used_at = now(), status = 'USED' where id = p_grant;
+    end if;
+  end if;
+  if not v_is_owner then
+    insert into public.share_access_events (grant_id, org_id, actor_user_id, outcome, assertions_accessed)
+      values (p_grant, g.org_id, auth.uid(), v_outcome, v_n);
+    insert into public.audit_events (event_type, actor_user_id, actor_type, clinician_id, org_id, assignment_id, grant_id, result, detail)
+      values (case when v_outcome = 'GRANTED' then 'SHARE_VIEWED' else 'SHARE_ACCESS_REFUSED' end,
+              auth.uid(), 'ORGANIZATION', g.clinician_id, g.org_id, g.assignment_id, p_grant, v_outcome::text,
+              jsonb_build_object('assertions_accessed', v_n));
+  end if;
+  return;
+end $$;
+revoke execute on function public.get_share_assertions(uuid) from public, anon;
+grant execute on function public.get_share_assertions(uuid) to authenticated;
+
+create function public.access_share_by_token(p_token text)
+returns table (requirement_label text, label text, mode public.assertion_mode, status text,
+               expires_on date, issuer text, jurisdiction_code text, kind text,
+               verification_level text, verification_source text, source_checked_on date)
+language plpgsql volatile security definer set search_path = '' as $$
+declare v_id uuid;
+begin
+  if p_token is null or length(p_token) < 16 then raise exception 'invalid token' using errcode = '22023'; end if;
+  select id into v_id from public.share_grants
+   where token_hash = encode(sha256(convert_to(p_token, 'UTF8')), 'hex');
+  if v_id is null then raise exception 'share not found' using errcode = 'P0002'; end if;
+  return query select * from public.get_share_assertions(v_id);
+end $$;
+revoke execute on function public.access_share_by_token(text) from public, anon;
+grant execute on function public.access_share_by_token(text) to authenticated;
