@@ -272,3 +272,22 @@ select optgroup{font-weight:700}
 .lvl-chip-v13{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:1px 8px;margin:2px 2px 0 0;font-size:11px}
 .psv-form-v13 .grid2-v83{gap:8px}
 @media (max-width:600px){.why-grid-v13{grid-template-columns:1fr}.why-grid-v13>div:nth-child(odd){margin-top:4px;font-weight:600}}
+
+/* ---------- PR 14: on-device document scan ---------- */
+.scan-v14{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;margin:8px 0;background:#f8fafc;display:flex;flex-direction:column;gap:6px;min-width:0}
+.scan-head-v14{display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
+.scan-bar-v14{height:8px;border-radius:6px;background:#e2e8f0;overflow:hidden}.scan-bar-v14>div{height:100%;background:#2563eb;transition:width .3s}
+.scan-fields-v14{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.scan-row-v14{display:flex;flex-direction:column;gap:3px;min-width:0}.scan-row-v14 input,.scan-row-v14 select{width:100%;box-sizing:border-box;min-width:0}
+.scan-lbl-v14{font-size:12px;font-weight:600;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.conf-v14{font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;white-space:nowrap}
+.conf-hi{background:#dcfce7;color:#166534}.conf-mid{background:#fef9c3;color:#854d0e}.conf-lo{background:#fee2e2;color:#991b1b}.conf-none{background:#e2e8f0;color:#334155}
+.mismatch-v14{border-left:4px solid #dc2626}.mismatch-v14 ul{margin:4px 0 4px 18px;padding:0}
+.scan-interp-v14{color:#1e3a8a}
+.docbox-v14{border:1px dashed #94a3b8;border-radius:10px;padding:8px 10px;margin:8px 0;background:#f8fafc}
+.docbox-v14 ol{margin:6px 0 4px 18px;padding:0}
+.accbar-v14{display:inline-block;width:70px;height:7px;border-radius:5px;background:#e2e8f0;vertical-align:middle;overflow:hidden}.accbar-v14>span{display:block;height:100%;background:#16a34a}
+/* date inputs overflowed narrow phones in the verifier form */
+.acct-form-v10 input[type=date],.acct-form-v10 input[type=month],.psv-form-v13 input,.psv-form-v13 select{max-width:100%;min-width:0;box-sizing:border-box}
+.grid2-v83>label{min-width:0}
+@media (max-width:560px){.psv-form-v13 .grid2-v83,.acct-form-v10 .grid2-v83{grid-template-columns:1fr}.scan-fields-v14{grid-template-columns:1fr}#acctAccuracyV14 .v81-table,#verifyExtractV14 .v81-table{display:block;overflow-x:auto}}

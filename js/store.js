@@ -242,12 +242,54 @@ class SupabaseAdapter{
   const c=this.need();const cred=this.cache.credentials.find(x=>x.id===credentialId);if(!cred?.source_document_path)throw new Error('No document uploaded.');
   const{data,error}=await c.storage.from('source-documents').createSignedUrl(cred.source_document_path,seconds);if(error)throw new Error('Signed link: '+error.message);return data.signedUrl;
  }
+ /* Verifier: a short signed link to a nurse's document (storage RLS lets verifiers read). */
+ async verifierDocumentUrl(path,seconds=60){
+  const c=this.need();if(!path)throw new Error('No document uploaded.');
+  const{data,error}=await c.storage.from('source-documents').createSignedUrl(path,seconds);if(error)throw new Error('Signed link: '+error.message);return data.signedUrl;
+ }
  async deleteCredential(credentialId){
   const c=this.need();const cred=this.cache.credentials.find(x=>x.id===credentialId);if(!cred)return;
   await this.run(c.from('credentials').delete().eq('id',credentialId),'Delete credential');
   if(cred.source_document_path)await c.storage.from('source-documents').remove([cred.source_document_path]).catch(()=>{});
   this.cache.credentials=this.cache.credentials.filter(x=>x.id!==credentialId);
   await this.log('CREDENTIAL_DELETED',{result:'DELETED',detail:{kind:cred.kind}});
+ }
+ /* ---- PR 14: details read from the document on this device ----
+    Shareable kinds keep the confirmed details in credentials.metadata.doc
+    (never shown in shares). PRIVATE kinds keep nothing but the expiration
+    date (the database refuses metadata for them). */
+ async saveDocumentDetails(credentialId,{doc,expiresOn,applyExpiry=false}={}){
+  const c=this.need();const cred=this.cache.credentials.find(x=>x.id===credentialId);if(!cred)throw new Error('Credential not found.');
+  if(cred.status==='VERIFIED')throw new Error('This credential is already verified. Its details are locked; upload a new credential instead.');
+  const upd={};
+  if(catalogPrivacy(cred.kind)!=='PRIVATE'&&doc)upd.metadata={...(cred.metadata||{}),doc};
+  if(applyExpiry&&expiresOn)upd.expires_on=expiresOn;
+  if(!Object.keys(upd).length)return cred;
+  const saved=await this.run(c.from('credentials').update(upd).eq('id',credentialId).select().single(),'Save document details');
+  Object.assign(cred,saved);return cred;
+ }
+ /* Accuracy telemetry: field NAMES, confidences and timings only. Fails
+    quietly when the table is not there yet (migration 9 not applied); the
+    same names also go into the audit log, which the accuracy panel falls
+    back to. */
+ async logExtraction(ev){
+  if(this.extractionTable===false)return false;
+  const c=this.need();const clinician_id=ev.event==='VERIFIER_CHECK'?(ev.clinician_id||null):this.cache.profile?.id||null;
+  const row={event:ev.event,credential_id:ev.credential_id||null,clinician_id,actor_user_id:this.user.id,kind:ev.kind,profile:ev.profile,method:ev.method||null,source_slug:ev.source_slug||null,
+   fields_expected:ev.fields_expected||[],fields_found:ev.fields_found||[],fields_corrected:ev.fields_corrected||[],fields_confirmed:ev.fields_confirmed||[],mismatches:ev.mismatches||[],confidence:ev.confidence||{},qr_found:ev.qr_found??null,rotated:ev.rotated||0,scan_ms:ev.scan_ms??null,confirm_ms:ev.confirm_ms??null};
+  const{error}=await c.from('extraction_events').insert(row);
+  if(error){if(/relation|does not exist|schema cache|404/i.test(error.message))this.extractionTable=false;console.warn('[Veridun] extraction log skipped:',error.message);return false}
+  this.extractionTable=true;return true;
+ }
+ /* Rows for the live accuracy panel (verifier/admin): extraction_events,
+    or the DOCUMENT_SCANNED / VERIFIER_CHECK audit events before migration 9. */
+ async extractionStats(){
+  const c=this.need();
+  const{data,error}=await c.from('extraction_events').select('event,kind,profile,method,source_slug,fields_expected,fields_found,fields_corrected,fields_confirmed,mismatches,confidence,qr_found,rotated,scan_ms,confirm_ms,created_at').order('created_at',{ascending:false}).limit(2000);
+  if(!error){this.extractionTable=true;return{from:'extraction_events',rows:data||[]}}
+  this.extractionTable=false;
+  const au=await this.run(c.from('audit_events').select('event_type,detail,occurred_at').in('event_type',['DOCUMENT_SCANNED','VERIFIER_CHECK']).order('occurred_at',{ascending:false}).limit(2000),'Load extraction events');
+  return{from:'audit_events',rows:au.map(e=>({event:e.event_type==='VERIFIER_CHECK'?'VERIFIER_CHECK':'CONFIRM',created_at:e.occurred_at,...(e.detail||{})}))};
  }
  /* ---- organizations ---- */
  async listOrganizations(){const c=this.need();return this.run(c.from('organizations').select('id,name,slug,org_type').eq('is_demo',false).order('name'),'Load organizations')}
@@ -329,8 +371,8 @@ class SupabaseAdapter{
  }
  async verifierQueue(){
   const c=this.need();
-  return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,verification_level,monitoring_state,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue').then(r=>{this.serverV13=true;return r})
-   .catch(()=>{this.serverV13=false;this.lastError=null;return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue')});
+  return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,verification_level,monitoring_state,metadata,source_document_path,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue').then(r=>{this.serverV13=true;return r})
+   .catch(()=>{this.serverV13=false;this.lastError=null;return this.run(c.from('credentials').select('id,kind,type_code,display_name,status,expires_on,jurisdiction_code,clinician_id,created_at,metadata,clinicians(full_name)').order('created_at',{ascending:false}).limit(80),'Verifier queue')});
  }
  /* PR 13: a manual check of an APPROVED registry source (board / Nursys /
     issuer / employer / vendor). The database decides the level. */

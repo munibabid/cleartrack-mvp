@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const puppeteer = require('puppeteer-core');
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr13-shots/';
-const VERSION = 'v13.0 demo';
+const VERSION = 'v14.0 demo';
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 240) : ''); R.push(l); console.log(l); };
@@ -29,7 +29,7 @@ async function partA(browser) {
   const noSideScroll = () => pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   const shot = async (file, sel) => { await W(250); const h = sel && await pg.$(sel); if (h) { await pg.evaluate(e => e.scrollIntoView({ block: 'start' }), h); await W(150); await h.screenshot({ path: SH + file }); } else await pg.screenshot({ path: SH + file }); };
 
-  const ver = await pg.evaluate(() => document.documentElement.textContent.includes('v13.0 demo'));
+  const ver = await pg.evaluate(() => document.documentElement.textContent.includes('v14.0 demo'));
   ok('site shows ' + VERSION, ver);
 
   const reg = await pg.evaluate(() => ({
@@ -42,7 +42,7 @@ async function partA(browser) {
     neverOk: ['DOCUMENT_REVIEW', 'SELF_ATTESTED', 'AI_EXTRACTION'].every(m => methodLevel(m) == null || levelRank(methodLevel(m)) < levelRank('PRIMARY_SOURCE_VERIFIED')) && ['document-review','self-attestation','ai-extraction'].every(id => !verificationSource(id).level || levelRank(verificationSource(id).level) < levelRank('PRIMARY_SOURCE_VERIFIED')),
     issuers: ['aha-ecards', 'aha-rqi', 'redcross-certificate', 'aacn', 'bcen', 'ncc'].every(id => verificationSource(id)?.type === 'CERTIFYING_BODY')
   }));
-  ok('registry has 70 sources incl. 56 approved boards', reg.n === 70 && reg.boards === 56 && reg.approvedBoards === 56, JSON.stringify([reg.n, reg.boards, reg.approvedBoards]));
+  ok('registry has 115 sources incl. 56 approved boards', reg.n === 115 && reg.boards === 56 && reg.approvedBoards === 56, JSON.stringify([reg.n, reg.boards, reg.approvedBoards]));
   ok('QuickConfirm approved, PSV-equivalent, no API', reg.qc.status === 'APPROVED' && reg.qc.method === 'PRIMARY_SOURCE_EQUIVALENT' && !reg.qc.api.available);
   ok('e-Notify is PENDING (not faked as connected)', reg.en.status === 'PENDING' && reg.en.monitoring === true);
   ok('AI extraction is unapproved with no level', reg.ai.status === 'UNAPPROVED' && reg.never[2] == null);
@@ -106,7 +106,7 @@ async function partA(browser) {
   const boards = await pg.evaluate(() => document.querySelectorAll('.reg-row-v13').length);
   await pg.select('#regTypeV13', ''); await pg.type('#regSearchV13', 'nursys'); await W(300);
   const nurs = await pg.evaluate(() => [...document.querySelectorAll('.reg-row-v13')].map(r => r.dataset.source));
-  ok('Verification Sources tab lists 70, filters 56 boards, searches Nursys', rows === 70 && boards === 56 && nurs.includes('nursys-quickconfirm') && nurs.includes('nursys-enotify'), JSON.stringify([rows, boards, nurs.length]));
+  ok('Verification Sources tab lists 115, filters 56 boards, searches Nursys', rows === 115 && boards === 56 && nurs.includes('nursys-quickconfirm') && nurs.includes('nursys-enotify'), JSON.stringify([rows, boards, nurs.length]));
   ok('no sideways scroll at 390px (registry)', await noSideScroll());
   await shot('04-registry.png', '#verifySourcesBodyV13');
 
