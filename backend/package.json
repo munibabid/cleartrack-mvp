@@ -7,7 +7,8 @@
     "test:db": "node tests/db-test.js",
     "test:store": "node tests/store-test.js",
     "test:xbrowser": "node tests/xbrowser.js",
-    "test": "node tests/store-test.js && node tests/xbrowser.js"
+    "test": "node tests/store-test.js && node tests/xbrowser.js",
+    "test:p142": "node tests/p142.js"
   },
   "devDependencies": {
     "otplib": "^13.5.0",

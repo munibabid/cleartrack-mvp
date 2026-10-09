@@ -6,7 +6,7 @@
      audit log before migration 9): per-field and per-kind accuracy, the
      auto-ready rate, and how often verifiers found the details matched.
    Only field names, confidences and timings are counted, never content. */
-const EXTRACT_FIELD_NAMES={holder_name:'Name',credential_id:'Card / license ID',course:'Credential / course',issued_on:'Issue date',renew_by:'Renewal month',expires_on:'Expiration',jurisdiction:'State',multistate:'Multistate',training_center:'Training center'};
+const EXTRACT_FIELD_NAMES={holder_name:'Name',credential_id:'Card / license ID',course:'Credential / course',issued_on:'Issue date',renew_by:'Renewal month',expires_on:'Expiration',jurisdiction:'State',multistate:'Multistate',training_center:'Training center',training_center_id:'Training Center ID'};
 const pctV14=x=>x==null||isNaN(x)?'—':(x*100).toFixed(1)+'%';
 function accBarV14(x){const p=Math.max(0,Math.min(100,Math.round((x||0)*100)));return`<span class="accbar-v14"><span style="width:${p}%"></span></span>`}
 /* Live statistics from event rows (names only). */
