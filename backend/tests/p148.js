@@ -194,10 +194,10 @@ async function run(browser, name, vp, shots) {
       if (jur) await pg.evaluate(j => { const s = $('acctJurV10'); s.value = j; s.dispatchEvent(new Event('change', { bubbles: true })); }, jur);
     };
     const screen = async id => { await pg.setInputFiles('#acctFileV10', fileOf(id)); await pg.waitForFunction(f => { const b = document.getElementById('acctScreenBoxV148'); return b && f.includes(b.dataset.state); }, FINAL, { timeout: SCREEN_MS }).catch(() => {}); await pg.waitForTimeout(100); return pg.evaluate(() => { const b = document.getElementById('acctScreenBoxV148'); return { state: b && b.dataset.state, code: b && b.dataset.code || '', box: b ? b.innerText : '', exp: $('acctExpV10').value, scopes: document.querySelectorAll('input[name=acctLicTypeV10]:checked').length, fields: document.querySelectorAll('#acctAddFormV10 .scan-field-v14').length, form: $('acctAddFormV10').innerText }; }); };
-    const submit = async () => { const n = await pg.evaluate(() => __fakeDb.credentials.length); await pg.evaluate(() => document.querySelector('#acctAddFormV10 button[type=submit]').click()); await pg.waitForTimeout(450); const row = await pg.evaluate(n => __fakeDb.credentials.length > n ? __fakeDb.credentials[__fakeDb.credentials.length - 1] : null, n); return { row, msg: await pg.evaluate(() => ($('acctWsMsgV10') || {}).textContent || '') }; };
+    const submit = async () => { const n = await pg.evaluate(() => { const m = $('acctWsMsgV10'); if (m) m.textContent = ''; return __fakeDb.credentials.length; }); await pg.evaluate(() => document.querySelector('#acctAddFormV10 button[type=submit]').click()); await pg.waitForTimeout(450); const row = await pg.evaluate(n => __fakeDb.credentials.length > n ? __fakeDb.credentials[__fakeDb.credentials.length - 1] : null, n); return { row, msg: await pg.evaluate(() => ($('acctWsMsgV10') || {}).textContent || '') }; };
     const tick = async () => { await pg.evaluate(() => { const c = $('acctExpOkV147'); if (c && c.offsetParent && !c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } }); };
     let unsafeHere = 0;
-    for (const c of CASES) {
+    for (const c of CASES.filter(x => !process.env.ONLY || process.env.ONLY.split(',').includes(x.id))) {
       const blockExp = c.expect !== 'CLEAR';
       // lazy nurse: picks the claimed type, uploads, ticks whatever is there, types nothing
       await openAdd(c.kind, c.jur);
@@ -216,7 +216,7 @@ async function run(browser, name, vp, shots) {
       // strict nurse: types the details herself
       let strict = { row: null };
       if (!lazy.row) {
-        await pg.fill('#acctExpV10', '2029-12-31').catch(() => {});
+        await pg.fill('#acctExpV10', '2029-12-31').catch(e => { if (process.env.DEBUG) console.log('fill failed', c.id, e.message.slice(0, 300)); });
         await pg.evaluate(() => { const r = document.querySelector('input[name=acctLicTypeV10][value=SINGLE]'); if (r && r.offsetParent) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); } });
         await tick(); strict = await submit();
       }
@@ -238,12 +238,12 @@ async function run(browser, name, vp, shots) {
     await openAdd('RN_LICENSE', 'US-AZ');
     const sc = await pg.evaluate(() => ({ n: document.querySelectorAll('input[name=acctLicTypeV10]:checked').length, src: ($('acctLicScopeSrcV145') || {}).innerText || '' }));
     t('account: no license scope preselected for a license from the primary state of residence', sc.n === 0 && !/default/i.test(sc.src), JSON.stringify(sc));
-    await pg.fill('#acctExpV10', '2028-10-31'); await tick();
+    await tick(); // expiration left empty here: WebKit can't clear a filled date input reliably under automation
     let sb = await submit();
     t('account: save blocked until the license scope is chosen', !sb.row && /scope/i.test(sb.msg), sb.msg);
     // RN license: "No expiration date on this document" is not accepted
     await pg.evaluate(() => { const r = document.querySelector('input[name=acctLicTypeV10][value=MULTI]'); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); });
-    await pg.fill('#acctExpV10', ''); await tick();
+    await tick();
     sb = await submit();
     t('account: an RN license cannot be saved as "no expiration" (licenses always expire)', !sb.row && /expiration/i.test(sb.msg), sb.msg);
     await pg.fill('#acctExpV10', '2028-10-31'); await tick();
