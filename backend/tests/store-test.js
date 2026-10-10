@@ -18,6 +18,11 @@ const URL_OK='https://abcdefghijklmnop.supabase.co';
  ok('events are append-only through the store API',st.events.list().length===1&&(st.events.append({event_type:'Y'}),st.events.list().length===2)&&typeof st.events.remove==='undefined');
  st.customAssignments.save([{id:'c'}]);st.shareRequests.save([{id:'r'}]);st.clearDemoSharingAndBuilder();
  ok('reset clears shares, requests and published demo assignments only',!ls._m.has('veridun_shares')&&!ls._m.has('veridun_share_requests')&&!ls._m.has('veridun_custom_assignments')&&ls._m.has('nursecredx_v2'));
+ // v14.6 demo references: own keys, answers kept apart, cleared by Reset Demo Data
+ ok('references start empty (answers default to an empty map, not a list)',Array.isArray(st.references.load())&&st.references.load().length===0&&JSON.stringify(st.referenceResponses.load())==='{}');
+ st.references.save([{id:'rf1',status:'COMPLETED'}]);st.referenceResponses.save({rf1:{comments:'x'}});
+ ok('references and answers use separate keys',ls._m.has('veridun_references')&&ls._m.has('veridun_reference_responses')&&!ls._m.get('veridun_references').includes('comments'));
+ st.clearDemoSharingAndBuilder();ok('reset clears demo references and their answers',!ls._m.has('veridun_references')&&!ls._m.has('veridun_reference_responses')&&ls._m.has('nursecredx_v2'));
  ls._m.set('veridun_shares','{corrupt');ok('corrupt JSON falls back safely',Array.isArray(st.shares.load())&&st.shares.load().length===0);
 
  // config validation — never service keys in the browser

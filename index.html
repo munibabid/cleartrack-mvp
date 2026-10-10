@@ -9,7 +9,7 @@
 <script src="https://unpkg.com/xrpl@5.3.0/build/xrpl-latest-min.js" integrity="sha384-ZYUY+olM49qzMChi4X9rVVRYUuL6GcWXCLRhnVwRqVW/EpBX8PzThCiVnjZFi0Pb" crossorigin="anonymous"></script>
 <!-- qrcode@1.5.1 (MIT) is vendored in js/vendor: pinned, integrity-checked, no network request. 1.5.1 is the latest version with a browser build. -->
 <script src="js/vendor/qrcode-1.5.1.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="css/app.css?v=14.5">
+<link rel="stylesheet" href="css/app.css?v=14.6">
 </head>
 <body>
 
@@ -19,6 +19,12 @@
 <div id="pubStatus" class="notice">Checking XRPL Devnet…</div><div id="pubRows"></div><div class="demo"><span>Credential Integrity</span><b id="pubScore">—</b></div><div id="pubOnboard" class="provenance"></div>
 <p class="small">Private documents, license numbers, DOB, SSN, addresses, medical records, vaccine records, background checks, and uploaded files remain off-chain.</p>
 </div></div></div></section>
+
+<section id="refPublic" class="public hidden"><div>
+<div class="brand" style="justify-content:center;margin-bottom:20px"><div class="mark">V</div>Veridun</div>
+<div class="passport ref-public-v146"><div class="passhead"><h2 style="margin:0">Professional reference</h2><div>Private reference request · demo</div></div><div class="passbody" id="refPublicBodyV146"></div></div>
+<div style="text-align:center;margin-top:12px"><button type="button" class="sec mini" id="refPublicBackV146">‹ Back to the demo (as the nurse)</button></div>
+</div></section>
 
 <section id="landing">
 <div class="entry-v82">
@@ -52,7 +58,7 @@
 <div class="shell"><div class="bar"><span>Illustrative example · static sample data</span><span>Credential Trust Layer</span></div><div class="inside">
 <div class="top"><div><h2 style="margin:0">Travel RN Onboarding</h2><span class="small">Automatic newcomer requirements</span></div><span class="badge READY">ONBOARDING READY</span></div>
 <div class="stats"><div class="stat"><span>Requirements</span><b>12</b></div><div class="stat"><span>Verified</span><b>10</b></div><div class="stat"><span>Proofs (optional)</span><b>5</b></div><div class="stat"><span>Credential Readiness</span><b>100%</b></div></div>
-<div class="grid"><div class="panel"><div class="ph">Licenses & Certifications</div><table><tr><td>California RN</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>BLS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>ACLS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>NIHSS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof: securing…</span></td></tr></table></div>
+<div class="grid"><div class="panel"><div class="ph">Licenses & Certifications</div><table id="landingLicTableV146"><tr><td>California RN</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>BLS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>ACLS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr><tr><td>NIHSS</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr></table></div>
 <div class="panel"><div class="ph">Screening & Health</div><table><tr><td>Background Check</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr><tr><td>Drug Screen</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr><tr><td>Physical</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr><tr><td>Fit Test</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="badge PRIVATE">PRIVATE</span></td></tr></table></div></div>
 </div></div>
 <div class="cards"><div class="card"><h3>Verification provenance</h3><p>Source, timestamp, verification method, verifier, status, expiration, and monitoring history travel with the credential record. Verification is simulated in this demo.</p></div><div class="card"><h3>Reusable Passport</h3><p>One master QR exposes current shareable credentials instead of generating a disconnected QR for every document.</p></div><div class="card"><h3>Machine-readable graph</h3><p>Structured credential types prepare Veridun for recruiter APIs and AI qualification agents.</p></div></div></div>
@@ -60,12 +66,13 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.5 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.6 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
 <button class="v7nav" data-view="opportunitiesView">◎ Opportunities</button>
 <button class="v7nav" data-view="shareView">⇆ Share &amp; Access</button>
+<button class="v7nav" data-view="referencesView">✉ References</button>
 <button class="v7nav" data-view="menuView">☰ Menu</button>
 <button class="side-switch switchRoleAny">⇄ Switch Role</button>
 </nav><div class="net"><b>Verification Network</b><div id="walletInfo">Advanced proof infrastructure stays in the background.</div></div></aside>
@@ -103,7 +110,9 @@
   </div>
   <div id="v7PassportSummaryV85" class="pass-summary-v85"></div>
   <div id="v7PassportSections"></div>
+  <div id="v7PassportRefsV146"></div>
 </div>
+<div id="referencesView" class="view"></div>
 
 <div id="tasksView" class="view">
   <div class="v7-head"><div><h1>Task Center</h1><div class="small">What to do next, in priority order. Computed from your Passport and your opportunities.</div></div></div>
@@ -133,6 +142,7 @@
     <button type="button" class="menu-item-v7 menuLinkV11" data-menu="profile"><span><b>Profile</b><span class="small">Specialty and professional information</span></span><span aria-hidden="true">›</span></button>
     <button type="button" class="menu-item-v7 menuLinkV11" data-menu="credentials"><span><b>Submitted Credentials</b><span class="small">Uploads and verification history</span></span><span aria-hidden="true">›</span></button>
     <button type="button" class="menu-item-v7 menuLinkV11 navLinkV83" data-menu="shares" data-view="shareView"><span><b>Share &amp; Access</b><span class="small">Who can see your Passport, for which assignment, and until when</span></span><span aria-hidden="true">›</span></button>
+    <button type="button" class="menu-item-v7 menuLinkV11" data-menu="references"><span><b>Professional References</b><span class="small">Ask past managers and colleagues to vouch for you. You see the status, not their answers</span></span><span aria-hidden="true">›</span></button>
     <button type="button" class="menu-item-v7 menuLinkV11" data-menu="settings"><span><b>Verification Settings</b><span class="small">Reminders and notification preferences</span></span><span aria-hidden="true">›</span></button>
     <button type="button" class="menu-item-v7 menuLinkV11" data-menu="advanced"><span><b>Advanced Verification</b><span class="small">Optional XRPL proof settings — never affects readiness</span></span><span aria-hidden="true">›</span></button>
     <button type="button" class="menu-item-v7 menuLinkV11" id="backendStatusV88" data-menu="storage"><span><b>Data storage</b><span class="small" id="backendStatusTextV88">This browser only (demo)</span></span><span class="badge PENDING">DEMO</span></button>
@@ -201,7 +211,7 @@
 
 <section id="verificationWorkspace" class="role-workspace">
 <div class="role-shell-v81"><div class="role-head-v81"><div><div class="brand"><div class="mark">V</div>Veridun <span class="small">Verification Console</span></div><h1>Verification Console</h1><p>Simulated primary-source checks (demo only), queue, and audit activity. No real licensing board or issuer is contacted. All metrics are computed from the demo event log.</p></div><div><span class="demo-tag-v81">AUTHORIZED DEMO</span> <button class="switch-role-btn switchRoleV81">Switch Role</button></div></div>
-<div class="role-tabs-v81"><button class="verifyTab active" data-target="verifyOverview">Dashboard</button><button class="verifyTab" data-target="verifyQueueV81">Verification Queue</button><button class="verifyTab" data-target="verifySourcesV13">Verification Sources</button><button class="verifyTab" data-target="verifyExtractV14">Extraction Accuracy</button><button class="verifyTab" data-target="verifyMismatchV85">Mismatch Alerts</button><button class="verifyTab" data-target="verifyManualV85">Manual Review</button><button class="verifyTab" data-target="verifyMonitorV85">Monitoring</button><button class="verifyTab" data-target="verifyRevokeV85">Revocations</button><button class="verifyTab" data-target="verifyAuditV81">Audit Logs</button><button class="verifyTab" data-target="verifyAnalyticsV81">Analytics</button><button class="verifyTab" data-target="verifyProofsV81">Advanced Proofs</button></div>
+<div class="role-tabs-v81"><button class="verifyTab active" data-target="verifyOverview">Dashboard</button><button class="verifyTab" data-target="verifyQueueV81">Verification Queue</button><button class="verifyTab" data-target="verifySourcesV13">Verification Sources</button><button class="verifyTab" data-target="verifyExtractV14">Extraction Accuracy</button><button class="verifyTab" data-target="verifyMismatchV85">Mismatch Alerts</button><button class="verifyTab" data-target="verifyManualV85">Manual Review</button><button class="verifyTab" data-target="verifyMonitorV85">Monitoring</button><button class="verifyTab" data-target="verifyRevokeV85">Revocations</button><button class="verifyTab" data-target="verifyRefCallsV146">Reference Calls</button><button class="verifyTab" data-target="verifyAuditV81">Audit Logs</button><button class="verifyTab" data-target="verifyAnalyticsV81">Analytics</button><button class="verifyTab" data-target="verifyProofsV81">Advanced Proofs</button></div>
 <div id="verifyOverview" class="verifyPanel"><div class="metrics-v81"><div class="metric-v81"><span>Pending</span><b id="verPendingV81">0</b></div><div class="metric-v81"><span>Verified</span><b id="verSuccessV81">0</b></div><div class="metric-v81"><span>Awaiting Manual Review</span><b id="verManualV81">0</b><small id="verManualDoneV85" class="small">0 completed</small></div><div class="metric-v81"><span>Mismatch Alerts</span><b id="verMismatchV85">0</b></div><div class="metric-v81"><span>Failed / Rejected</span><b id="verFailedV81">0</b></div><div class="metric-v81"><span>Revocations</span><b id="verRevokedV85">0</b></div><div class="metric-v81"><span>Median Time</span><b id="verMedianV81">—</b></div><div class="metric-v81"><span>Monitored ≤30 days</span><b id="verMonitorV82">—</b></div></div><div class="panel-v81"><div class="ph">Verification Queue</div><div class="pb" id="verifyQueuePreviewV81"></div></div><div class="panel-v81"><div class="ph">Mismatch Alerts <span class="demo-tag-v81">RULE-DERIVED</span></div><div class="pb" id="verifyMismatchPreviewV85"></div></div><div class="panel-v81"><div class="ph">Recent Audit Events</div><div class="pb audit-v81" id="verifyAuditPreviewV85"></div></div></div>
 <div id="verifyQueueV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Queue <span class="demo-tag-v81">SIMULATED PRIMARY-SOURCE</span></div><div class="pb" id="verifyQueueBodyV81"></div></div></div>
 <div id="verifySourcesV13" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Source Registry <span class="demo-tag-v81">REAL SOURCES · NOT CONNECTED IN THE DEMO</span></div><div class="pb" id="verifySourcesBodyV13"></div></div></div>
@@ -210,7 +220,8 @@
 <div id="verifyManualV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Manual Review <span class="demo-tag-v81">DEMO</span></div><div class="pb" id="verifyManualBodyV85"></div></div></div>
 <div id="verifyMonitorV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Continuous Monitoring <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="verifyMonitorBodyV85"></div></div></div>
 <div id="verifyRevokeV85" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Revocations <span class="demo-tag-v81">SIMULATED</span></div><div class="pb" id="verifyRevokeBodyV85"></div></div></div>
-<div id="verifyAuditV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Append-Only Audit Events <select id="auditFilterV85" class="filter" style="margin-left:auto"><option value="all">All events</option><option value="VERIF">Verification</option><option value="MONITOR">Monitoring &amp; revocation</option><option value="SHARE">Sharing</option><option value="ASSIGN">Assignments</option><option value="CRED">Credentials</option></select></div><div class="pb audit-v81" id="verifyAuditBodyV81"></div></div></div>
+<div id="verifyRefCallsV146" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Reference Calls <span class="demo-tag-v81">DEMO · NO CALLS PLACED</span></div><div class="pb" id="verifyRefCallsBodyV146"></div></div></div>
+<div id="verifyAuditV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Append-Only Audit Events <select id="auditFilterV85" class="filter" style="margin-left:auto"><option value="all">All events</option><option value="VERIF">Verification</option><option value="MONITOR">Monitoring &amp; revocation</option><option value="SHARE">Sharing</option><option value="ASSIGN">Assignments</option><option value="CRED">Credentials</option><option value="REF">References</option></select></div><div class="pb audit-v81" id="verifyAuditBodyV81"></div></div></div>
 <div id="verifyAnalyticsV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Verification Performance <span class="demo-tag-v81">DEMO DATA — NOT PRODUCTION RESULTS</span></div><div class="pb" id="verifyAnalyticsBodyV81"></div></div></div>
 <div id="verifyProofsV81" class="verifyPanel hidden"><div class="panel-v81"><div class="ph">Advanced Verification Proofs</div><div class="pb" id="verifyProofsBodyV81"></div></div></div></div>
 </section>
@@ -257,6 +268,7 @@
   <div id="shareOptionsV83" class="share-options"></div>
   <details style="margin:8px 0"><summary class="small">Other Passport items — not needed for this assignment, not shared unless you add them</summary><div id="shareExtraV83" class="share-options"></div></details>
   <div class="share-option" style="border:1px solid var(--b);border-radius:10px;padding:10px 12px;margin:8px 0"><span><b>Source documents</b><span class="small"> · PDFs, images, uploads, health results</span></span><span class="badge REVOKED">NOT SHARED</span></div>
+  <div id="shareRefRowV146"></div>
   <label for="shareV7Duration">Access duration</label><select id="shareV7Duration"></select>
   <div id="shareCustomRowV83" class="hidden"><label for="shareCustomV83">Access ends on (11:59 PM)</label><input type="date" id="shareCustomV83"></div>
   <div id="shareReviewV83" class="provenance small" style="line-height:1.6"></div>
@@ -282,33 +294,34 @@
 <dialog id="orgShareViewDlgV83"><div class="mh"><b>Shared Passport</b><button class="sec xorgshare">✕</button></div><div class="mb" id="orgShareViewBodyV83"></div><div class="mf"><button class="sec xorgshare">Close</button></div></dialog>
 
 <script src="js/config.js"></script>
-<script src="js/store.js"></script>
-<script src="js/credential-model.js?v=14.5"></script>
+<script src="js/store.js?v=14.6"></script>
+<script src="js/credential-model.js?v=14.6"></script>
 <script src="js/specialties.js"></script>
-<script src="js/credential-catalog.js?v=14.5"></script>
+<script src="js/credential-catalog.js?v=14.6"></script>
 <script src="js/verification-registry.js"></script>
-<script src="js/doc-extract.js?v=14.5"></script>
-<script src="js/extraction-benchmark.js?v=14.5"></script>
-<script src="js/demo-data.js?v=14.5"></script>
-<script src="js/requirements.js?v=14.5"></script>
+<script src="js/doc-extract.js?v=14.6"></script>
+<script src="js/extraction-benchmark.js?v=14.6"></script>
+<script src="js/demo-data.js?v=14.6"></script>
+<script src="js/requirements.js?v=14.6"></script>
 <script src="js/assignments.js"></script>
-<script src="js/readiness-engine.js?v=14.5"></script>
+<script src="js/readiness-engine.js?v=14.6"></script>
 <script src="js/analytics.js"></script>
-<script src="js/verification.js?v=14.5"></script>
-<script src="js/xrpl.js"></script>
-<script src="js/sharing.js?v=14.5"></script>
-<script src="js/insights.js?v=14.5"></script>
-<script src="js/roles/clinician.js?v=14.5"></script>
-<script src="js/roles/organization.js?v=14.5"></script>
-<script src="js/roles/verifier.js?v=14.5"></script>
-<script src="js/app.js?v=14.5"></script>
+<script src="js/verification.js?v=14.6"></script>
+<script src="js/xrpl.js?v=14.6"></script>
+<script src="js/sharing.js?v=14.6"></script>
+<script src="js/insights.js?v=14.6"></script>
+<script src="js/roles/clinician.js?v=14.6"></script>
+<script src="js/roles/organization.js?v=14.6"></script>
+<script src="js/roles/verifier.js?v=14.6"></script>
+<script src="js/references.js?v=14.6"></script>
+<script src="js/app.js?v=14.6"></script>
 <script src="js/tour.js"></script>
 <script src="js/lookup-sources.js"></script>
 <script src="js/anchor.js"></script>
-<script src="js/account-mfa.js?v=14.5"></script>
-<script src="js/doc-scan.js?v=14.5"></script>
-<script src="js/extraction-panel.js?v=14.5"></script>
-<script src="js/account.js?v=14.5"></script>
-<script src="js/menu.js?v=14.5"></script>
+<script src="js/account-mfa.js?v=14.6"></script>
+<script src="js/doc-scan.js?v=14.6"></script>
+<script src="js/extraction-panel.js?v=14.6"></script>
+<script src="js/account.js?v=14.6"></script>
+<script src="js/menu.js?v=14.6"></script>
 </body>
 </html>

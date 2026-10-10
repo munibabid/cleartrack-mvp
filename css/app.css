@@ -297,3 +297,31 @@ select optgroup{font-weight:700}
 /* v14.2: Training Center ID shown for context only; eCard-code-not-found note */
 .scan-info-v142{opacity:.95}.scan-info-val-v142{font-size:15px;padding:6px 2px;word-break:break-all}
 .scan-note-v142{color:#92400e}
+
+/* ---- v14.6 Professional references (demo) ---- */
+#referencesView input:not([type=checkbox]):not([type=radio]),#referencesView select,.ref-public-v146 input:not([type=checkbox]):not([type=radio]),.ref-public-v146 select,.ref-public-v146 textarea,#verifyRefCallsV146 input:not([type=checkbox]):not([type=radio]),#verifyRefCallsV146 select,#verifyRefCallsV146 textarea{width:100%;box-sizing:border-box;min-width:0;padding:10px 11px;border:1px solid var(--b);border-radius:9px;font-size:16px;font-weight:400;background:#fff;margin:4px 0 10px}
+.ref-dates-v146 select,#verifyRefCallsV146 .ref-dates-v146 select{width:auto!important;display:inline-block;min-width:96px;margin:4px 4px 6px 0!important}
+.ref-dates-v146 select:disabled{opacity:.5}
+.ref-fs-v146{border:1px solid var(--b);border-radius:10px;padding:10px 12px 6px;margin:0 0 12px;min-width:0}
+.ref-fs-v146 legend{font-weight:800;font-size:14px;padding:0 4px}
+.ref-inline-v146,.ref-phone-opts-v146 label,.ref-rate-o-v146 label{display:inline-flex!important;align-items:center;gap:6px;font-weight:400!important;font-size:14px;margin:4px 12px 6px 0}
+.ref-inline-v146 input,.ref-phone-opts-v146 input,.ref-rate-o-v146 input{width:auto;margin:0;min-width:18px;min-height:18px}
+.ref-rate-v146{padding:6px 0;border-top:1px solid #eef0f3}
+.ref-rate-v146:first-of-type{border-top:0}
+.ref-rate-l-v146{font-weight:700;font-size:14px}
+.ref-rate-o-v146{display:flex;flex-wrap:wrap}
+.ref-chip-v146{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;border:1px solid #d1d5db;background:#f8fafc;white-space:nowrap}
+.ref-chip-v146.ref-stronger,.small.ref-stronger{color:#166534}
+.ref-chip-v146.ref-stronger{background:#f0fdf4;border-color:#bbf7d0}
+.ref-chip-v146.ref-weaker,.small.ref-weaker{color:#9a3412}
+.ref-chip-v146.ref-weaker{background:#fff7ed;border-color:#fed7aa}
+.ref-hint-v146{color:#9a3412;font-weight:700}
+.ref-card-v146 .acts{display:flex;flex-wrap:wrap;gap:6px}
+.ref-card-v146 .acts a.mini{text-decoration:none;display:inline-flex;align-items:center}
+.ref-prov-v146{display:grid;gap:2px;margin-top:6px}
+.ref-answers-v146{margin-top:8px;padding:8px 10px;border-radius:9px;background:#f8fafc;border:1px solid var(--b);font-size:13px;display:grid;gap:3px}
+.ref-share-block-v146{margin-top:6px}
+.ref-public-v146 textarea{font-size:16px}
+@media(max-width:620px){.ref-card-v146 .acts>*{flex:1 1 100%;justify-content:center;text-align:center}.ref-rate-o-v146 label{margin-right:10px}}
+.ref-public-v146 #refPubStateV146{margin:0 0 14px}
+#referencesView .v7-head{flex-wrap:wrap;gap:10px}#referencesView .v7-head>div{min-width:0;flex:1 1 220px}#referencesView .v7-head>button{flex:0 0 auto}

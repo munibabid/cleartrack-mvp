@@ -2,12 +2,13 @@
    checks, rule-derived mismatch alerts, manual review, monitoring,
    revocations and the audit log. Metrics come from the event log and the
    current demo data. */
-const AUDIT_GROUPS={VERIF:/^(VERIFICATION_|SOURCE_CHECK|MANUAL_REVIEW|CLASSIFICATION)/,MONITOR:/^(MONITORING_|CREDENTIAL_(REVOKED|REINSTATED|EXPIRED))/,SHARE:/^SHARE_/,ASSIGN:/^ASSIGNMENT_/,CRED:/^(CREDENTIAL_UPLOADED|CREDENTIAL_RENEWED|DEMO_SEEDED)/};
+const AUDIT_GROUPS={VERIF:/^(VERIFICATION_|SOURCE_CHECK|MANUAL_REVIEW|CLASSIFICATION)/,MONITOR:/^(MONITORING_|CREDENTIAL_(REVOKED|REINSTATED|EXPIRED))/,SHARE:/^SHARE_/,ASSIGN:/^ASSIGNMENT_/,REF:/^(REFERENCE_|SHARE_REFERENCES)/,CRED:/^(CREDENTIAL_UPLOADED|CREDENTIAL_RENEWED|DEMO_SEEDED)/};
 function auditRowHtml(e){const c=e.credential_id?creds.find(x=>x.id===e.credential_id):null;return`<div class="row-v81" style="display:block"><b>${ec(e.event_type)}</b><div class="small">${ec(activityText(e))}</div><div class="small">${new Date(e.timestamp).toLocaleString()} · ${ec(e.actor_type)}${e.verification_method?' · '+ec(e.verification_method):''}${c?' · '+ec(c.name):''}</div></div>`}
 function alertHtml(a,withAction){return`<div class="alert-row-v85"><div><span class="layer-tag-v84 sev-${a.severity}">${a.severity}</span> <b>${ec(a.c.name)}</b> <span class="small">· ${ec(a.rule)}</span></div><div class="small" style="margin-top:4px">${ec(a.text)}</div>${withAction&&['VERIFYING','UNVERIFIED'].includes(a.c.primary)?`<button class="mini" style="margin-top:6px" onclick="document.querySelector('.verifyTab[data-target=verifyManualV85]').click()">Open Manual Review</button>`:''}</div>`}
 function v81RenderVerifier(x){const{ev,pending,med}=x;
  if($('verifySourcesBodyV13')&&!$('verifySourcesBodyV13').innerHTML)renderRegistryV13();
  if(typeof renderExtractionPanelV14==='function')renderExtractionPanelV14();
+ if(typeof renderRefCallsV146==='function')renderRefCallsV146();
  const n=t=>ev.filter(e=>e.event_type===t).length,success=n('VERIFICATION_SUCCEEDED'),failed=n('VERIFICATION_FAILED'),manual=ev.filter(e=>e.manual_intervention).length,revoked=n('CREDENTIAL_REVOKED'),alerts=mismatchAlerts();
  const set=(id,v)=>{if($(id))$(id).textContent=v};
  set('verPendingV81',pending.length);set('verSuccessV81',success);set('verManualV81',creds.filter(needsManualReview).length);if($('verManualDoneV85'))$('verManualDoneV85').textContent=(n('MANUAL_REVIEW_APPROVED')+n('MANUAL_REVIEW_REJECTED'))+' completed';set('verFailedV81',failed);set('verMedianV81',v81Fmt(med));set('verMonitorV82',fmtPct(monitoringCoverage()));set('verMismatchV85',alerts.length);set('verRevokedV85',revoked);

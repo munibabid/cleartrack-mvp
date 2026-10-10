@@ -16,7 +16,9 @@ function ec(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;
 function cls(s){return String(s).replaceAll(' ','')}
 function fd(d){return d?new Date(d+'T00:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'—'}
 function eligible(c){return c.primary==='VERIFIED'&&!c.privateOnly&&c.chain==='NOT ISSUED'}
-function userChain(c){if(c.privateOnly)return 'PRIVATE';if(c.chain==='ACCEPTED')return 'PROOF ON DEVNET';if(c.chain==='XRPL ISSUED'||c.chain==='SECURING')return 'PROOF SECURING';if(c.chain==='REVOKED')return 'PROOF REVOKED';return 'NO PROOF (OPTIONAL)'}
+/* v14.6: a pending proof transaction older than 30 s (see js/xrpl.js) */
+function proofIsStale(c){return typeof proofStale==='function'?proofStale(c):!!(c.proofPending&&Date.now()-new Date(c.proofPending.startedAt).getTime()>30000)}
+function userChain(c){if(c.privateOnly)return 'PRIVATE';if(c.chain==='ACCEPTED')return 'PROOF ON DEVNET';if(c.proofPending)return proofIsStale(c)?'PROOF DELAYED — RETRYING':'PROOF IN PROGRESS';if(c.chain==='XRPL ISSUED')return 'PROOF IN PROGRESS';if(c.chain==='SECURING')return 'PROOF ISSUED — ACCEPT TO FINISH';if(c.chain==='REVOKED')return 'PROOF REVOKED';return 'NO PROOF (OPTIONAL)'}
 /* Handoff §50: verification status is the primary badge. Every verification
    in this demo is a demo seed or a simulated check, so VERIFIED reads
    "VERIFIED · DEMO". The optional XRPL proof is a quiet secondary label. */
@@ -33,7 +35,7 @@ function verificationBadge(c){
  return{cls:cls(c.primary),text:String(c.primary||'—')};
 }
 function verificationBadgeHtml(c){const b=verificationBadge(c);return`<span class="badge ${b.cls}">${ec(b.text)}</span>`}
-function proofLabel(c){if(c.privateOnly)return'Proof: n/a (private)';if(c.chain==='ACCEPTED')return'Proof: on XRPL Devnet ✓';if(c.chain==='XRPL ISSUED'||c.chain==='SECURING')return'Proof: securing…';if(c.chain==='REVOKED')return'Proof: revoked';return'Proof: optional'}
+function proofLabel(c){if(c.privateOnly)return'Proof: n/a (private)';if(c.chain==='ACCEPTED')return'Proof: on XRPL Devnet ✓';if(c.proofPending)return proofIsStale(c)?'Proof delayed — retrying':'Proof in progress';if(c.chain==='XRPL ISSUED')return'Proof in progress';if(c.chain==='SECURING')return'Proof issued — accept to finish';if(c.proofNote&&c.chain==='NOT ISSUED')return'Proof didn\'t go through — try again';if(c.chain==='REVOKED')return'Proof: revoked';return'Proof: optional'}
 function proofLabelHtml(c){return`<span class="proof-label-v84">${ec(proofLabel(c))}</span>`}
 function userChainClass(c){if(c.privateOnly)return 'PRIVATE';if(c.chain==='ACCEPTED')return 'ACCEPTED';if(c.chain==='XRPL ISSUED'||c.chain==='SECURING')return 'PENDING';if(c.chain==='REVOKED')return 'REVOKED';return 'NOTISSUED'}
 function catFor(c){const k=catalogKind(c.kind);if(k&&c.kind!=='OTHER')return k.category;const n=(c.name+' '+c.type).toUpperCase();if(n.includes('RN_')||n.includes('LICENSE'))return 'Licenses';if(n.includes('CERT_'))return 'Certifications';if(n.includes('EDU_'))return 'Education';if(n.includes('EMP_'))return 'Employment & HR';if(n.includes('HEALTH_'))return 'Employee Health';if(n.includes('SCREEN_'))return 'Background & Screening';if(n.includes('CLINICAL'))return 'Clinical Qualifications';return 'Submitted Credentials'}

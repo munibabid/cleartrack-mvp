@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const puppeteer = require('puppeteer-core');
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr13-shots/';
-const VERSION = 'v14.5 demo';
+const VERSION = 'v14.6 demo';
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 240) : ''); R.push(l); console.log(l); };
@@ -29,7 +29,7 @@ async function partA(browser) {
   const noSideScroll = () => pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   const shot = async (file, sel) => { await W(250); const h = sel && await pg.$(sel); if (h) { await pg.evaluate(e => e.scrollIntoView({ block: 'start' }), h); await W(150); await h.screenshot({ path: SH + file }); } else await pg.screenshot({ path: SH + file }); };
 
-  const ver = await pg.evaluate(() => document.documentElement.textContent.includes('v14.5 demo'));
+  const ver = await pg.evaluate(() => document.documentElement.textContent.includes('v14.6 demo'));
   ok('site shows ' + VERSION, ver);
 
   const reg = await pg.evaluate(() => ({
