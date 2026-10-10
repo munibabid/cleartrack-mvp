@@ -51,6 +51,7 @@ const LEDGER_MOCK = () => {
       const tx = JSON.parse(blob), s = st(); const hash = 'H' + String(s.n).padStart(4, '0'); let code = 'tesSUCCESS';
       const ct = String(tx.CredentialType || '');
       if (!ct || ct.length > 128 || ct.length % 2 || !/^[0-9A-F]+$/i.test(ct)) code = 'temMALFORMED';
+      else if (tx.TransactionType === 'CredentialCreate' && s.forceFail) { code = 'tecNO_PERMISSION'; s.forceFail = false; }
       else if (tx.TransactionType === 'CredentialCreate') { if (s.objs.some(o => o.Subject === tx.Subject && o.Issuer === tx.Account && o.CredentialType === ct.toUpperCase())) code = 'tecDUPLICATE'; else s.objs.push({ LedgerEntryType: 'Credential', Subject: tx.Subject, Issuer: tx.Account, CredentialType: ct.toUpperCase(), URI: tx.URI || '', Flags: 0 }); }
       else if (tx.TransactionType === 'CredentialAccept') { const o = s.objs.find(o => o.Subject === tx.Account && o.Issuer === tx.Issuer && o.CredentialType === ct.toUpperCase()); if (!o) code = 'tecNO_ENTRY'; else if (o.Flags & 65536) code = 'tecDUPLICATE'; else o.Flags |= 65536; }
       s.log.push({ type: tx.TransactionType, ct: ct.toUpperCase(), uri: tx.URI || '', code, hash }); s.txs[hash] = { code }; put(s);
@@ -169,26 +170,28 @@ async function run(browser, name, vp) {
       await Promise.all([issue(9201), issue(9201)]); __closeDlg();
       const creates = __ledger().log.filter(x => x.type === 'CredentialCreate').length - before;
       // re-issue after a failed (rolled back) attempt reuses the same id
-      const b = creds.find(x => x.id === 9202); const s = __ledger(); s.forceFail = true; localStorage.setItem('xl', JSON.stringify(s));
+      const b = creds.find(x => x.id === 9202);
       LedgerIdentity.ensure(b, creds); const firstId = b.ledgerCredentialType;
       // copied record holding another credential's id (never issued) → gets a fresh id at issue
       const c = creds.find(x => x.id === 9203); c.ledgerCredentialType = creds.find(x => x.id === 9201).ledgerCredentialType; save();
       await issue(9203); __closeDlg();
+      { const s = __ledger(); s.forceFail = true; localStorage.setItem('xl', JSON.stringify(s)); }
+      await issue(9202); __closeDlg(); const afterFail = { chain: creds.find(x => x.id === 9202).chain, id: creds.find(x => x.id === 9202).ledgerCredentialType };
       await issue(9202); __closeDlg();
       const g = id => creds.find(x => x.id === id);
-      return { creates, aChain: g(9201).chain, firstId, bId: g(9202).ledgerCredentialType, cId: g(9203).ledgerCredentialType, aId: g(9201).ledgerCredentialType, cChain: g(9203).chain, bad: __ledger().log.filter(x => x.code !== 'tesSUCCESS').map(x => x.code) };
+      return { creates, aChain: g(9201).chain, firstId, afterFail, bId: g(9202).ledgerCredentialType, bChain: g(9202).chain, cId: g(9203).ledgerCredentialType, aId: g(9201).ledgerCredentialType, cChain: g(9203).chain, bad: __ledger().log.filter(x => x.code !== 'tesSUCCESS' && x.code !== 'tecNO_PERMISSION').map(x => x.code) };
     });
     t('double-click issue: exactly one CredentialCreate is submitted', dup.creates === 1 && dup.aChain === 'SECURING', JSON.stringify(dup));
-    t('ledger id generated once: issuing later reuses the id assigned earlier', dup.firstId && dup.bId === dup.firstId, JSON.stringify(dup));
+    t('ledger id generated once: a failed issue rolls back, and the retry reuses the same id', dup.firstId && dup.afterFail.chain === 'NOT ISSUED' && dup.afterFail.id === dup.firstId && dup.bId === dup.firstId && dup.bChain === 'SECURING', JSON.stringify(dup));
     t('colliding (copied) ledger id is replaced before issue; no tecDUPLICATE reaches the ledger', dup.cId && dup.cId !== dup.aId && dup.cChain === 'SECURING' && dup.bad.length === 0, JSON.stringify(dup));
-    const dupAcc = await pg.evaluate(async () => { const n = __ledger().log.filter(x => x.type === 'CredentialAccept').length; await Promise.all([accept(9201), accept(9201)]); __closeDlg(); return { n: __ledger().log.filter(x => x.type === 'CredentialAccept').length - n, chain: creds.find(x => x.id === 9201).chain, bad: __ledger().log.filter(x => x.code !== 'tesSUCCESS').map(x => x.code) }; });
+    const dupAcc = await pg.evaluate(async () => { const n = __ledger().log.filter(x => x.type === 'CredentialAccept').length; await Promise.all([accept(9201), accept(9201)]); __closeDlg(); return { n: __ledger().log.filter(x => x.type === 'CredentialAccept').length - n, chain: creds.find(x => x.id === 9201).chain, bad: __ledger().log.filter(x => x.code !== 'tesSUCCESS' && x.code !== 'tecNO_PERMISSION').map(x => x.code) }; });
     t('double-click accept: exactly one CredentialAccept is submitted', dupAcc.n === 1 && dupAcc.chain === 'ACCEPTED' && dupAcc.bad.length === 0, JSON.stringify(dupAcc));
 
     /* 7b. DOM ids in the nurse's credential table + proof details show network/proof id */
-    const tbl = await pg.evaluate(() => { v81ShowRole('clinician'); const ids = [...document.querySelectorAll('#rows [id]')].map(e => e.id); showProof(9201); const grid = $('proofGrid').innerText; __closeDlg(); return { ids, dupData: [...document.querySelectorAll('#rows .details')].map(b => b.dataset.id).length === new Set([...document.querySelectorAll('#rows .details')].map(b => b.dataset.id)).size, grid }; });
+    const tbl = await pg.evaluate(() => { v81ShowRole('clinician'); const ids = [...document.querySelectorAll('#rows [id]')].map(e => e.id); showProof(9201); const grid = [...$('proofGrid').children].map(e => e.textContent).join(' | '); __closeDlg(); return { ids, dupData: [...document.querySelectorAll('#rows .details')].map(b => b.dataset.id).length === new Set([...document.querySelectorAll('#rows .details')].map(b => b.dataset.id)).size, grid }; });
     t('credential table: no DOM id built from the semantic type; row buttons keyed by record id', tbl.ids.every(i => !/RN_LICENSE|CERT_|:/.test(i)) && tbl.dupData, JSON.stringify(tbl.ids));
-    t('proof details show network, ledger proof id, proof schema and semantic type separately', /XRPL Devnet/.test(tbl.grid) && /vc1_[0-9a-f]{32}/.test(tbl.grid) && /veridun\.xrpl-credential\.v1/.test(tbl.grid) && /CERT_PALS/.test(tbl.grid), tbl.grid.slice(0, 600));
-    t('no unexpected alerts', alerts.every(a => !/failed|collision/i.test(a)), JSON.stringify(alerts));
+    t('proof details show network, ledger proof id, proof schema and semantic type separately', /XRPL Devnet/.test(tbl.grid) && /vc1_[0-9a-f]{32}/.test(tbl.grid) && /veridun\.xrpl-credential\.v1/.test(tbl.grid) && /CERT_PALS/.test(tbl.grid), JSON.stringify(tbl.grid.slice(0, 900)));
+    t('no unexpected alerts (only the one forced tecNO_PERMISSION failure)', alerts.filter(a => /failed|collision|review/i.test(a)).length === 1 && alerts.some(a => /tecNO_PERMISSION/.test(a)), JSON.stringify(alerts));
     t('no page errors', errs.length === 0, errs.join(' | '));
   } catch (e) { t('run', false, e.message.split('\n')[0]); }
   await ctx.close(); return pass;
