@@ -56,7 +56,7 @@ if (L) {
   ok('semanticType() is the catalog kind (RN_LICENSE), not the jurisdiction code', L.semanticType(ca) === 'RN_LICENSE' && L.semanticType({ type: 'RN_LICENSE:US-TX' }) === 'RN_LICENSE' && L.semanticType({ kind: 'CERT_BLS', type: 'CERT_BLS' }) === 'CERT_BLS');
   // 6. passport entries
   Object.assign(ca, { name: 'California RN License', chain: 'ACCEPTED', acceptTx: 'ATX', acceptLedger: 77, expiration: '2029-01-31', prov: { source: 'CA BRN (demo)', verifiedAt: '2026-01-01T00:00:00Z' } });
-  const ren = { id: 3, kind: 'RN_LICENSE', type: 'RN_LICENSE:US-CA', renews: 1, chain: 'ACCEPTED', name: 'California RN License' }; L.ensure(ren, [ca, ma, ren]);
+  const ren = { id: 3, kind: 'RN_LICENSE', type: 'RN_LICENSE:US-CA', renews: 1, chain: 'NOT ISSUED', name: 'California RN License' }; L.ensure(ren, [ca, ma, ren]); ren.chain = 'ACCEPTED';
   ok('a renewal records the ledger id it supersedes (link, separate generation)', ren.ledgerSupersedes === idCa && ren.ledgerCredentialType !== idCa, JSON.stringify(ren));
   const e1 = L.passportEntry(ca), e2 = L.passportEntry(leg), e3 = L.passportEntry(ren);
   ok('passport entry stores semantic type and ledger id separately', e1.st === 'RN_LICENSE' && e1.l === idCa && e1.t === 'RN_LICENSE:US-CA' && !('lg' in e1), JSON.stringify(e1));
