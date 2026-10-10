@@ -145,7 +145,9 @@ async function run(browser, name, vp, shots) {
     // v14.8 P0: TNCC is held as unsupported in the RN pilot (was the "no expiration" example before); CCRN is used instead
     const nT = await pg.evaluate(() => { openAddForm({ kind: 'CERT_TNCC' }); return creds.length; });
     await ctr('#addExpOkV147'); await pg.check('#addExpOkV147'); await pg.evaluate(() => $('save').click());
-    t('v14.8: TNCC is held as unsupported (not saved), in plain words', await pg.evaluate(n => creds.length === n, nT) && /support/i.test(lastAlert()), lastAlert());
+    // t150u: while the hold is active the save button is disabled and replaced by the corrective action
+    const tn = await pg.evaluate(() => ({ off: $('save').disabled, fix: ($('addFixV148') || {}).textContent || '', box: ($('addScreenV148') || {}).innerText || '' }));
+    t('v14.8: TNCC is held as unsupported (not saved), approved pilot wording; save replaced by "Choose a supported RN credential"', await pg.evaluate(n => creds.length === n, nT) && tn.off && tn.fix === 'Choose a supported RN credential' && /isn.t supported in the RN Passport pilot yet/.test(tn.box), JSON.stringify(tn));
     await pg.evaluate(() => { if ($('add').open) $('add').close(); openAddForm({ kind: 'CERT_CCRN' }); });
     await ctr('#addExpOkV147'); await pg.check('#addExpOkV147'); await pg.evaluate(() => $('save').click());
     const sv2 = await pg.evaluate(() => { const c = creds[creds.length - 1]; return { kind: c.kind, exp: c.expiration, ec: c.expConfirm }; });
@@ -186,7 +188,7 @@ async function run(browser, name, vp, shots) {
     const sc = () => pg.evaluate(() => ({ state: $('acctScreenBoxV148').dataset.state, box: $('acctScreenBoxV148').innerText, rows: document.querySelectorAll('#acctAddFormV10 .scan-row-v14').length, exp: $('acctExpV10').value, ctxt: $('acctExpOkTextV147').textContent, on: $('acctExpOkV147').checked, form: $('acctAddFormV10').innerText }));
     const s1 = await sc();
     t('v14.8 license file: checked on the device, nothing read into the form (no issue-date row, no values)', s1.state === 'clear' && s1.rows === 0 && !/2019|Original Issue Date/.test(s1.form), JSON.stringify({ state: s1.state, rows: s1.rows }));
-    t('v14.8 expiration NOT pre-filled; the confirmation reads "No expiration date on this document" until the nurse types a date', s1.exp === '' && s1.ctxt === 'No expiration date on this document' && !s1.on, JSON.stringify(s1));
+    t('v14.8 expiration NOT pre-filled; t150u: for an RN license the tick reads "The current-practice-through date isn\'t printed on my document" until the nurse types a date', s1.exp === '' && s1.ctxt === "The current-practice-through date isn't printed on my document" && !s1.on, JSON.stringify(s1));
     await shot('2-scan-license', '#acctAddFormV10');
     await pg.fill('#acctExpV10', '2029-01-31');
     await pg.evaluate(() => { const r = document.querySelector('input[name=acctLicTypeV10][value=SINGLE]'); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); });
