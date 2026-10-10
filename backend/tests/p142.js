@@ -115,53 +115,37 @@ async function partC(browser, cases) {
   await pg.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await pg.goto(BASE, { waitUntil: 'networkidle2' });
   const tap = async sel => { await pg.waitForSelector(sel, { timeout: 15000 }); await pg.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel); await W(120); await pg.evaluate(s => document.querySelector(s).click(), sel); };
-  const waitScan = () => pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }, { timeout: 90000 });
+  /* v14.8 (t150u): the nurse form no longer shows a reader review box (no read-back values, no confidence chips,
+     no eCard/TC-ID hints) and the verifier types the evidence (no on-device reader, no prefill, no Copy).
+     C1–C5, C7, C8 retired; C6, C9 rewritten. See LEGACY_TEST_MAP.md. */
+  const waitScan = () => pg.waitForFunction(() => { const b = document.getElementById('acctScreenBoxV148'); return b && b.dataset.state && b.dataset.state !== 'checking'; }, { timeout: 90000 });
   const setVal = (id, v) => pg.evaluate((id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, id, v);
   await pg.evaluate(require('./p14-fake.js'));
   const file = id => cases.find(c => c.id === id).file;
   const b64 = id => fs.readFileSync(file(id)).toString('base64');
-  const seeded = await pg.evaluate(async (h, o) => {
+  const seeded = await pg.evaluate(async (o) => {
     const mk = (b, n, t) => new File([Uint8Array.from(atob(b), c => c.charCodeAt(0))], n, { type: t });
-    const hdr = __fakeSeed({ kind: 'CERT_BLS', type_code: 'CERT_BLS', display_name: 'BLS — header layout', expires_on: '2028-06-30', jurisdiction_code: null }, mk(h, 'bls-header.pdf', 'application/pdf'));
     const only = __fakeSeed({ kind: 'CERT_BLS', type_code: 'CERT_BLS', display_name: 'BLS — TC ID only', expires_on: '2028-06-30', jurisdiction_code: null }, mk(o, 'bls-tc-only.pdf', 'application/pdf'));
-    await store.account.hydrate(); acctShow('acctPassportV10'); return { hdr, only };
-  }, b64('tc-header-scanned-clean.pdf'), b64('tc-only-text.pdf'));
+    await store.account.hydrate(); acctShow('acctPassportV10'); return { only };
+  }, b64('tc-only-text.pdf'));
   await W(300);
-  // nurse: add a BLS with a card that only shows the TC ID
+  // nurse: add a BLS with a card that only shows the TC ID; she types only the date
   await tap('[data-act="toggle-add"]'); await W(200);
   await pg.select('#acctKindV10', 'CERT_BLS'); await setVal('acctExpV10', '2028-06-30');
   await (await pg.$('#acctFileV10')).uploadFile(file('tc-only-clean.png'));
-  await pg.waitForSelector('#acctScanBoxV14[data-state="scanning"]', { timeout: 10000 }).catch(() => {}); await waitScan();
-  const n1 = await pg.evaluate(() => ({ v: acctScan.values, lbl: [...document.querySelectorAll('#acctScanBoxV14 .scan-lbl-v14')].map(x => x.textContent.trim()), note: document.getElementById('acctScanNote-credential_id')?.textContent || '', info: document.getElementById('acctScanInfo-training_center_id')?.innerText || '', chips: document.querySelectorAll('#acctScanBoxV14 .conf-v14').length, wanted: acctScan.res.fieldsWanted.length }));
-  ok('C1 nurse: eCard code left empty with "eCard code not found. Type it from your card; it\'s needed for AHA verification."', n1.v.credential_id === '' && /eCard code not found\. Type it from your card; it's needed for AHA verification\./.test(n1.note), JSON.stringify({ v: n1.v.credential_id, note: n1.note }));
-  ok('C2 nurse: Training Center ID shown separately as "not used for verification"; ID label is "eCard code" (not RQI)', /Training Center ID/.test(n1.info) && /CA00001/.test(n1.info) && /Not used for verification/.test(n1.info) && n1.lbl.some(l => /^eCard code/.test(l)) && !n1.lbl.some(l => /RQI/.test(l)), JSON.stringify(n1));
-  ok('C3 nurse: every needed field still shows one confidence chip', n1.chips === n1.wanted, n1.chips + '/' + n1.wanted);
-  await setVal('acctScanF-credential_id', 'CA00001'); await W(150);
-  const n2 = await pg.evaluate(() => document.getElementById('acctScanMismatchBoxV14')?.innerText || '');
-  ok('C4 nurse: typing the TC ID into the eCard code box is flagged', /looks like the Training Center ID/.test(n2), n2.replace(/\s+/g, ' ').slice(0, 160));
-  await setVal('acctScanF-credential_id', '261100000041'); await W(150);
-  ok('C5 nurse: a real eCard code clears that note', !/looks like the Training Center ID/.test(await pg.evaluate(() => document.getElementById('acctScanMismatchBoxV14')?.innerText || '')));
-  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]');
+  await waitScan();
+  await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]');
   await pg.waitForFunction(() => !document.body.classList.contains('acct-busy-v10'), { timeout: 60000 });
-  const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); const xe = __fakeDb.extraction_events.filter(e => e.credential_id === c.id); return { doc: c.metadata.doc, xe, leak: JSON.stringify([c.metadata, xe, __fakeDb.audit_events.map(e => e.detail)]) }; });
-  ok('C6 saved: extraction event accepted by the field-name rule (no training_center_id), no values on the server', saved.xe.length === 1 && !saved.xe[0].fields_expected.includes('training_center_id') && !/CA00001|261100000041|Testa/.test(saved.leak), JSON.stringify(saved.xe[0] && saved.xe[0].fields_expected));
-  // verifier: header-layout scanned PDF → assisted AHA lookup uses the eCard code
+  const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); const xe = (__fakeDb.extraction_events || []).filter(e => e.credential_id === c.id); return { c: c && { exp: c.expires_on, status: c.status, keys: Object.keys(c.metadata || {}).sort().join(',') }, xe: xe.map(e => e.fields_expected || null), leak: JSON.stringify([c.metadata, xe, __fakeDb.audit_events.map(e => e.detail)]) }; });
+  ok('C6 (rewritten v14.8) saved with only what the nurse typed; nothing read from the card (TC ID, code, name) reaches the server', saved.c && saved.c.exp === '2028-06-30' && saved.c.status !== 'VERIFIED' && !/CA00001|2611000000|Testa/.test(saved.leak) && !/doc|holder|number|issued/.test(saved.c.keys), JSON.stringify(saved));
+  // verifier: TC-ID-only card → nothing prefilled, no on-device reader, no Copy button
   await tap('.acctTab[data-target="acctVerifyV12"]'); await W(300);
-  await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), { timeout: 20000 }, seeded.hdr);
-  await tap(`.acct-verify-pick-v12[data-id="${seeded.hdr}"]`);
-  await pg.waitForSelector('#acctVerifyFormV12[data-mode="registry"]', { timeout: 15000 });
-  await tap('#acctVReadV14'); await pg.waitForSelector('#acctCopyCodeV14', { timeout: 90000 });
-  const v1 = await pg.evaluate(() => ({ ref: document.getElementById('acctVerifyRefV12').value, copy: document.getElementById('acctCopyCodeV14').dataset.code, tc: document.getElementById('acctVTcIdV142')?.innerText || '', sel: document.getElementById('acctVerifySourceIdV13').value, aha: !!document.getElementById('acctOpenAhaV14'), box: document.getElementById('acctDocBoxV14').innerText }));
-  ok('C7 verifier: reference and Copy use the eCard code (261100000025), never the TC ID; AHA eCards preselected', v1.ref === '261100000025' && v1.copy === '261100000025' && v1.sel === 'aha-ecards' && v1.aha && !/RQI code/.test(v1.box), JSON.stringify({ ref: v1.ref, copy: v1.copy, sel: v1.sel }));
-  ok('C8 verifier: Training Center ID shown for context, marked not used for verification', /CA00001/.test(v1.tc) && /Not used for verification/.test(v1.tc), v1.tc);
-  // verifier: TC-ID-only card → no code, clear message, reference left empty
-  await pg.evaluate(() => { acctVerifyRows = null; acctVScan = null; acctRenderVerify(); }); await W(300);
   await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), { timeout: 20000 }, seeded.only);
   await tap(`.acct-verify-pick-v12[data-id="${seeded.only}"]`);
   await pg.waitForSelector('#acctVerifyFormV12[data-mode="registry"]', { timeout: 15000 });
-  await tap('#acctVReadV14'); await pg.waitForSelector('#acctVNoCodeV142', { timeout: 90000 });
-  const v2 = await pg.evaluate(() => ({ ref: document.getElementById('acctVerifyRefV12').value, msg: document.getElementById('acctVNoCodeV142').innerText, copy: !!document.getElementById('acctCopyCodeV14') }));
-  ok('C9 verifier: card with only a TC ID → "eCard code not found" message, nothing prefilled, no Copy button', v2.ref === '' && !v2.copy && /eCard code not found/.test(v2.msg) && /Training Center ID can't be used/.test(v2.msg), JSON.stringify(v2));
+  await W(500);
+  const v2 = await pg.evaluate(() => ({ ref: document.getElementById('acctVerifyRefV12').value, copy: !!document.getElementById('acctCopyCodeV14'), reader: !!document.getElementById('acctVReadV14') }));
+  ok('C9 (rewritten v14.8) verifier: card with only a TC ID → reference empty (the verifier types it from the source), no reader, no Copy button', v2.ref === '' && !v2.copy && !v2.reader, JSON.stringify(v2));
   ok('C10 no page errors', errs.length === 0, errs.slice(0, 2).join(' | '));
   await ctx.close();
 }

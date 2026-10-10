@@ -95,6 +95,7 @@ async function run(browser, name, vp, shots) {
         renewed: P(L + 'License Number: RN.0001234\nRenewed: 01/15/2026\nExpires: 01/31/2028', 'RN_LICENSE'),
         renewedOnly: P(L + 'License Number: RN.765432\nLast Renewed: 10/01/2025\nRenewal Date: 10/31/2027', 'RN_LICENSE'),
         swap: P(L + 'License Number: RN.1\nExpiration Date: 01/31/2024\nIssue Date: 01/31/2026', 'RN_LICENSE'),
+        registered: P('THE UNIVERSITY OF THE STATE OF NEW YORK\nRegistered Professional Nurse\nLicense No. 000999888\nDate of registration: 09/01/2022\nRegistered through: 08/31/2028', 'RN_LICENSE'),
         repairFns: ['fixDigits', 'normCode', 'renewToExpiry', 'interpretRenewal'].filter(f => typeof DocExtract[f] === 'function'),
       };
     });
@@ -108,6 +109,7 @@ async function run(browser, name, vp, shots) {
     t('"Renew By" never becomes the expiration', !pr.renewBy.expires_on && !(pr.renewBy._exp && pr.renewBy._exp.value), JSON.stringify(pr.renewBy));
     t('"Renewed" is not the expiration; the printed Expires date is', pr.renewed.expires_on === '2028-01-31' && pr.renewed.issued_on !== '2026-01-15', JSON.stringify(pr.renewed));
     t('"Last Renewed" / "Renewal Date" alone → no expiration', !pr.renewedOnly.expires_on && !(pr.renewedOnly._exp && pr.renewedOnly._exp.value), JSON.stringify(pr.renewedOnly));
+    t('t150u A: a time-limited registration\'s printed "Registered through" date is read as its current-practice-through date; "Date of registration" never is', pr.registered.expires_on === '2028-08-31' && pr.registered.issued_on === '2022-09-01', JSON.stringify(pr.registered));
     t('no issue/expiration swap (dates stay under their printed labels)', pr.swap.expires_on === '2024-01-31' && pr.swap.issued_on === '2026-01-31', JSON.stringify(pr.swap));
     t('repair helpers are gone from the reader API', pr.repairFns.length === 0, pr.repairFns.join());
 

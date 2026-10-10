@@ -72,9 +72,10 @@ async function partA1(pg) {
       if (lic && prof !== 'license') problems.push('license profile ' + prof);
       if (k.category === 'Certifications' && !['cert', 'aha_resus'].includes(prof)) problems.push('cert profile ' + prof);
       // the date check runs for every kind
-      const v = prof === 'aha_resus' ? { renew_by: '2028-06' } : { expires_on: '2028-06-30' };
-      const m = DocExtract.compareToEntered(v, { kind: k.kind, expires_on: '2028-05-08' });
+      /* v14.8 (rewritten): only a printed expiration is compared; a "Renew By" month is never turned into one */
+      const m = DocExtract.compareToEntered({ expires_on: '2028-06-30' }, { kind: k.kind, expires_on: '2028-05-08' });
       if (!m.some(x => x.field === 'expires_on' && x.document === '2028-06-30')) problems.push('no date mismatch check');
+      if (prof === 'aha_resus' && DocExtract.compareToEntered({ renew_by: '2028-06' }, { kind: k.kind, expires_on: '2028-05-08' }).some(x => x.field === 'expires_on')) problems.push('renew-by treated as an expiration');
       // certification document patterns: the kind's own pattern exists
       if (k.category === 'Certifications' && !DocExtract.kindPattern(k)) problems.push('no document pattern');
       out.push({ kind: k.kind, route: route && route.id, problems });
@@ -100,8 +101,7 @@ async function partA2(pg) {
     const out = {};
     // Munib's case: card renews 06/2028, he typed May 8, 2028
     const bls = P('AMERICAN HEART ASSOCIATION\nBLS Provider\nTesta Fakename\nhas successfully completed the cognitive and skills evaluations\n06/12/2026   06/2028\nIssue Date   Recommended Renewal Date\neCard Code 261100000017', 'CERT_BLS');
-    const m = DocExtract.compareToEntered(v(bls), { kind: 'CERT_BLS', expires_on: '2028-05-08', profileName: 'Testa Fakename', issuer: bls.issuer });
-    out.bls = { v: v(bls), src: bls.source && bls.source.id, m: m.map(x => x.field + ':' + x.document), text: DocExtract.documentExpiry(bls.fields, bls.issuer).text };
+    out.bls = { v: v(bls), src: bls.source && bls.source.id };
     const rqi = P('American Heart Association\nRQI HeartCode Complete\nACLS Provider\nName: Mock Clinician\nIssue Date 01/15/2026\nRenew By 01/2028\neCard Code AB12CD34EF56', 'CERT_ACLS');
     out.rqi = { src: rqi.source && rqi.source.id, code: rqi.fields.credential_id && rqi.fields.credential_id.value };
     const rc = P('American Red Cross\nAdult and Pediatric First Aid/CPR/AED\nBasic Life Support\nThis certifies that\nImaginary Person\nhas successfully completed\nDate Completed 03/01/2026\nValid for 2 years 03/01/2028\nCertificate ID: 01ABCD2', 'CERT_BLS');
@@ -119,11 +119,10 @@ async function partA2(pg) {
     const tb = P('Occupational Health\nEmployee Fakey McTestface\nTest Date 04/01/2026\nNext Due 04/01/2027', 'HEALTH_TB_CURRENT');
     out.tb = { profile: tb.profile, keys: Object.keys(tb.fields).sort().join(','), m: DocExtract.compareToEntered(v(tb), { kind: 'HEALTH_TB_CURRENT', expires_on: '2027-01-01', profileName: 'Testa Fakename' }).map(x => x.field) };
     out.never = [bls, nih, lic, tb].every(x => !('verified' in x) && !/verified/i.test(JSON.stringify(x.fields)));
-    out.ocrFix = DocExtract.normCode('26I1 OOOO OO17');
     return out;
   });
-  ok('06/2028 card vs typed May 8, 2028 → expiration mismatch, document date = June 30, 2028', r.bls.m.includes('expires_on:2028-06-30') && r.bls.v.renew_by === '2028-06', JSON.stringify(r.bls.m));
-  ok('renewal month is explained as the end of that month', /end of the month/.test(r.bls.text) && /June 30, 2028/.test(r.bls.text), r.bls.text);
+  /* v14.8: "06/2028 card vs typed May 8 → expiration mismatch" and "renewal month = end of month" retired:
+     a Renew By month is never an expiration (p148 '"Renew By" never becomes the expiration'). */
   ok('BLS card suggests AHA eCards (never Nursys)', r.bls.src === 'aha-ecards', r.bls.src);
   ok('code with letters → AHA RQI', r.rqi.src === 'aha-rqi' && r.rqi.code === 'AB12CD34EF56', JSON.stringify(r.rqi));
   ok('Red Cross certificate → Red Cross source', r.rc.src === 'redcross-certificate' && r.rc.issuer === 'RED_CROSS', JSON.stringify(r.rc));
@@ -133,7 +132,7 @@ async function partA2(pg) {
   ok('TNCC document on an NRP credential → course mismatch', r.tnccOnNrp.includes('course'), JSON.stringify(r.tnccOnNrp));
   ok('license: number, state, single-state; state and multistate mismatches; board/Nursys source', r.lic.v.credential_id === '000999111RN' && r.lic.v.jurisdiction === 'US-OR' && r.lic.v.multistate === 'single-state' && r.lic.m.includes('jurisdiction') && r.lic.m.includes('multistate') && /^(nursys|board-)/.test(r.lic.src), JSON.stringify(r.lic));
   ok('private TB record: dates only, date check still runs', r.tb.profile === 'dates_only' && r.tb.keys === 'expires_on,issued_on' && r.tb.m.includes('expires_on') && !r.tb.m.includes('holder_name'), JSON.stringify(r.tb));
-  ok('OCR digit fixes in codes (I→1, O→0)', r.ocrFix && r.ocrFix.code === '261100000017', JSON.stringify(r.ocrFix));
+  /* v14.8: "OCR digit fixes in codes" retired: identifiers are never transformed (p148 'no O/0, I/1, L swaps', 'repair helpers are gone'). */
   ok('a parse result never claims "verified"', r.never);
 }
 
@@ -456,9 +455,10 @@ async function partB(browser) {
     if (!fs.existsSync(FIX + '/01-bls-text.pdf')) await require('./p14-fixtures.js').generateOther(browser, FIX).then(() => require('./p14-fixtures.js').generate(browser, BASE, FIX));
     await partA4(browser);
     await partA5(browser);
-    const live = await require('./live-db.js').reachable() && await require('./live-db.js').client().then(async c => { try { await c.query('select 1'); return true; } catch { return false; } finally { await c.end().catch(() => {}); } }).catch(() => false);
+    /* v14.8: the live-database part is opt-in (P14_LIVE=1). Default runs never touch a live database. */
+    const live = process.env.P14_LIVE === '1' && await require('./live-db.js').reachable() && await require('./live-db.js').client().then(async c => { try { await c.query('select 1'); return true; } catch { return false; } finally { await c.end().catch(() => {}); } }).catch(() => false);
     if (live) await partB(browser);
-    else skip('live database checks', 'database not reachable from this machine (Management API token rejected, Postgres ports closed)');
+    else skip('live database checks', process.env.P14_LIVE === '1' ? 'database not reachable from this machine (Management API token rejected, Postgres ports closed)' : 'live checks are opt-in (P14_LIVE=1); default runs never touch a live database');
   } catch (e) { if (process.env.P14_DEBUG) console.log(JSON.stringify(String(e && e.message)).slice(0, 800)); ok('p14 run', false, String(e && e.stack || e).replace(/postgres(ql)?:\/\/[^\s'"]+/g, '***').replace(/sbp_[A-Za-z0-9_]+/g, 'sbp_***')); }
   finally { await Promise.race([browser.close().catch(() => {}), W(15000)]); }
   const fails = R.filter(r => r.startsWith('FAIL')).length, skips = R.filter(r => r.startsWith('SKIP')).length;

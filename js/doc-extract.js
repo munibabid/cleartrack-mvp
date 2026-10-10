@@ -148,12 +148,14 @@ function detectSource(flat,kind,sources){
  for(const s of list){try{if(new RegExp(s.docIssuer,'i').test(flat))return{id:s.id,name:s.name,how:'named on the document'}}catch{}}
  return null;
 }
-const RE_ISSUE=/issue|issued|completion|completed|date\s+of\s+(course|exam|test|completion|certification)|test\s*date|exam\s*date|administered|date\s+given|collected|certified\s+(since|on)|initial|original|awarded|conferred|earned|effective|course\s+date|class\s+date|read\s+on|date\s+read|signed/i;
+const RE_ISSUE=/issue|issued|completion|completed|date\s+of\s+(course|exam|test|completion|certification|registration)|test\s*date|exam\s*date|administered|date\s+given|collected|certified\s+(since|on)|initial|original|awarded|conferred|earned|effective|course\s+date|class\s+date|read\s+on|date\s+read|signed/i;
 /* v14.8: "Renew By", "Recommended Renewal", "Renewed", "Last Renewed", "Renewal Date" and
    recertification dates are never an expiration (and never an issue date). Dates are only taken
-   from their own printed label: no ordering guesses, no issue/expiration swaps. */
+   from their own printed label: no ordering guesses, no issue/expiration swaps.
+   t150u: a time-limited registration's printed "Registered through" / "Registration valid through"
+   date is that license's current-practice-through date (labelled, so it is read as the expiration). */
 const RE_RENEW=/renew|recertif/i;
-const RE_EXP=/expir|certified\s+(through|thru|until)|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)\b|exp\.?\s*date|\bexp\b\.?|good\s+through|next\s*(test|due)|\bdue\s+date\b/i;
+const RE_EXP=/expir|certified\s+(through|thru|until)|registered\s+(through|thru|until)|registration\s+(valid\s+)?(through|thru|until|expires?)|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)\b|exp\.?\s*date|\bexp\b\.?|good\s+through|next\s*(test|due)|\bdue\s+date\b/i;
 function pickDates(lines,{monthYearOk=true}={}){
  const {full,my}=findDates(lines);
  const renewLine=li=>RE_RENEW.test(lines[li]||'');
