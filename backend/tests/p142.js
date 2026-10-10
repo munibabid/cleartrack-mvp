@@ -77,7 +77,8 @@ function partA() {
   ok('A18 two-column card (label above value): eCard code, TC ID = CA-pattern, Instructor ID kept out, TC name not merged with the instructor', tf('credential_id') === '271100000056' && tf('training_center_id') === 'CA00002' && tf('training_center') === 'Example Permanente Education' && !JSON.stringify(two.fields).includes('24000000017'), JSON.stringify({ code: tf('credential_id'), tc: tf('training_center_id'), name: tf('training_center') }));
   const y27 = D.compareToEntered({ credential_id: '271100000056', issued_on: '2026-06-03', renew_by: '2028-06' }, { kind: 'CERT_BLS', expires_on: '2028-06-30', issuer: 'AHA' });
   ok('A19 a 2026 card whose eCard code starts with 27 is not flagged (real cards do this)', !y27.some(m => m.field === 'credential_id') && !two.warnings.some(w => /issue year/.test(w)), JSON.stringify(y27));
-  ok('A17 the same date without its label scores lower than with it', nolab.issued_on && nolab.issued_on.conf < hi.issued_on.conf, JSON.stringify({ nolabel: nolab.issued_on && nolab.issued_on.conf, label: hi.issued_on.conf }));
+  /* v14.8 P0: a date without its label is no longer guessed at all (was: read with a lower score) */
+  ok('A17 the same date without its label is not read (v14.8) — never scores as high as with it', !nolab.issued_on || nolab.issued_on.conf < hi.issued_on.conf, JSON.stringify({ nolabel: nolab.issued_on && nolab.issued_on.conf, label: hi.issued_on.conf }));
 }
 
 async function partB(browser) {
