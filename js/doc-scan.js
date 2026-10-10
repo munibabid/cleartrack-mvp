@@ -12,9 +12,24 @@ function scanConfChip(c,found=true){
  return`<span class="conf-v14 conf-${cls}" title="How sure the reader is about this field">${p}% · ${c>=0.9?'high':c>=0.7?'check it':'low, check it'}</span>`;
 }
 function scanIdLabel(res){if(!res)return'ID';if(res.profile==='aha_resus')return res.issuer==='RED_CROSS'?'Certificate ID':res.issuer==='AHA_RQI'?'RQI eCard code':'eCard code';return DocExtract.ID_LABELS[res.profile]||'ID'}
+/* v14.7: which date this is depends on the credential family. Licenses get only an issue date
+   (if printed), never a completion date; completion dates are for NIHSS, skills checklists and
+   courses. A date the document labels otherwise (e.g. "Effective") keeps its printed label. */
+function scanIsLicenseKind(kind){const k=typeof catalogKind==='function'?catalogKind(kind):null;return!!k&&(k.category==='Licenses'||/LICENSE|^LPN|^LVN/.test(k.kind))}
+function scanKind(){return acctScan?(acctScan.target==='add'?scanContext().kind||acctScan.kind:acctScan.kind):null}
+const SCAN_PLAIN_ISSUE=/^(?:date\s+(?:of\s+)?)?(?:issue|issued)(?:\s+date)?$/i;
+function scanIssueDateLabel(res,kind=scanKind()){
+ if(res?.profile==='dates_only')return'Date on the record (test / completion)';
+ const raw=res?.fields?.issued_on?.label;
+ if(scanIsLicenseKind(kind)||res?.profile==='license')return raw&&!SCAN_PLAIN_ISSUE.test(raw)?`Date printed as “${raw}” (if printed on the document)`:'Issue date (if printed on the document)';
+ if(kind==='CERT_NIHSS'||/^SKILLS_/.test(kind||''))return'Completion date';
+ if(/\bcourse\b/i.test(catalogKind(kind)?.label||''))return'Issue / completion date';
+ return raw&&!SCAN_PLAIN_ISSUE.test(raw)&&!/complet/i.test(raw)?`Date printed as “${raw}”`:'Issue date';
+}
+const SCAN_LICENSE_ISSUE_NOTE='The original issue date may differ from the date on this card, which can show the latest renewal. Not required. The verifier confirms the original issue date with the state board during verification.';
 function scanFieldLabel(k,res){
  if(k==='credential_id')return scanIdLabel(res);
- if(k==='issued_on'&&res?.profile==='dates_only')return'Date on the record (test / completion)';
+ if(k==='issued_on')return scanIssueDateLabel(res);
  if(k==='expires_on'&&res?.profile==='dates_only')return'Next due / expires';
  return DocExtract.FIELD_LABEL[k]||k;
 }
@@ -75,7 +90,7 @@ function scanBoxHtml(target){
  return`<div class="scan-v14" id="acctScanBoxV14" data-state="done" data-profile="${ec(r.profile)}">
  <div class="scan-head-v14"><b>Read from your document</b> <span class="small">· ${ec(({PDF_TEXT:'PDF text',PDF_OCR:'scanned PDF (OCR)',IMAGE_OCR:'image (OCR)'})[r.method]||r.method)}${r.rotated?` · turned ${r.rotated}°`:''}${r.qrFound?' · QR code read':''} · ${(r.ms/1000).toFixed(1)} s</span></div>
  <div class="small">Check each detail against your document and correct anything wrong. ${priv?'This is a private record: only the dates are used, and only the expiration date is saved. Nothing else from it is stored.':'The values stay on this device: Veridun saves only which fields you confirmed and any mismatch flag. The verifier reads the document again on their side.'}</div>
- <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14${s.target==='add'&&(k==='expires_on'||k==='renew_by'||k==='multistate')?' hidden scan-exp-moved-v144':''}" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile|swapped/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}${!f&&r.notes?.[k]?`<span class="small scan-note-v142" id="acctScanNote-${k}">${ec(r.notes[k])}</span>`:''}</label>`}).join('')}${(r.infoFields||[]).filter(k=>r.fields[k]).map(k=>`<div class="scan-row-v14 scan-info-v142" data-info-field="${k}" id="acctScanInfo-${k}"><span class="scan-lbl-v14">${ec(DocExtract.FIELD_LABEL[k]||k)}</span><span class="scan-info-val-v142">${k==='test_group'?'Group '+ec(r.fields[k].value)+' '+scanConfChip(r.fields[k].conf,true):k==='nihss_module'?ec(r.fields[k].value)+' '+scanConfChip(r.fields[k].conf,true):ec(r.fields[k].value)}</span><span class="small">${k==='nihss_module'?'As printed (“'+ec(r.fields[k].raw||'')+'”).':k==='test_group'?'As printed (“'+ec(r.fields[k].raw||'')+'”). Some facilities accept only certain groups, or a different group than last time.':ec(DocExtract.TC_ID_NOTE)}</span></div>`).join('')}</div>
+ <div class="scan-fields-v14">${fields.map(k=>{const f=r.fields[k];return`<label class="scan-row-v14${s.target==='add'&&(k==='expires_on'||k==='renew_by'||k==='multistate')?' hidden scan-exp-moved-v144':''}" data-field="${k}"><span class="scan-lbl-v14">${ec(scanFieldLabel(k,r))} ${!f&&k==='issued_on'&&(scanIsLicenseKind(scanKind())||r.profile==='license')?'<span class="conf-v14 conf-none">not printed · optional</span>':scanConfChip(f?.conf||0,!!f)}</span>${scanInput(k,s.values[k])}${f?.how&&/damaged|different|abbreviation|profile|swapped/.test(f.how)?`<span class="small">read from: ${ec(f.how)}</span>`:''}${!f&&r.notes?.[k]?`<span class="small scan-note-v142" id="acctScanNote-${k}">${ec(r.notes[k])}</span>`:''}${k==='issued_on'&&(scanIsLicenseKind(scanKind())||r.profile==='license')?`<span class="small scan-note-v147" id="acctScanIssueNoteV147">${ec(SCAN_LICENSE_ISSUE_NOTE)}</span>`:''}</label>`}).join('')}${(r.infoFields||[]).filter(k=>r.fields[k]).map(k=>`<div class="scan-row-v14 scan-info-v142" data-info-field="${k}" id="acctScanInfo-${k}"><span class="scan-lbl-v14">${ec(DocExtract.FIELD_LABEL[k]||k)}</span><span class="scan-info-val-v142">${k==='test_group'?'Group '+ec(r.fields[k].value)+' '+scanConfChip(r.fields[k].conf,true):k==='nihss_module'?ec(r.fields[k].value)+' '+scanConfChip(r.fields[k].conf,true):ec(r.fields[k].value)}</span><span class="small">${k==='nihss_module'?'As printed (“'+ec(r.fields[k].raw||'')+'”).':k==='test_group'?'As printed (“'+ec(r.fields[k].raw||'')+'”). Some facilities accept only certain groups, or a different group than last time.':ec(DocExtract.TC_ID_NOTE)}</span></div>`).join('')}</div>
  ${exp&&s.target!=='add'?`<div class="small scan-interp-v14" id="acctScanInterpV14">${ec(exp.text)}</div>`:''}${exp&&s.target==='add'?`<div class="small" id="acctScanExpMovedV144">The expiration date read from the document is in the Expiration date field above.</div>`:''}
  ${r.warnings.length?`<div class="small notice">${r.warnings.map(ec).join('<br>')}</div>`:''}
  <div id="acctScanMismatchBoxV14">${scanMismatchHtml()}</div>
@@ -117,6 +132,7 @@ function scanPrefillExpiry(){
    only a typed value is kept. */
 function scanClearDocExpiry(){const el=$('acctExpV10');if(el&&el.dataset.origin==='document'){el.value='';delete el.dataset.origin}}
 function scanExpMark(){
+ if(typeof expConfirmSync==='function')expConfirmSync('acct');
  const el=$('acctExpV10'),src=$('acctExpSrcV144'),note=$('acctExpNoteV144');if(!el||!src||!note)return;
  const on=acctScan&&acctScan.target==='add'&&acctScan.status==='done'&&acctScan.res?.supported;
  const exp=on?scanDocExpiry():null;

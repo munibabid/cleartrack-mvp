@@ -154,6 +154,12 @@ The entry screen has a **Your account · staging** card under the three demo wor
 - **Licenses follow the assignment:** the Passport needs an RN license. A state license that a pursued assignment needs and that your home/compact license doesn't cover is marked **Required** (e.g. Massachusetts for Boston).
 - **Accounts: manual primary-source check.** A verifier at AAL2 picks the approved source for the credential (the board for that state, or Nursys QuickConfirm), opens its lookup, and records the result, status at source, expiration, reference and monitoring state. The **database** sets the level (`record_source_check`), and the credential then shows *PRIMARY SOURCE VERIFIED · Source · Checked*. Nobody can set a level from the browser.
 
+### v14.7: clearer dates, confirmed expirations, references count toward readiness
+
+- **License issue date.** On the scan review, a license shows only **Issue date (if printed on the document)**. It is never a completion date and it isn't required. If the document labels the date differently (for example "Effective Date"), that printed label is shown as is. A note explains that the original issue date can differ from the date on the card, which can show the latest renewal, and that the verifier confirms the original issue date with the state board. That **original issue date** is a verifier-side field: the verifier records it (demo Verification Console, or the account source-check form), and it then shows in provenance, apart from any date printed on the document. Completion dates appear only where they apply: NIHSS, skills checklists and courses.
+- **Expiration confirmation.** The expiration field works as before (filled from the scan or typed). Next to it the nurse must tick **I confirm this expiration date matches my document**, or **No expiration date on this document** when none is printed. Saving is blocked until it is ticked. Changing the date or choosing a new file clears the tick. Veridun records where the date came from (document scan, typed, or none printed), that the nurse confirmed it, and when. The date itself stays in the credential's expiration field. On signed-in accounts this uses the existing `metadata` column and audit events; there is no database change.
+- **References aren't credentials.** "Specialty Reference Evaluation" is no longer in the Add credential list. References live only in the References section, and the specialty-reference requirement now reads **References: N of 2 completed** from completed references (demo store). Alex's demo seed has two completed example references, so Boston stays 11/12. Older demo data that still had a reference entry in the credential list is moved out on load. It is kept in this browser (`veridun_reference_legacy`), not deleted, and the References section says so. Signed-in accounts don't have references yet, so their references requirement says so.
+
 ### Professional references (v14.6, demo only)
 
 **Demo only. Nothing is sent and nothing is stored in the database.** References live in this browser (`veridun_references`; answers under their own key, `veridun_reference_responses`) and are cleared by Reset Demo Data.
@@ -274,6 +280,7 @@ js/verification.js         simulated verification + provenance/proof dialog
 js/xrpl.js                 XRPL Devnet issue/accept/live check
 js/sharing.js              Passport QR + assignment-scoped live shares (durations, enforcement, revoke, extension requests)
 js/references.js           v14.6 professional references (demo only): requests, private reference form, expiry/reminders, phone-call entry, identity confidence, shared view
+js/exp-confirm.js          v14.7 expiration confirmation next to the expiration field (demo + account add forms)
 js/roles/clinician.js      clinician workspace views
 js/roles/organization.js   organization workspace
 js/roles/verifier.js       Verification Console

@@ -115,7 +115,13 @@ function evaluateNihss(req,c,a,list){
  /* the requirement date is calculated (completion + the rule's months): shown as such, never as an expiration */
  return{status:'MET',basis:`meets the ${rule.label} until ${fd(until)} (requirement date, calculated from completion; not printed)${g?' · Group '+g:''}`,until,requirementDate:until,rule};
 }
-function evaluateRequirement(req,a,list=creds){
+function evaluateRequirement(req,a,list=creds,refStatuses=null){
+ /* v14.7: references are not credentials. The live demo nurse (and comparison
+    nurses, via refStatuses) satisfy this from the References section. */
+ if(req.kind==='REF_SPECIALTY'&&typeof evaluateReferencesRequirement==='function'){
+  if(refStatuses)return evaluateReferencesRequirement(req,a,refStatuses);
+  if(list===creds)return evaluateReferencesRequirement(req,a,nurseReferenceStatuses(DEMO_NURSES[0]));
+ }
  const label=requirementLabel(req);
  const matches=list.map(c=>({c,basis:satisfactionBasis(req,c)})).filter(x=>x.basis);
  const verifiedAny=matches.filter(x=>isVerifiedActive(x.c));
@@ -146,11 +152,12 @@ function evaluateRequirement(req,a,list=creds){
   if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>licenseRuleKind(c)==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Multistate license (home ${ms.jurisdiction}) not honored here: ${nlcStatusLabel(req.jurisdiction)}`}
   out={req,label,status:'MISSING',note};
  }
+ if(req.kind==='REF_SPECIALTY'&&out.status==='MISSING')out.note='References are requested in the References section of the demo; not yet available for signed-in accounts';
  out.decision=REQUIREMENT_DECISIONS[out.status]||out.status;
  out.why=requirementWhy(out,a);
  return out;
 }
-const REQUIREMENT_DECISIONS={MET:'Satisfied',PENDING_VERIFICATION:'Pending verification',MISSING:'Not satisfied — missing',EXPIRES_BEFORE_END:'Not satisfied — expires before the assignment ends',NOT_RECENT:'Not satisfied — experience not recent enough',LEVEL_TOO_LOW:'Not satisfied — verification level too low',NEEDS_REVIEW:'Needs review',OUTSIDE_WINDOW:'Not satisfied — outside the NIHSS recency window',GROUP_NOT_ACCEPTED:'Not satisfied — NIHSS test group not accepted'};
+const REQUIREMENT_DECISIONS={MET:'Satisfied',WAITING_REFERENCES:'Not satisfied — waiting on references',PENDING_VERIFICATION:'Pending verification',MISSING:'Not satisfied — missing',EXPIRES_BEFORE_END:'Not satisfied — expires before the assignment ends',NOT_RECENT:'Not satisfied — experience not recent enough',LEVEL_TOO_LOW:'Not satisfied — verification level too low',NEEDS_REVIEW:'Needs review',OUTSIDE_WINDOW:'Not satisfied — outside the NIHSS recency window',GROUP_NOT_ACCEPTED:'Not satisfied — NIHSS test group not accepted'};
 /* Plain-words explanation of a decision (the "Why?" on readiness). */
 function requirementWhy(i,a){
  const r=i.req,c=i.credential,lvl=c?credentialLevel(c):null,p=c?.prov||{};
@@ -172,9 +179,10 @@ function v81Assignment(a,nurse=null){
  const n=nurse||DEMO_NURSES[0],sp=matchedSpecialty(a,n);
  if(!sp)return{eligible:false,specialty:n.specialty,ok:0,total:0,missing:[],ready:false,items:[],reqs:[]};
  const list=nurseCreds(n),reqs=layeredRequirements(a,sp);
- const items=reqs.map(r=>({...evaluateRequirement(r,a,list),layer:r.layer,authority:r.authority}));
+ const rs=typeof nurseReferenceStatuses==='function'?nurseReferenceStatuses(n):null;
+ const items=reqs.map(r=>({...evaluateRequirement(r,a,list,rs),layer:r.layer,authority:r.authority}));
  const ok=items.filter(i=>i.status==='MET').length;
- const missing=items.filter(i=>i.status!=='MET').map(i=>i.label+(i.status==='NEEDS_REVIEW'?' — needs review':i.status==='OUTSIDE_WINDOW'?' — outside the NIHSS window':i.status==='GROUP_NOT_ACCEPTED'?' — test group not accepted':'')+(i.status==='EXPIRES_BEFORE_END'?' — renew before submission':i.status==='NOT_RECENT'?' — experience not recent':i.status==='PENDING_VERIFICATION'?' — pending verification':i.status==='LEVEL_TOO_LOW'?' — needs a stronger verification':''));
+ const missing=items.filter(i=>i.status!=='MET').map(i=>i.label+(i.status==='NEEDS_REVIEW'?' — needs review':i.status==='OUTSIDE_WINDOW'?' — outside the NIHSS window':i.status==='GROUP_NOT_ACCEPTED'?' — test group not accepted':'')+(i.status==='WAITING_REFERENCES'?' — waiting on references':'')+(i.status==='EXPIRES_BEFORE_END'?' — renew before submission':i.status==='NOT_RECENT'?' — experience not recent':i.status==='PENDING_VERIFICATION'?' — pending verification':i.status==='LEVEL_TOO_LOW'?' — needs a stronger verification':''));
  return{eligible:true,specialty:sp,ok,total:items.length,missing,ready:missing.length===0,items,reqs};
 }
 function v7Readiness(){const req=creds.filter(c=>c.required),ok=req.filter(reqSatisfied).length;return req.length?Math.round(ok/req.length*100):0}

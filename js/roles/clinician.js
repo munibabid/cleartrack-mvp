@@ -47,6 +47,8 @@ function renderOpportunities(){
 function completeMissingRequirement(aid){
  const a=getAssignment(aid);if(!a)return;const r=v81Assignment(a),next=r.items.find(i=>['MISSING','EXPIRES_BEFORE_END','NOT_RECENT'].includes(i.status));if(!next)return;
  if(!eventsSinceSeed().some(e=>e.event_type==='ASSIGNMENT_INTEREST'&&e.assignment_id===aid))v81Log('ASSIGNMENT_INTEREST',null,{assignment_id:aid,actor_type:'CLINICIAN',result:`${r.ok}/${r.total}`,detail:{total:r.total,missing:r.total-r.ok,missingLabels:r.missing}});
+ /* v14.7: references aren't credentials: go to the References section instead of the Add Credential form */
+ if(next.req.kind==='REF_SPECIALTY'){showV7View('referencesView');return}
  const kind=next.req.kind===RN_AUTHORIZATION?'RN_LICENSE':next.req.kind;
  openAddForm({kind,jurisdiction:next.req.jurisdiction||'',context:`Completing <b>${ec(a.name)}</b>: ${ec(next.label)}${next.note?' <span class="small">('+ec(next.note)+')</span>':''}`});
 }
@@ -60,7 +62,7 @@ function openAddForm(pre={}){
  $('addContextV82').innerHTML=pre.context||'';$('addContextV82').classList.toggle('hidden',!pre.context);
  v81SyncAddForm();$('add').showModal();
 }
-function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','dt','fl','skillsDoneV144'].forEach(id=>{$(id).value=''});$('addContextV82').classList.add('hidden');v81SyncAddForm()}
+function resetAddForm(){if(typeof renewalTargetV85!=='undefined')renewalTargetV85=null;['kindSearchV82','jurSearchV82','nm','dt','fl','skillsDoneV144'].forEach(id=>{$(id).value=''});if(typeof expConfirmReset==='function')expConfirmReset('add');$('addContextV82').classList.add('hidden');v81SyncAddForm()}
 function v81SyncAddForm(){
  const k=resolveCatalogKind($('kindSearchV82').value);
  const needsJur=!!k?.jurisdiction,list=k?.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;
@@ -84,17 +86,20 @@ function v81SyncAddForm(){
  $('privacyNoteV82').innerHTML=note;
 }
 function addCredentialFromForm(){
- const k=resolveCatalogKind($('kindSearchV82').value);if(!k){alert('Choose a credential type from the list.');return}
+ const k=resolveCatalogKind($('kindSearchV82').value);if(!k){alert(/refer/i.test($('kindSearchV82').value)?'References aren\'t credentials. Add them in the References section.':'Choose a credential type from the list.');return}
+ const eb=typeof expConfirmBlocker==='function'?expConfirmBlocker('add'):null;if(eb){alert(eb);return}
+ const expRec=typeof expConfirmRecord==='function'?expConfirmRecord('add','TYPED'):null;
  let jur='';
  if(k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS,j=resolveJurisdiction($('jurSearchV82').value,list);if(!j){alert(k.jurisdiction==='NLC_HOME'?'Choose your primary state of residence from the list (only states that issue multistate licenses).':'Choose the license jurisdiction from the list (any US state or territory).');return}jur=j.code}
  const scope=k.kind==='RN_LICENSE'?(nlcCanIssueMultistate(jur)?(document.querySelector('input[name=licScopeV145]:checked')?.value||'SINGLE_STATE'):'SINGLE_STATE'):null;
  const name=k.kind==='OTHER'?$('nm').value.trim():credentialDisplayName(k.kind,jur,undefined,scope);if(!name){alert('Enter a credential name.');return}
  const type=k.kind==='OTHER'?('CUSTOM_'+(($('nm').value||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL')):credentialTypeCode(k.kind,jur),f=$('fl').files[0];
   const exp=k.experience?{years:$('expYearsV11').value!==''?+ $('expYearsV11').value:undefined,recentMonths:$('expRecentV11').value!==''?+$('expRecentV11').value:undefined,lastWorked:$('expLastV11').value||''}:{};
- const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',...(scope?{compact_privilege_type:scope}:{}),expiration:(k.experience||isSkillsKind(k.kind))?'':$('dt').value,...(isSkillsKind(k.kind)&&$('skillsDoneV144')?.value?{completed:$('skillsDoneV144').value}:{}),file:f?f.name:'',...exp,prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
+ const c=v81Normalize({id:Date.now(),name,kind:k.kind,type,jurisdiction:jur,section:k.section,required:isBaselineRequired(k.kind),primary:'VERIFYING',chain:'NOT ISSUED',...(scope?{compact_privilege_type:scope}:{}),expiration:(k.experience||isSkillsKind(k.kind))?'':$('dt').value,...(isSkillsKind(k.kind)&&$('skillsDoneV144')?.value?{completed:$('skillsDoneV144').value}:{}),file:f?f.name:'',...exp,...(expRec?{expConfirm:expRec}:{}),prov:{source:'',method:'',verifier:'',verifiedAt:'',active:false,lastMonitored:new Date().toISOString()}});
  const old=renewalTargetV85!=null?creds.find(x=>x.id===renewalTargetV85&&x.kind===c.kind&&(x.jurisdiction||'')===(jur||'')):null;if(old)c.renews=old.id;renewalTargetV85=null;
  creds.push(c);save();
  v81Log('CREDENTIAL_UPLOADED',c.id,{actor_type:'CLINICIAN',result:'PENDING_VERIFICATION',detail:{document:f?'PRIVATE_FILENAME_ONLY':'NONE',...(c.renews?{renews:c.renews}:{})}});
+ if(expRec)v81Log('EXPIRATION_CONFIRMED',c.id,{actor_type:'CLINICIAN',result:expRec.source,detail:{source:expRec.source,confirmed_by:'CLINICIAN',confirmed_at:expRec.confirmed_at,has_expiration:expRec.has_expiration}});
  v81Log('CLASSIFICATION_COMPLETED',c.id,{actor_type:'SYSTEM',result:'SIMULATED_CLASSIFICATION',detail:{kind:c.kind,jurisdiction:jur||null,privacy:catalogPrivacy(c.kind)}});
  v81Log('VERIFICATION_STARTED',c.id,{actor_type:'SYSTEM',result:'QUEUED'});
  $('add').close();render();
@@ -201,6 +206,7 @@ function activityText(e){
   VERIFICATION_STARTED:`${cn} entered the verification queue`,VERIFICATION_SUCCEEDED:`${cn} verified (simulated check)`,VERIFICATION_FAILED:`${cn} verification failed (${plainCode(e.result)})`,SOURCE_CHECK_COMPLETED:`Simulated source check completed for ${cn}`,
   ASSIGNMENT_INTEREST:`Started completing ${getAssignment(e.assignment_id)?.name||e.assignment_id} (${plainCode(e.result)})`,ASSIGNMENT_READY:`${getAssignment(e.assignment_id)?.name||e.assignment_id} is assignment ready (${plainCode(e.result)})`,
   DEMO_SEEDED:'Demo data seeded',
+  EXPIRATION_CONFIRMED:d.has_expiration?`Expiration date confirmed by you (${d.source==='DOCUMENT_SCAN'?'read from the document':'typed'})`:'Confirmed: no expiration date on the document',ORIGINAL_ISSUE_DATE_RECORDED:`Original issue date recorded by the verifier from the state board (${fd(d.original_issue_date)})`,REFERENCE_CREDENTIAL_MOVED:`“${d.name||'Reference'}” moved from credentials to the References section`,
   REFERENCE_ADDED:`Added ${d.referee||'a reference'} (${d.facility||''}) as a reference`,REFERENCE_REQUESTED:`Reference request to ${d.referee} by ${(REF_CHANNEL_LABEL?.[d.channel]||d.channel||'').toLowerCase()} (demo, not sent)`,REFERENCE_RESENT:`New reference link for ${d.referee} by ${(REF_CHANNEL_LABEL?.[d.channel]||d.channel||'').toLowerCase()} (demo, not sent)`,
   REFERENCE_REMINDER:`Reminder to ${d.referee} (demo, not sent)`,REFERENCE_OPENED:`${d.referee} opened the reference request`,REFERENCE_COMPLETED:`${d.referee} completed a reference${d.channel==='CALL'?' by phone'+(d.caller?' with '+d.caller:''):''}`,REFERENCE_DECLINED:`${d.referee} declined to give a reference`,REFERENCE_EXPIRED:`Reference request to ${d.referee} expired`,REFERENCE_REMOVED:`Removed ${d.referee} from references`,
   SHARE_REFERENCES_CHANGED:`Changed what ${w} can see of your references: ${typeof refScopeLabel==='function'?refScopeLabel(d.to):d.to||''}`
@@ -248,7 +254,7 @@ function renderTaskCenter(){
  if(!$('v7TaskCategories'))return;const t=taskSections(),cat=c=>ec(catFor(c));
  const sec=(id,title,hint,rows,empty,open=true)=>`<div class="task-category-v7 task-sec-v85" id="${id}"><div class="cathead"><b>${title}</b><span class="chip">${rows.length}</span></div><div class="small task-hint-v85">${hint}</div>${rows.length?(open?rows.join(''):`<details><summary class="small">Show ${rows.length}</summary>${rows.join('')}</details>`):`<div class="small task-empty-v85">${empty}</div>`}</div>`;
  $('v7TaskCategories').innerHTML=[
-  sec('taskReqV85','Required Before Submission','Blocking at least one opportunity that accepts your specialty.',t.required.map(b=>taskRow(b.item.label,`${ec(b.item.note||'Missing')} · for ${b.assignments.map(a=>ec(a.name)).join(', ')}`,`<button class="mini pri" onclick="completeMissingRequirement('${b.assignments[0].id}')">Complete</button>`)),'Nothing is blocking your opportunities.'),
+  sec('taskReqV85','Required Before Submission','Blocking at least one opportunity that accepts your specialty.',t.required.map(b=>taskRow(b.item.label,`${ec(b.item.note||'Missing')} · for ${b.assignments.map(a=>ec(a.name)).join(', ')}`,(b.item.req?.kind==='REF_SPECIALTY'?`<button class="mini pri" onclick="showV7View('referencesView')">Go to References</button>`:`<button class="mini pri" onclick="completeMissingRequirement('${b.assignments[0].id}')">Complete</button>`))),'Nothing is blocking your opportunities.'),
   sec('taskExp30V85','Expiring Within 30 Days','Renew now to stay assignment-ready.',t.exp30.map(x=>taskRow(x.c.name,`${cat(x.c)} · expires ${fd(credExpiry(x.c))} (${x.d} days)${x.renewing?' · renewal submitted — awaiting verification':''}`,x.renewing?'<span class="badge PENDING">RENEWAL PENDING</span>':`<button class="mini pri" onclick="openRenewal(${x.c.id})">Renew</button>`)),'Nothing expires in the next 30 days.'),
   sec('taskRenewV85','Renewal Recommended','Expires in 31–90 days.',t.renew.map(x=>taskRow(x.c.name,`${cat(x.c)} · expires ${fd(credExpiry(x.c))} (${x.d} days)${x.renewing?' · renewal submitted — awaiting verification':''}`,x.renewing?'<span class="badge PENDING">RENEWAL PENDING</span>':`<button class="mini" onclick="openRenewal(${x.c.id})">Renew</button>`)),'No renewals due in the next 90 days.'),
   sec('taskAwaitV85','Awaiting Verification','In the Verification Console queue (simulated checks).',t.awaiting.map(c=>taskRow(c.name,`${cat(c)} · ${ec(verificationBadge(c).text)}${c.renews?' · renewal — replaces the current record once verified':''}`,`<button class="mini details" data-id="${c.id}">Open</button>`)),'Nothing is waiting for verification.'),

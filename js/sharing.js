@@ -71,7 +71,7 @@ function shareStatus(s,now=Date.now()){if(s.status==='REVOKED')return'REVOKED';i
    meets. Private kinds (health/screening) are shared only as
    "Requirement Satisfied" — no results, dates or documents. */
 function recommendedAssertions(a){
- return v81Assignment(a).items.filter(i=>i.status==='MET').map(i=>({credId:i.credential.id,requirement:i.label,label:i.credential.name,mode:catalogPrivacy(i.credential.kind)==='PRIVATE'?'REQUIREMENT_SATISFIED':'VERIFIED_CREDENTIAL'}));
+ return v81Assignment(a).items.filter(i=>i.status==='MET'&&i.credential).map(i=>({credId:i.credential.id,requirement:i.label,label:i.credential.name,mode:catalogPrivacy(i.credential.kind)==='PRIVATE'?'REQUIREMENT_SATISFIED':'VERIFIED_CREDENTIAL'}));
 }
 function optionalAssertions(a,rec){const ids=new Set(rec.map(x=>x.credId));return creds.filter(c=>isVerifiedActive(c)&&!ids.has(c.id)).map(c=>({credId:c.id,requirement:null,label:c.name,mode:catalogPrivacy(c.kind)==='PRIVATE'?'REQUIREMENT_SATISFIED':'VERIFIED_CREDENTIAL'}))}
 /* Live view of one assertion (current Passport state). */

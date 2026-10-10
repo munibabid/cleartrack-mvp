@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { buildPdf } = require('./lib/mini-pdf');
 const { BANNER } = require('./p144-fixtures.js');
+const EXPOK = () => { const r = document.getElementById('acctExpDateRowV10'), cb = document.getElementById('acctExpOkV147'); if (r && cb && !r.classList.contains('hidden') && !expConfirmValid('acct')) cb.click(); }; /* v14.7: the nurse confirms the expiration */
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); };
@@ -57,7 +58,7 @@ const pdf = lines => buildPdf([{ text: [{ s: BANNER, x: 230, y: 590, size: 10, b
       if (f) { await (await pg.$('#acctFileV10')).uploadFile(f); await W(200); await waitScan(); await W(200); }
       return state();
     };
-    const save = async () => { await tap('#acctScanConfirmV14'); await tap('#acctAddFormV10 button[type=submit]'); await W(700);
+    const save = async () => { await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await W(700);
       return pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => /^RN_LICENSE/.test(x.kind)).pop(); return c && { kind: c.kind, name: c.display_name, type: c.type_code, scope: c.metadata.compact_privilege_type, src: c.metadata.compact_privilege_source, mm: c.metadata.doc && c.metadata.doc.mismatch_fields }; }); };
 
     const opts = await pg.evaluate(() => { const host = document.createElement('div'); host.innerHTML = acctAddForm(); return [...host.querySelectorAll('#acctKindV10 option')].map(o => [o.value, o.textContent]).filter(([v]) => /^RN_LICENSE/.test(v)); });

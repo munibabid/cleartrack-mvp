@@ -9,7 +9,7 @@
 <script src="https://unpkg.com/xrpl@5.3.0/build/xrpl-latest-min.js" integrity="sha384-ZYUY+olM49qzMChi4X9rVVRYUuL6GcWXCLRhnVwRqVW/EpBX8PzThCiVnjZFi0Pb" crossorigin="anonymous"></script>
 <!-- qrcode@1.5.1 (MIT) is vendored in js/vendor: pinned, integrity-checked, no network request. 1.5.1 is the latest version with a browser build. -->
 <script src="js/vendor/qrcode-1.5.1.js" integrity="sha384-VT1EeewTCEXgndcPMQ0PzV+uVFYjxFIjmAA7s5gcMX9t4Dt5TD+OVQIn7NJWIXn7" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="css/app.css?v=14.6">
+<link rel="stylesheet" href="css/app.css?v=14.7">
 </head>
 <body>
 
@@ -66,7 +66,7 @@
 <div class="business"><h2>Built around onboarding ROI, not blockchain hype</h2><div class="cards"><div class="card"><h3>Faster starts</h3><p>Reduce repeated credential collection and delayed clinician start dates.</p></div><div class="card"><h3>Less manual checking</h3><p>Give agencies current verification provenance and reusable proof.</p></div><div class="card"><h3>Continuous monitoring</h3><p>Designed for license and certification status refreshes instead of static PDF snapshots. Simulated in this demo (Verification Console → Monitoring); no issuer is polled.</p></div><div class="card"><h3>Qualification APIs (future)</h3><p>Future APIs can return only candidates whose required qualifications are currently verified.</p></div></div></div>
 </section>
 
-<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.6 demo</span></div><nav>
+<section id="app" class="app hidden"><aside class="side"><div class="brand"><div class="mark">V</div>Veridun <span class="small" style="color:#cbd5e1">v14.7 demo</span></div><nav>
 <button class="active v7nav" data-view="homeView">⌂ Home</button>
 <button class="v7nav" data-view="passportView">▣ Passport</button>
 <button class="v7nav" data-view="tasksView">☑ Tasks</button>
@@ -235,7 +235,7 @@
 <div id="experienceHelpV11" class="small hidden" style="margin:6px 0"></div>
 <div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years of experience in this specialty <span class="small">(optional)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
 <div id="skillsRowV144" class="hidden"><label for="skillsDoneV144">Completed on</label><input id="skillsDoneV144" type="date"><div class="small" id="skillsNoteV144">Skills checklists are usually provided by your agency or facility (often through a skills-checklist vendor) and are self-attested by you. They are never shown as verified. Suggested redo: 12 months after completion (calculated); the facility rule is final, and some facilities need a new checklist per assignment.</div></div>
-<div id="dtRowV144"><label for="dt">Expiration date</label><input id="dt" type="date"></div>
+<div id="dtRowV144"><label for="dt">Expiration date <span class="small">(if it has one)</span></label><input id="dt" type="date"><div class="exp-confirm-v147" id="addExpConfirmV147"><label class="exp-confirm-lbl-v147"><input type="checkbox" id="addExpOkV147"> <span id="addExpOkTextV147">No expiration date on this document</span></label><div class="small" id="addExpOkStateV147">Required before saving.</div></div></div>
 <label for="fl">Source document (optional)</label><input id="fl" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx">
 <div id="privacyNoteV82" class="provenance small" style="line-height:1.6"></div>
 </div><div class="mf"><button class="sec xadd">Cancel</button><button id="save" class="pri">Add &amp; Submit for Verification</button></div></dialog>
@@ -294,34 +294,35 @@
 <dialog id="orgShareViewDlgV83"><div class="mh"><b>Shared Passport</b><button class="sec xorgshare">✕</button></div><div class="mb" id="orgShareViewBodyV83"></div><div class="mf"><button class="sec xorgshare">Close</button></div></dialog>
 
 <script src="js/config.js"></script>
-<script src="js/store.js?v=14.6"></script>
-<script src="js/credential-model.js?v=14.6"></script>
+<script src="js/store.js?v=14.7"></script>
+<script src="js/credential-model.js?v=14.7"></script>
 <script src="js/specialties.js"></script>
-<script src="js/credential-catalog.js?v=14.6"></script>
+<script src="js/credential-catalog.js?v=14.7"></script>
 <script src="js/verification-registry.js"></script>
-<script src="js/doc-extract.js?v=14.6"></script>
-<script src="js/extraction-benchmark.js?v=14.6"></script>
-<script src="js/demo-data.js?v=14.6"></script>
-<script src="js/requirements.js?v=14.6"></script>
+<script src="js/doc-extract.js?v=14.7"></script>
+<script src="js/extraction-benchmark.js?v=14.7"></script>
+<script src="js/demo-data.js?v=14.7"></script>
+<script src="js/requirements.js?v=14.7"></script>
 <script src="js/assignments.js"></script>
-<script src="js/readiness-engine.js?v=14.6"></script>
+<script src="js/readiness-engine.js?v=14.7"></script>
 <script src="js/analytics.js"></script>
-<script src="js/verification.js?v=14.6"></script>
-<script src="js/xrpl.js?v=14.6"></script>
-<script src="js/sharing.js?v=14.6"></script>
-<script src="js/insights.js?v=14.6"></script>
-<script src="js/roles/clinician.js?v=14.6"></script>
-<script src="js/roles/organization.js?v=14.6"></script>
-<script src="js/roles/verifier.js?v=14.6"></script>
-<script src="js/references.js?v=14.6"></script>
-<script src="js/app.js?v=14.6"></script>
+<script src="js/verification.js?v=14.7"></script>
+<script src="js/xrpl.js?v=14.7"></script>
+<script src="js/sharing.js?v=14.7"></script>
+<script src="js/insights.js?v=14.7"></script>
+<script src="js/roles/clinician.js?v=14.7"></script>
+<script src="js/roles/organization.js?v=14.7"></script>
+<script src="js/roles/verifier.js?v=14.7"></script>
+<script src="js/references.js?v=14.7"></script>
+<script src="js/exp-confirm.js?v=14.7"></script>
+<script src="js/app.js?v=14.7"></script>
 <script src="js/tour.js"></script>
 <script src="js/lookup-sources.js"></script>
 <script src="js/anchor.js"></script>
-<script src="js/account-mfa.js?v=14.6"></script>
-<script src="js/doc-scan.js?v=14.6"></script>
-<script src="js/extraction-panel.js?v=14.6"></script>
-<script src="js/account.js?v=14.6"></script>
-<script src="js/menu.js?v=14.6"></script>
+<script src="js/account-mfa.js?v=14.7"></script>
+<script src="js/doc-scan.js?v=14.7"></script>
+<script src="js/extraction-panel.js?v=14.7"></script>
+<script src="js/account.js?v=14.7"></script>
+<script src="js/menu.js?v=14.7"></script>
 </body>
 </html>

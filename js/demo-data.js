@@ -5,7 +5,10 @@
    gap is a Massachusetts RN license (Massachusetts has enacted the NLC but it
    is not yet in effect, so the Arizona compact license is not honored there).
    Expiration dates are offsets (days) from the demo anchor, so they stay valid
-   through every demo assignment. */
+   through every demo assignment.
+   v14.7: references are not credentials. Alex's two completed specialty references
+   are seeded into the References section (demo store), not the credential list;
+   the comparison nurses carry a static count of completed references (refsCompleted). */
 const DEMO_SEED_VERSION='6';
 const DEMO_SEED_VERSION_KEY='veridun_demo_seed_version';
 const DEMO_PROFILE={name:'Alex Morgan',credentials:'RN, BSN, CCRN',specialty:'ICU',secondarySpecialties:['PCU'],homeState:'US-AZ'};
@@ -16,7 +19,7 @@ const DEMO_SEED=[
  ['RN_LICENSE','US-CA',570,false],
  ['CERT_BLS','',400,true],['CERT_ACLS','',480,true],['CERT_NIHSS','',75,false],['CERT_TNCC','',21,false],
  ['EMP_ICU_VERIFIED','',null,true,{name:'ICU experience — 3 yrs, verified by employer',years:3,lastWorkedDays:-21}],
- ['SKILLS_ICU','',365,true,{name:'ICU Skills Checklist — completed & attested'}],['REF_SPECIALTY','',365,true,{name:'ICU Specialty Reference Evaluation'}],
+ ['SKILLS_ICU','',365,true,{name:'ICU Skills Checklist — completed & attested'}],
  ['COMP_CRRT','',365,false,{name:'CRRT Competency — employer validated'}],['COMP_VENTILATOR','',365,false,{name:'Ventilator Management Competency — employer validated'}],
  ['HEALTH_PHYSICAL_CURRENT','',330,true],['HEALTH_FIT_TEST','',300,true],['HEALTH_TB_CURRENT','',280,true],['HEALTH_FLU_CURRENT','',200,true],
  ['SCREEN_DRUG_CURRENT','',250,true],['SCREEN_BACKGROUND_CURRENT','',250,true],
@@ -31,13 +34,13 @@ const DEMO_CANDIDATES=[{name:'Jamie Smith',specialty:'ICU',ok:11,total:12,status
    [kind, jurisdiction, expiresInDays|null] */
 const DEMO_NURSES=[
  {id:'alex',...DEMO_PROFILE,live:true},
- {id:'jordan',name:'Jordan Rivera',credentials:'RN, BSN, CEN',specialty:'ED',homeState:'US-CO',seed:[
+ {id:'jordan',refsCompleted:2,name:'Jordan Rivera',credentials:'RN, BSN, CEN',specialty:'ED',homeState:'US-CO',seed:[
   ['RN_LICENSE_MULTISTATE','US-CO',500],['RN_LICENSE','US-CA',420],['CERT_BLS','',380],['CERT_ACLS','',420],['CERT_PALS','',460],['CERT_CEN','',800],
-  ['EMP_ED_VERIFIED','',null,{name:'ED experience — 5 yrs, verified by employer',years:5,lastWorkedDays:-45}],['SKILLS_ED','',365,{name:'ED Skills Checklist — completed & attested'}],['REF_SPECIALTY','',365,{name:'ED Specialty Reference Evaluation'}],['HEALTH_PHYSICAL_CURRENT','',300],['HEALTH_FIT_TEST','',300],['HEALTH_TB_CURRENT','',260],['HEALTH_FLU_CURRENT','',200],
+  ['EMP_ED_VERIFIED','',null,{name:'ED experience — 5 yrs, verified by employer',years:5,lastWorkedDays:-45}],['SKILLS_ED','',365,{name:'ED Skills Checklist — completed & attested'}],['HEALTH_PHYSICAL_CURRENT','',300],['HEALTH_FIT_TEST','',300],['HEALTH_TB_CURRENT','',260],['HEALTH_FLU_CURRENT','',200],
   ['SCREEN_DRUG_CURRENT','',240],['SCREEN_BACKGROUND_CURRENT','',240]]},
- {id:'sam',name:'Sam Okafor',credentials:'RN, BSN',specialty:'LD',homeState:'US-CA',seed:[
+ {id:'sam',refsCompleted:2,name:'Sam Okafor',credentials:'RN, BSN',specialty:'LD',homeState:'US-CA',seed:[
   ['RN_LICENSE','US-CA',610],['CERT_BLS','',350],['CERT_NRP','',500],['CERT_FETAL_MONITORING','',640],
-  ['EMP_LD_VERIFIED','',null,{name:'L&D experience — 4 yrs, verified by employer',years:4,lastWorkedDays:-30}],['SKILLS_LD','',365,{name:'L&D Skills Checklist — completed & attested'}],['REF_SPECIALTY','',365,{name:'L&D Specialty Reference Evaluation'}],['HEALTH_PHYSICAL_CURRENT','',310],['HEALTH_FIT_TEST','',290],['HEALTH_TB_CURRENT','',270],['HEALTH_FLU_CURRENT','',210],['HEALTH_HEPB','',null],
+  ['EMP_LD_VERIFIED','',null,{name:'L&D experience — 4 yrs, verified by employer',years:4,lastWorkedDays:-30}],['SKILLS_LD','',365,{name:'L&D Skills Checklist — completed & attested'}],['HEALTH_PHYSICAL_CURRENT','',310],['HEALTH_FIT_TEST','',290],['HEALTH_TB_CURRENT','',270],['HEALTH_FLU_CURRENT','',210],['HEALTH_HEPB','',null],
   ['SCREEN_DRUG_CURRENT','',230],['SCREEN_BACKGROUND_CURRENT','',230]]}
 ];
 function experienceFields(x,anchor){return x&&x.years!=null?{years:x.years,lastWorked:isoDay(addDays(anchor,x.lastWorkedDays||0))}:x?.recentMonths!=null?{recentMonths:x.recentMonths,lastWorked:isoDay(addDays(anchor,x.lastWorkedDays||0))}:{}}
@@ -60,10 +63,11 @@ function demoSeedCredentials(){
    from rendering. */
 function initNewcomer(force=false){
  if(!force){creds=store.credentials.load();if(!Array.isArray(creds))creds=[];
-  if(creds.length&&store.meta.seedVersion()===DEMO_SEED_VERSION){creds=creds.map(v81Normalize);return}}
+  if(creds.length&&store.meta.seedVersion()===DEMO_SEED_VERSION){creds=creds.map(v81Normalize);if(typeof migrateReferenceCredentials==='function')migrateReferenceCredentials();return}}
  const reason=force?'RESET':creds.length?'SEED_UPGRADE':'FIRST_RUN';
  store.meta.setDemoAnchor(new Date().toISOString().slice(0,10));
  store.clearDemoSharingAndBuilder();
  creds=demoSeedCredentials();save();store.meta.setSeedVersion(DEMO_SEED_VERSION);
+ if(typeof seedDemoReferences==='function')seedDemoReferences();
  v81Log('DEMO_SEEDED',null,{actor_type:'SYSTEM',result:`DEMO_SEED_${creds.length}_CREDENTIALS`,detail:{reason,version:DEMO_SEED_VERSION}});
 }

@@ -127,7 +127,7 @@ function acctCredRow(c){
  const hist=acct().cache.events.filter(e=>e.credential_id===c.id).slice().reverse().map(e=>`${ACCT_EVENT_TEXT[e.event_type]||e.event_type} ${fmtDT(e.occurred_at)}`);
  return`<div class="acct-item-v10" data-cred="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(lic?'RN License · '+(licenseScopeOf(c)==='MULTISTATE'?'multistate':'single-state'):catalogKind(c.kind)?.short||catalogKind(c.kind)?.label||c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''}${c.expires_on?' · expires '+fd(c.expires_on):''}${priv?' · <span class="badge PRIVATE">PRIVATE</span>':''}</div><div class="small">${ec(s.sub)}</div>${acctProvenanceHtml(c,s)}${lic&&c.jurisdiction_code?`<div class="small acct-cov-v11">${ec(licenseCoverage(licenseRuleKind(c),c.jurisdiction_code).text)}${ec(licenseHomeStateHint(licenseRuleKind(c),c.jurisdiction_code,home))}</div>`:''}${catalogKind(c.kind)?.experience&&(m.years!=null||m.recent_months!=null||m.last_worked_on)?`<div class="small">${[m.years!=null?m.years+' yrs':'',m.recent_months!=null?m.recent_months+' months in the last 2 years':'',m.last_worked_on?'last worked '+fd(m.last_worked_on):'',m.last_worked_on?'counts as recent until '+fd(experienceRecentUntil(m.last_worked_on,catalogKind(c.kind)?.recencyMonths))+' (calculated)':''].filter(Boolean).map(ec).join(' · ')}</div>`:''}${isSkillsKind(c.kind)?`<div class="small acct-skills-v144">${m.completed_on?ec('completed '+fd(m.completed_on)+' · suggested redo by '+fd(skillsRedoBy(m.completed_on))+' (calculated; the facility rule is final)'):'completion date not recorded'} · self-attested, never shown as verified</div>`:''}<div class="small acct-hist-v11">History: ${hist.length?ec(hist.join(' · ')):'added'} · not verified by anyone yet</div>
  <div class="small">Document: ${c.source_document_path?`private file · <button class="linkbtn-v10" type="button" data-act="doc-open" data-id="${c.id}">Open (60-second signed link)</button>${c.status!=='VERIFIED'&&/\.(pdf|png|jpe?g|webp)$/i.test(c.source_document_path)?` · <button class="linkbtn-v10" type="button" data-act="doc-rescan" data-id="${c.id}">Re-scan document</button>`:''}`:'none'} · <label class="linkbtn-v10">${c.source_document_path?'Replace':'Upload'} file<input type="file" class="acct-doc-input-v10 sr-only-v10" data-id="${c.id}" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label></div>
- ${acctDocDetailsHtml(c)}<div data-scan-slot="${c.id}">${typeof scanBoxHtml==='function'?scanBoxHtml(c.id):''}</div></div>
+ ${acctDocDetailsHtml(c)}${acctExpProvHtml(c)}<div data-scan-slot="${c.id}">${typeof scanBoxHtml==='function'?scanBoxHtml(c.id):''}</div></div>
  <div class="acct-item-side-v10"><span class="badge ${s.cls}">${ec(s.text)}</span><button class="mini sec" type="button" data-act="cred-delete" data-id="${c.id}">Delete</button></div></div>`;
 }
 function acctAddForm(){
@@ -141,7 +141,7 @@ function acctAddForm(){
  <div id="acctLicenseNoteV10" class="small hidden" style="margin:6px 0"></div>
  <div id="acctSkillsRowV144" class="hidden"><label>Completed on<input type="date" id="acctSkillsDoneV144"></label><div class="small" id="acctSkillsCalcV144"></div><div class="small acct-note-v10">Skills checklists are usually provided by your agency or facility (often through a skills-checklist vendor) and are self-attested by you. Veridun never shows them as verified. Some facilities ask for a new checklist for every assignment; their rule is final.</div></div>
  <div class="small hidden" id="acctExpCalcV144"></div>
- <div id="acctExpDateRowV10"><label for="acctExpV10">Expiration date <span class="small">(if it has one)</span> <span id="acctExpSrcV144"></span></label><input type="date" id="acctExpV10"><div id="acctExpNoteV144" class="small"></div></div>
+ <div id="acctExpDateRowV10"><label for="acctExpV10">Expiration date <span class="small">(if it has one)</span> <span id="acctExpSrcV144"></span></label><input type="date" id="acctExpV10"><div id="acctExpNoteV144" class="small"></div>${typeof expConfirmHtml==='function'?expConfirmHtml('acct'):''}</div>
  <label>Source document <span class="small">(optional · PDF, PNG, JPEG, DOC, DOCX · max 10 MB · private)</span><input type="file" id="acctFileV10" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label>
  <div class="small">PDF and image files are read on this device so you can check the details before saving. Nothing is sent to an AI service.</div>
  <div id="acctScanSlotV14">${typeof scanBoxHtml==='function'?scanBoxHtml('add'):''}</div>
@@ -179,10 +179,15 @@ async function acctSubmitCredential(){
  if(scope){meta.compact_privilege_type=scope;meta.compact_privilege_source=acctLicenseScopeSource()}
  if(scope==='MULTISTATE'&&jur){const h=a.cache.profile?.home_jurisdiction;if(h&&jur!==h&&!confirm(`Multistate licenses are issued by your primary state of residence (${jurisdictionName(h)}). This license is from ${jurisdictionName(jur)}.\n\nSave it as multistate anyway? (If you moved, update your primary state of residence in your profile.)`))return null}
  if(isSkillsKind(k.kind)&&$('acctSkillsDoneV144')?.value)meta.completed_on=$('acctSkillsDoneV144').value;
+ const eb=typeof expConfirmBlocker==='function'?expConfirmBlocker('acct'):null;if(eb)throw new Error(eb);
+ const expRec=typeof expConfirmRecord==='function'?expConfirmRecord('acct',$('acctExpV10')?.dataset.origin==='document'?'DOCUMENT_SCAN':'TYPED'):null;
  const sum=typeof scanForAdd==='function'?scanForAdd():null;
  if(sum&&k.privacy!=='PRIVATE')meta.doc=sum.doc;
+ /* v14.7: expiration confirmation provenance. Private kinds can't hold metadata (database rule), so for them it is only in the audit event. */
+ if(expRec&&k.privacy!=='PRIVATE')meta.exp_confirm=expRec;
  const saved=await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:k.experience?null:isSkillsKind(k.kind)?((acctScan?.target==='add'&&acctScan.applyExpiry&&$('acctExpV10').value)||null):($('acctExpV10').value||null),metadata:meta},file);
  if(sum){await scanAfterSave(saved.id,sum,{applied:!!acctScan?.applyExpiry});acctLastScanResult={name,mismatch:sum.ms.length>0}}
+ if(expRec)await a.log('EXPIRATION_CONFIRMED',{credential_id:saved.id,result:expRec.source,detail:{kind:k.kind,source:expRec.source,confirmed_by:'CLINICIAN',confirmed_at:expRec.confirmed_at,has_expiration:expRec.has_expiration}});
  if(acctScan?.target==='add')acctScan=null;
  return name;
 }
@@ -366,7 +371,7 @@ function acctOrgResultHtml(r){
 async function acctOpenShare(input){acctOrgResult=await acct().openShare(input);acctOrgShares=null}
 
 /* ---------- Activity ---------- */
-const ACCT_EVENT_TEXT={DOCUMENT_SCANNED:'Document read on this device, details confirmed',DOCUMENT_MISMATCH:'Credential mismatch detected',DOCUMENT_DATE_APPLIED:'Expiration set from the document',VERIFIER_CHECK:'Verifier double-checked the document details',PROFILE_CREATED:'Profile created',PROFILE_UPDATED:'Profile updated',CREDENTIAL_ADDED:'Credential added',CREDENTIAL_DELETED:'Credential deleted',SHARE_CREATED:'Share created',SHARE_REVOKED:'Share revoked',SHARE_EXTENDED:'Share extended',SHARE_EXTENSION_DECLINED:'Extension declined',SHARE_VIEWED:'An organization viewed a share',SHARE_ACCESS_REFUSED:'An organization was refused (share not active)',SHARE_EXTENSION_REQUESTED:'An organization asked for more time',ASSIGNMENT_READY:'Ready for an assignment'};
+const ACCT_EVENT_TEXT={EXPIRATION_CONFIRMED:'Expiration date confirmed by you',ORIGINAL_ISSUE_DATE_RECORDED:'Original issue date recorded by the verifier',DOCUMENT_SCANNED:'Document read on this device, details confirmed',DOCUMENT_MISMATCH:'Credential mismatch detected',DOCUMENT_DATE_APPLIED:'Expiration set from the document',VERIFIER_CHECK:'Verifier double-checked the document details',PROFILE_CREATED:'Profile created',PROFILE_UPDATED:'Profile updated',CREDENTIAL_ADDED:'Credential added',CREDENTIAL_DELETED:'Credential deleted',SHARE_CREATED:'Share created',SHARE_REVOKED:'Share revoked',SHARE_EXTENDED:'Share extended',SHARE_EXTENSION_DECLINED:'Extension declined',SHARE_VIEWED:'An organization viewed a share',SHARE_ACCESS_REFUSED:'An organization was refused (share not active)',SHARE_EXTENSION_REQUESTED:'An organization asked for more time',ASSIGNMENT_READY:'Ready for an assignment'};
 function acctRenderActivity(){
  const a=acct(),ev=a.cache.events,el=$('acctActivityV10');
  el.innerHTML=`<div class="panel-v81"><div class="ph">Activity on my account (${ev.length})</div><div class="pb">${ev.length?ev.map(e=>`<div class="acct-event-v10"><span class="small mono">${ec(fmtDT(e.occurred_at))}</span> <b>${ec(acctEventText(e))}</b></div>`).join(''):'<div class="small">Nothing yet.</div>'}
@@ -409,7 +414,7 @@ function acctWire(){
  ws.addEventListener('submit',e=>{
   const id=e.target.id;if(!/V10$/.test(id))return;e.preventDefault();
   if(id==='acctProfileFormV10')acctDo(async()=>{const sec=[...document.querySelectorAll('.acctSecSpecV10:checked')].map(x=>x.value);await acct().saveProfile({full_name:$('acctNameV10').value,post_nominals:$('acctPostV10').value,specialty:$('acctSpecV10').value,secondary_specialties:sec,home_jurisdiction:$('acctHomeV10').value});acctEditingProfile=false},'Profile saved to your account.');
-  if(id==='acctAddFormV10'){const block=typeof scanAddBlocker==='function'?scanAddBlocker():null;if(block){acctMsg(block,'err');return}}
+  if(id==='acctAddFormV10'){const block=(typeof scanAddBlocker==='function'?scanAddBlocker():null)||(typeof expConfirmBlocker==='function'?expConfirmBlocker('acct'):null);if(block){acctMsg(block,'err');return}}
   if(id==='acctAddFormV10')acctDo(async()=>{acctLastScanResult=null;const n=await acctSubmitCredential();return n}).then(n=>{if(!n)return;const sr=acctLastScanResult;acctMsg(sr?(sr.mismatch?`${n} saved. Credential mismatch detected: it goes to the verifier's review queue, flagged. Status: ${SCAN_STATUS_TEXT}.`:`${n} saved. Status: ${SCAN_STATUS_TEXT}.`):`${n} saved to your account. Status: Submitted, not verified.`,sr?.mismatch?'err':'ok')});
   if(id==='acctShareFormV10')acctDo(acctSubmitShare,'Share created. Copy the link or code now.');
   if(id==='acctOrgCreateFormV10')acctDo(async()=>{const o=await acct().createOrganization($('acctOrgNameV10').value);acctOrgId=o.id;acctOrgShares=null},'Organization created. You are its owner.');
@@ -476,7 +481,7 @@ document.addEventListener('DOMContentLoaded',()=>{acctBoot()});
 function acctProvenanceHtml(c,s){
  const v=s.v;if(!v||!(c.status==='VERIFIED'||c.status==='REJECTED'||c.status==='REVOKED'||c.status==='EXPIRED'))return'';
  const src=v.source_slug?verificationSource(v.source_slug):null,an=s.an;
- const rows=[['Level',c.verification_level?levelLabel(c.verification_level):'—'],['Source',v.source_name||'—'],['Source type',src?SOURCE_TYPES[src.type]:'—'],['Method',src?VERIFICATION_METHODS[src.method].label:'Issuer lookup (recorded before PR 13)'],['Verified by',v.verifier_label||'Veridun verifier'],['Checked',v.checked_on||'—'],['Status at source',v.status_at_source||'—'],['Expiration (source)',v.source_expires_on||c.expires_on||'—'],['Evidence reference',v.reference_code||'stored off-chain'],['Monitoring',({MANUAL_RECHECK:'Re-checked by hand before each submission',NOT_ENROLLED:'Not monitored',ENROLLED:'Continuously monitored (Nursys e-Notify)'})[v.monitoring_state||c.monitoring_state]||'—'],['Policy',v.policy_ref||'—'],['XRPL anchor',an?.tx_hash?`${an.network} · ${an.tx_hash.slice(0,12)}…`:'none yet (optional)']];
+ const rows=[['Level',c.verification_level?levelLabel(c.verification_level):'—'],['Source',v.source_name||'—'],['Source type',src?SOURCE_TYPES[src.type]:'—'],['Method',src?VERIFICATION_METHODS[src.method].label:'Issuer lookup (recorded before PR 13)'],['Verified by',v.verifier_label||'Veridun verifier'],['Checked',v.checked_on||'—'],['Status at source',v.status_at_source||'—'],['Expiration (source)',v.source_expires_on||c.expires_on||'—'],...(acctOriginalIssueOf(c)?[['Original issue date (state board)',fd(acctOriginalIssueOf(c).date)+' — recorded by the verifier']]:[]),...(acctExpConfirmOf(c)?[['Expiration confirmed by the nurse',expConfirmText(acctExpConfirmOf(c))]]:[]),['Evidence reference',v.reference_code||'stored off-chain'],['Monitoring',({MANUAL_RECHECK:'Re-checked by hand before each submission',NOT_ENROLLED:'Not monitored',ENROLLED:'Continuously monitored (Nursys e-Notify)'})[v.monitoring_state||c.monitoring_state]||'—'],['Policy',v.policy_ref||'—'],['XRPL anchor',an?.tx_hash?`${an.network} · ${an.tx_hash.slice(0,12)}…`:'none yet (optional)']];
  return`<details class="why-v13 acct-prov-v13"><summary>Provenance</summary><div class="small prov-help-v13">${ec(PROVENANCE_HELP)}</div><div class="why-grid-v13">${rows.map(([k,x])=>`<div>${ec(k)}</div><div>${ec(x)}</div>`).join('')}</div></details>`;
 }
 function acctPassportLicenseNote(){
@@ -488,8 +493,17 @@ function acctPassportLicenseNote(){
 
 /* PR 14: what was confirmed from the document. Only field names and flags
    are stored; the values themselves never leave the device that read them. */
+/* v14.7: the nurse's expiration confirmation and, once a verifier records it, the
+   original issue date from the state board (kept apart from any printed date). */
+function acctEventsFor(c,t){return(acct()?.cache?.events||[]).filter(e=>e.credential_id===c.id&&e.event_type===t)}
+function acctExpConfirmOf(c){const m=c.metadata?.exp_confirm;if(m)return m;const e=acctEventsFor(c,'EXPIRATION_CONFIRMED').pop();return e?{source:e.detail?.source||e.result,has_expiration:!!e.detail?.has_expiration,confirmed_at:e.detail?.confirmed_at||e.occurred_at}:null}
+function acctOriginalIssueOf(c){const e=acctEventsFor(c,'ORIGINAL_ISSUE_DATE_RECORDED').pop();return e?.detail?.original_issue_date?{date:e.detail.original_issue_date,source:e.detail.source||'State board',at:e.occurred_at}:null}
+function acctExpProvHtml(c){
+ const x=acctExpConfirmOf(c),o=acctOriginalIssueOf(c);if(!x&&!o)return'';
+ return`<div class="small acct-expprov-v147" data-cred="${c.id}">${x?`<div class="exp-prov-v147">Expiration: ${ec(expConfirmText(x))}</div>`:''}${o?`<div class="orig-issue-v147">Original issue date: ${ec(fd(o.date))} — recorded by the verifier from ${ec(o.source)} (${ec(fmtDT(o.at))})</div>`:''}</div>`;
+}
 function acctDocDetailsHtml(c){
  const d=c.metadata?.doc;if(!d||!d.confirmed)return'';
- const nm=k=>(DocExtract.FIELD_LABEL[k]||k).toLowerCase();
+ const nm=k=>(k==='issued_on'&&typeof scanIssueDateLabel==='function'?scanIssueDateLabel({profile:d.profile},c.kind).replace(/\s*\(.*\)$/,''):(DocExtract.FIELD_LABEL[k]||k)).toLowerCase();
  return`<div class="small acct-docdet-v14">Document read on this device ${ec(fmtDT(d.read_at))}: ${ec((d.fields_confirmed||[]).map(nm).join(', ')||'no fields')} confirmed${(d.corrected||[]).length?` (${ec(d.corrected.map(nm).join(', '))} corrected)`:''}.${d.mismatch?` <span class="badge REVOKED">MISMATCH</span> ${ec((d.mismatch_fields||[]).map(nm).join(', '))}`:''} The values stay on your device; the verifier reads the document again.</div>`;
 }
