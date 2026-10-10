@@ -137,13 +137,19 @@ async function run(browser, name, vp, shots) {
     await pg.setInputFiles('#fl', { name: 'card.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic') });
     b = await box(); t('choosing a new file clears the confirmation', !b.on, JSON.stringify(b));
     await ctr('#addExpOkV147'); await pg.check('#addExpOkV147');
+    // v14.8: the file is checked on the device first (merged / wrong-type / unsupported); saving waits for that check
+    await pg.waitForFunction(() => { const b = $('addScreenV148'); return b && ['clear', 'blocked', 'unreadable', 'unsupported', 'error'].includes(b.dataset.state); }, null, { timeout: 120000 });
     await pg.evaluate(() => $('save').click());
     const sv = await pg.evaluate(() => { const c = creds[creds.length - 1]; return { kind: c.kind, exp: c.expiration, ec: c.expConfirm, ev: v81Events().filter(e => e.credential_id === c.id).map(e => e.event_type), prov: provenanceRows(c).map(r => r.join(': ')).join(' | ') }; });
     t('saved with provenance: typed, confirmed by the nurse, time; event logged; shown in provenance', sv.kind === 'CERT_BLS' && sv.exp === '2028-06-30' && sv.ec && sv.ec.source === 'TYPED' && sv.ec.has_expiration === true && sv.ec.confirmed_by === 'CLINICIAN' && !isNaN(Date.parse(sv.ec.confirmed_at)) && sv.ev.includes('EXPIRATION_CONFIRMED') && /Expiration confirmed by the nurse: Confirmed by the nurse · typed by you/.test(sv.prov), JSON.stringify(sv));
-    await pg.evaluate(() => openAddForm({ kind: 'CERT_TNCC' }));
+    // v14.8 P0: TNCC is held as unsupported in the RN pilot (was the "no expiration" example before); CCRN is used instead
+    const nT = await pg.evaluate(() => { openAddForm({ kind: 'CERT_TNCC' }); return creds.length; });
+    await ctr('#addExpOkV147'); await pg.check('#addExpOkV147'); await pg.evaluate(() => $('save').click());
+    t('v14.8: TNCC is held as unsupported (not saved), in plain words', await pg.evaluate(n => creds.length === n, nT) && /support/i.test(lastAlert()), lastAlert());
+    await pg.evaluate(() => { if ($('add').open) $('add').close(); openAddForm({ kind: 'CERT_CCRN' }); });
     await ctr('#addExpOkV147'); await pg.check('#addExpOkV147'); await pg.evaluate(() => $('save').click());
     const sv2 = await pg.evaluate(() => { const c = creds[creds.length - 1]; return { kind: c.kind, exp: c.expiration, ec: c.expConfirm }; });
-    t('"No expiration date on this document" confirmed → saved with no expiration, source "none printed"', sv2.kind === 'CERT_TNCC' && !sv2.exp && sv2.ec && sv2.ec.source === 'NONE_PRINTED' && sv2.ec.has_expiration === false, JSON.stringify(sv2));
+    t('"No expiration date on this document" confirmed → saved with no expiration, source "none printed"', sv2.kind === 'CERT_CCRN' && !sv2.exp && sv2.ec && sv2.ec.source === 'NONE_PRINTED' && sv2.ec.has_expiration === false, JSON.stringify(sv2));
     t('no confirmation needed where there is no expiration field (experience)', await pg.evaluate(() => { openAddForm({ kind: 'EMP_ICU_VERIFIED' }); const r = !expConfirmNeeded('add') && expConfirmBlocker('add') === null; $('add').close(); return r; }));
 
     /* ---------- 1. Issue date wording + verifier-side original issue date ---------- */
@@ -172,29 +178,31 @@ async function run(browser, name, vp, shots) {
     await pg.waitForSelector('[data-act="toggle-add"]'); await pg.evaluate(() => document.querySelector('[data-act="toggle-add"]').click());
     await pg.waitForSelector('#acctKindV10'); await pg.selectOption('#acctKindV10', 'RN_LICENSE');
     await pg.evaluate(() => { const s = $('acctJurV10'); s.value = 'US-AZ'; s.dispatchEvent(new Event('change', { bubbles: true })); });
-    const waitScan = () => pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }, null, { timeout: 120000 });
+    /* v14.8 P0: the document is only checked for safety problems; nothing is read into the form. These checks
+       replace the v14.7 scan-review checks (printed issue-date label, expiration pre-filled from the scan,
+       provenance "document scan") with the typed-entry equivalents. */
+    const waitScan = () => pg.waitForFunction(() => { const b = document.getElementById('acctScreenBoxV148'); return b && ['clear', 'blocked', 'unreadable', 'unsupported', 'error'].includes(b.dataset.state); }, null, { timeout: 120000 });
     await pg.setInputFiles('#acctFileV10', FILES.orig); await waitScan();
-    const sc = () => pg.evaluate(() => { const row = document.querySelector('#acctScanBoxV14 .scan-row-v14[data-field="issued_on"]'); return { state: $('acctScanBoxV14').dataset.state, lbl: row && row.querySelector('.scan-lbl-v14').textContent, val: $('acctScanF-issued_on') && $('acctScanF-issued_on').value, note: $('acctScanIssueNoteV147') && $('acctScanIssueNoteV147').textContent, box: $('acctScanBoxV14').innerText, exp: $('acctExpV10').value, ctxt: $('acctExpOkTextV147').textContent, on: $('acctExpOkV147').checked }; });
+    const sc = () => pg.evaluate(() => ({ state: $('acctScreenBoxV148').dataset.state, box: $('acctScreenBoxV148').innerText, rows: document.querySelectorAll('#acctAddFormV10 .scan-row-v14').length, exp: $('acctExpV10').value, ctxt: $('acctExpOkTextV147').textContent, on: $('acctExpOkV147').checked, form: $('acctAddFormV10').innerText }));
     const s1 = await sc();
-    t('scan review (license): the printed label is kept ("Original Issue Date"), marked optional; no completion date anywhere', s1.state === 'done' && /Date printed as “Original Issue Date” \(if printed on the document\)/.test(s1.lbl) && s1.val === '2019-04-02' && !/complet/i.test(s1.box), JSON.stringify(s1));
-    t('note: original issue date may differ from the card (latest renewal); the verifier confirms it with the state board', /may differ from the date on this card/.test(s1.note) && /latest renewal/.test(s1.note) && /verifier confirms the original issue date with the state board/.test(s1.note) && /Not required/.test(s1.note), s1.note);
-    t('expiration pre-filled from the scan, and needs the nurse\'s confirmation', s1.exp === '2029-01-31' && s1.ctxt === 'I confirm this expiration date matches my document' && !s1.on, JSON.stringify(s1));
+    t('v14.8 license file: checked on the device, nothing read into the form (no issue-date row, no values)', s1.state === 'clear' && s1.rows === 0 && !/2019|Original Issue Date/.test(s1.form), JSON.stringify({ state: s1.state, rows: s1.rows }));
+    t('v14.8 expiration NOT pre-filled; the confirmation reads "No expiration date on this document" until the nurse types a date', s1.exp === '' && s1.ctxt === 'No expiration date on this document' && !s1.on, JSON.stringify(s1));
     await shot('2-scan-license', '#acctAddFormV10');
-    await pg.evaluate(() => { const c = $('acctScanConfirmV14'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
+    await pg.fill('#acctExpV10', '2029-01-31');
+    await pg.evaluate(() => { const r = document.querySelector('input[name=acctLicTypeV10][value=SINGLE]'); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); });
     const nA = await pg.evaluate(() => __fakeDb.credentials.length);
     await pg.evaluate(() => document.querySelector('#acctAddFormV10 button[type=submit]').click()); await pg.waitForTimeout(500);
     t('account save is blocked until the expiration is confirmed', await pg.evaluate(n => __fakeDb.credentials.length === n, nA) && /Confirm the expiration date/.test(await pg.textContent('#acctWsMsgV10')), await pg.textContent('#acctWsMsgV10'));
     await ctr('#acctExpOkV147'); await pg.check('#acctExpOkV147');
     await pg.setInputFiles('#acctFileV10', FILES.none); await waitScan(); await pg.waitForTimeout(200);
     const s2 = await sc();
-    t('a new file clears the confirmation; no issue date printed → "Issue date (if printed on the document)" · "not printed · optional"', !s2.on && /^Issue date \(if printed on the document\)/.test(s2.lbl) && /not printed · optional/.test(s2.lbl) && s2.exp === '2029-02-28', JSON.stringify(s2));
-    await pg.evaluate(() => { const c = $('acctScanConfirmV14'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
+    t('a new file clears the confirmation; the typed date stays (nothing replaced by the file)', !s2.on && s2.exp === '2029-01-31' && s2.rows === 0, JSON.stringify(s2));
     await ctr('#acctExpOkV147'); await pg.check('#acctExpOkV147');
     await pg.evaluate(() => document.querySelector('#acctAddFormV10 button[type=submit]').click());
     await pg.waitForFunction(n => __fakeDb.credentials.length > n, nA);
     await pg.waitForTimeout(400);
     const as = await pg.evaluate(() => { const c = __fakeDb.credentials[__fakeDb.credentials.length - 1]; return { exp: c.expires_on, ec: c.metadata.exp_confirm, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => [e.event_type, e.result]), row: (document.querySelector(`.acct-expprov-v147[data-cred="${c.id}"]`) || {}).textContent || '' }; });
-    t('account save: provenance = document scan + confirmed by the nurse + time (no date copied into metadata); event logged; shown on the credential', as.exp === '2029-02-28' && as.ec && as.ec.source === 'DOCUMENT_SCAN' && as.ec.confirmed_by === 'CLINICIAN' && !JSON.stringify(as.ec).includes('2029') && as.ev.some(e => e[0] === 'EXPIRATION_CONFIRMED' && e[1] === 'DOCUMENT_SCAN') && /Confirmed by the nurse · read from the document scan/.test(as.row), JSON.stringify(as));
+    t('account save: provenance = typed by the nurse + confirmed + time (no date copied into metadata); event logged; shown on the credential', as.exp === '2029-01-31' && as.ec && as.ec.source === 'TYPED' && as.ec.confirmed_by === 'CLINICIAN' && !JSON.stringify(as.ec).includes('2029') && as.ev.some(e => e[0] === 'EXPIRATION_CONFIRMED' && e[1] === 'TYPED') && /Confirmed by the nurse · typed by you/.test(as.row), JSON.stringify(as));
     const vo2 = await pg.evaluate(async () => { const c = __fakeDb.credentials[__fakeDb.credentials.length - 1]; await acct().log('ORIGINAL_ISSUE_DATE_RECORDED', { actor_type: 'VERIFIER', credential_id: c.id, clinician_id: c.clinician_id, result: 'RECORDED', detail: { original_issue_date: '2017-03-09', source: 'Arizona State Board of Nursing' } }); await acct().hydrate(); acctRenderAll(); const e = __fakeDb.audit_events.find(x => x.event_type === 'ORIGINAL_ISSUE_DATE_RECORDED'); return { cl: e.clinician_id === c.clinician_id, row: (document.querySelector(`.acct-expprov-v147[data-cred="${c.id}"]`) || {}).textContent || '' }; });
     t('account: an original issue date recorded by a verifier shows on the credential, apart from the printed dates', vo2.cl && /Original issue date: .*2017.* — recorded by the verifier from Arizona State Board of Nursing/.test(vo2.row), JSON.stringify(vo2));
     t('no horizontal overflow (account)', await noOverflow());
