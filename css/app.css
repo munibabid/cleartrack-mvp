@@ -325,3 +325,14 @@ select optgroup{font-weight:700}
 @media(max-width:620px){.ref-card-v146 .acts>*{flex:1 1 100%;justify-content:center;text-align:center}.ref-rate-o-v146 label{margin-right:10px}}
 .ref-public-v146 #refPubStateV146{margin:0 0 14px}
 #referencesView .v7-head{flex-wrap:wrap;gap:10px}#referencesView .v7-head>div{min-width:0;flex:1 1 220px}#referencesView .v7-head>button{flex:0 0 auto}
+/* v14.7: explicit expiration confirmation, license issue-date note, original issue date */
+.exp-confirm-v147{margin:6px 0 10px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc}
+.exp-confirm-v147 .exp-confirm-lbl-v147{display:flex;align-items:flex-start;gap:8px;font-weight:600;font-size:15px;line-height:1.35;cursor:pointer;margin:0}
+.exp-confirm-v147 input[type=checkbox]{width:20px;height:20px;min-width:20px;margin:1px 0 0;flex:0 0 auto}
+.exp-confirm-v147 .small{margin-top:4px;color:#475569}
+.exp-confirm-v147:has(input:checked){border-color:#16a34a;background:#f0fdf4}
+.scan-note-v147{display:block;margin-top:4px;color:#475569}
+.verify-act-v147{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.orig-issue-in-v147{display:flex;flex-direction:column;gap:2px;max-width:260px}
+.orig-issue-in-v147 input{font-size:16px}
+@media (max-width:600px){.verify-act-v147{align-items:stretch}.orig-issue-in-v147{max-width:none}}

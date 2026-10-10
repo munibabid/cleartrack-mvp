@@ -57,7 +57,10 @@ async function run(browser, name, vp, shots) {
   };
   try {
     await pg.goto(BASE, { waitUntil: 'networkidle' });
-    t('version label v14.6', await pg.evaluate(() => document.documentElement.textContent.includes('v14.6 demo')));
+    t('version label v14.7', await pg.evaluate(() => document.documentElement.textContent.includes('v14.7 demo')));
+    // v14.7: the demo seeds two completed example references (References section, not credentials); start this flow from none
+    const seeded = await pg.evaluate(() => { const a = loadReferences(); const r = { n: a.length, done: a.filter(x => refStatus(x) === 'COMPLETED' && x.seed).length, cred: creds.some(c => c.kind === 'REF_SPECIALTY') }; store.references.save([]); store.referenceResponses.save({}); return r; });
+    t('demo seed: 2 completed example references, no reference in the credential list', seeded.n === 2 && seeded.done === 2 && !seeded.cred, JSON.stringify(seeded));
     // v14.6: landing sample table comes from the demo seed; no stuck "Proof: securing…"; plain "Proof in progress"
     const land = await pg.evaluate(() => { const t = $('landingLicTableV146'), rows = [...t.querySelectorAll('tr')].map(r => [...r.cells].map(c => c.textContent.trim())); const want = DEMO_SEED.filter(([k]) => ['Licenses', 'Certifications'].includes(catalogKind(k)?.category)).map(([k, j, , , x]) => x?.name || credentialDisplayName(k, j)); return { rows, want, any: /securing/i.test(document.body.innerText + document.body.innerHTML), pl: proofLabel({ chain: 'SECURING' }), pl2: proofLabel({ chain: 'XRPL ISSUED' }), uc: userChain({ chain: 'SECURING' }) }; });
     t('landing Licenses & Certifications table is built from the demo seed (same names as the Passport)', land.rows.length === land.want.length && land.rows.every((r, i) => r[0] === land.want[i]) && land.rows.some(r => /NIHSS/.test(r[0])), JSON.stringify(land.rows));
@@ -217,7 +220,7 @@ async function run(browser, name, vp, shots) {
     t('reference details are escaped (no markup injection)', !xss.fired && !xss.img && xss.shown, JSON.stringify(xss));
     // Reset demo clears references
     await pg.evaluate(() => { v81ShowRole('clinician'); $('resetDemo').click(); });
-    t('Reset Demo Data clears references and answers', await pg.evaluate(() => loadReferences().length === 0 && Object.keys(loadRefResponses()).length === 0));
+    t('Reset Demo Data clears added references and answers (only the 2 seeded examples come back)', await pg.evaluate(() => { const a = loadReferences(), r = loadRefResponses(); return a.length === 2 && a.every(x => x.seed) && Object.keys(r).length === 2 && !JSON.stringify(r).includes('ZQX-private-comment-7731'); }));
     t('golden path unaffected: Boston Travel ICU still 11/12 before the MA license', await pg.evaluate(() => { const a = getAssignments().find(x => /Boston/.test(x.name)); const r = v81Assignment(a); return r.ok === 11 && r.total === 12; }));
     t('no page errors', errs.length === 0, errs.join(' | '));
   } catch (e) { t('run', false, e.message.split('\n')[0]); }

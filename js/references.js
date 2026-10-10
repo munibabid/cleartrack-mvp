@@ -231,9 +231,11 @@ function renderReferencesView(){
  el.innerHTML=`<div class="v7-head"><div><h1>Professional References</h1><div class="small">Ask people you've worked with to vouch for you. They answer privately. You'll see where each request stands, never their answers.</div></div><button type="button" class="pri" id="refAddBtnV146"${a.length>=REF_MAX?' disabled':''}>+ Add reference</button></div>
  <div class="notice" style="margin:0 0 14px"><b>Demo:</b> nothing is actually sent. Emails, texts and calls are simulated, and references are stored only in this browser. Requests expire after ${REF_EXPIRY_DAYS} days. Because this is a demo, you can switch to the Organization role and see what an organization would see; in the real product you couldn't.</div>
  <div class="pass-summary-v85"><span class="chip">${n('COMPLETED')} completed</span><span class="chip">${waiting} waiting</span><span class="chip">${n('EXPIRED')} expired</span><span class="chip">${n('DECLINED')} declined</span><span class="demo-tag-v81">DEMO</span></div>
+ ${refLegacyNoteHtml()}
  <div id="refFormWrapV146">${refFormOpen?refFormHtml():''}</div>
  <div id="refListV146">${a.map(refCardHtml).join('')||`<div class="empty"><b>No references yet.</b><div class="small" style="margin-top:6px">Most agencies ask for two recent references, often a manager or charge nurse. <button type="button" class="sec mini" id="refExamplesV146">Add example references (demo)</button></div></div>`}</div>
  <div class="small" style="margin-top:10px">How references are confirmed: a work email at the facility's own email domain is stronger than a personal email. For phone references, a recruiter records who called, when, and how they reached the person. Veridun never says more than what was checked.</div>`;
+ if($('refLegacyOkV147'))$('refLegacyOkV147').onclick=()=>{refLegacyDismiss();renderReferencesView()};
  $('refAddBtnV146').onclick=()=>{refFormOpen=true;renderReferencesView();$('refNameV146')?.focus()};
  if($('refExamplesV146'))$('refExamplesV146').onclick=()=>{refAddExamples();renderReferencesView()};
  if(refFormOpen){
@@ -369,3 +371,67 @@ function refEnsureShareControl(value){
 }
 function refSelectedScope(){return $('shareRefScopeV146')?.value||'NONE'}
 if(typeof module!=='undefined')module.exports={refEmailCheck,refValidate,refValidateAnswers,refStatus,REF_EXPIRY_DAYS};
+
+/* ---------------- v14.7: references count toward readiness ----------------
+   References are not credentials. The specialty-reference requirement
+   (REF_SPECIALTY, "References") is satisfied by COMPLETED references from the
+   References section (demo store), never by a credential entry. */
+const REF_REQUIRED_DEFAULT=2;
+function refRequiredCount(req){return Math.max(1,+(req&&req.count)||REF_REQUIRED_DEFAULT)}
+/* Status list used for readiness: the live demo nurse reads the References
+   section; comparison nurses carry a static completed count. */
+function nurseReferenceStatuses(n){
+ if(!n||n.live)return loadReferences().map(r=>refStatus(r));
+ return Array.from({length:+n.refsCompleted||0},()=>'COMPLETED');
+}
+function evaluateReferencesRequirement(req,a,statuses){
+ const need=refRequiredCount(req),done=statuses.filter(s=>s==='COMPLETED').length,waiting=statuses.filter(s=>s==='REQUESTED'||s==='OPENED').length;
+ const label=`References: ${Math.min(done,need)} of ${need} completed`;
+ let out;
+ if(done>=need)out={req,label,status:'MET',basis:`${done} completed reference${done===1?'':'s'} in the References section`,refs:{need,done,waiting}};
+ else if(waiting&&done+waiting>=need)out={req,label,status:'WAITING_REFERENCES',note:`${waiting} reference request${waiting===1?'':'s'} waiting for an answer`,refs:{need,done,waiting}};
+ else out={req,label,status:'MISSING',note:`Needs ${need-done} more completed reference${need-done===1?'':'s'}. Add and request them in the References section.`,refs:{need,done,waiting}};
+ out.decision=REQUIREMENT_DECISIONS[out.status]||out.status;
+ out.why=out.status==='MET'?`Satisfied by ${done} completed reference${done===1?'':'s'} (needs ${need}). Answers stay private; organizations see them only if you share references.`
+  :out.status==='WAITING_REFERENCES'?`${done} of ${need} completed; ${waiting} still waiting for an answer. Requests expire after ${REF_EXPIRY_DAYS} days.`
+  :`${done} of ${need} completed. References are added and requested in the References section, not as credentials.`;
+ return out;
+}
+
+/* ---------------- v14.7: demo seed + migration ---------------- */
+const REF_SEED=[
+ {name:'Renee Castillo',title:'ICU Nurse Manager',facility:'Sonoran Regional Medical Center',unit:'Medical ICU',email:'r.castillo@sonoranregional.example',sentDays:-30,doneDays:-27,
+  ans:{fromMonth:3,fromYear:2022,current:false,toMonth:9,toYear:2024,role:'MANAGER',ratings:{clinical:5,professionalism:5,teamwork:4,reliability:5,communication:4},rehire:'YES',comments:'Demo answer (fictional).'}},
+ {name:'Theo Marchetti',title:'Charge Nurse',facility:'Beacon Harbor Medical Center',unit:'Surgical ICU',email:'t.marchetti@beaconharbor.example',sentDays:-26,doneDays:-24,
+  ans:{fromMonth:1,fromYear:2023,current:true,toMonth:null,toYear:null,role:'CHARGE',ratings:{clinical:4,professionalism:5,teamwork:5,reliability:4,communication:5},rehire:'YES',comments:'Demo answer (fictional).'}}
+];
+function seedDemoReferences(){
+ const now=Date.now(),d=n=>new Date(now+n*864e5).toISOString(),list=loadReferences(),resp=loadRefResponses();
+ REF_SEED.forEach((x,i)=>{
+  const id='rfseed'+i+'-'+now.toString(36);
+  const r={id,seed:true,name:x.name,title:x.title,facility:x.facility,unit:x.unit,email:x.email,phone:'',allowText:false,allowCall:false,createdAt:d(x.sentDays),status:'COMPLETED',token:randomShareToken(),channel:'EMAIL',sentAt:d(x.sentDays),openedAt:d(x.doneDays),completedAt:d(x.doneDays),declinedAt:null,reminders:0,lastReminderAt:null,resends:0,completion:null};
+  r.completion={by:'REFERENCE',channel:'EMAIL',emailCheck:refEmailCheck(r).level,attested:true};
+  list.push(r);resp[id]={...x.ans,ratings:{...x.ans.ratings},submittedAt:d(x.doneDays)};
+ });
+ saveReferences(list);saveRefResponses(resp);
+}
+/* Older demo data kept "Specialty Reference Evaluation" entries in the credential
+   list. They are moved out (kept in their own store key, not deleted) and noted in
+   the References section. The demo seed's entry is replaced by the seeded completed
+   references, so readiness doesn't change. */
+function migrateReferenceCredentials(){
+ const moved=creds.filter(c=>c.kind==='REF_SPECIALTY');if(!moved.length)return 0;
+ const legacy=store.referenceLegacy.load(),at=new Date().toISOString();
+ moved.forEach(c=>legacy.push({movedAt:at,noteDismissed:false,credential:c}));
+ store.referenceLegacy.save(legacy);
+ creds=creds.filter(c=>c.kind!=='REF_SPECIALTY');save();
+ const fromSeed=moved.some(c=>/\(demo seed\)/.test(c.prov?.source||''));
+ if(fromSeed&&!loadReferences().some(r=>refStatus(r)==='COMPLETED'))seedDemoReferences();
+ moved.forEach(c=>v81Log('REFERENCE_CREDENTIAL_MOVED',c.id,{actor_type:'SYSTEM',result:'MOVED_TO_REFERENCES',detail:{name:c.name,from_demo_seed:/\(demo seed\)/.test(c.prov?.source||'')}}));
+ return moved.length;
+}
+function refLegacyNoteHtml(){
+ const l=store.referenceLegacy.load().filter(x=>!x.noteDismissed);if(!l.length)return'';
+ return`<div class="notice" id="refLegacyNoteV147" style="margin:0 0 14px"><b>Moved here from your credentials:</b> ${l.map(x=>`“${ec(x.credential?.name||'Reference')}”`).join(', ')}. References aren't credentials, so they now live only in this section. The old entr${l.length===1?'y is':'ies are'} kept in this browser, not deleted${l.some(x=>/\(demo seed\)/.test(x.credential?.prov?.source||''))?'. The demo example was replaced by completed example references below':''}. <button type="button" class="sec mini" id="refLegacyOkV147">OK</button></div>`;
+}
+function refLegacyDismiss(){store.referenceLegacy.save(store.referenceLegacy.load().map(x=>({...x,noteDismissed:true})))}

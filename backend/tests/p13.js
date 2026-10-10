@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const puppeteer = require('puppeteer-core');
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr13-shots/';
-const VERSION = 'v14.6 demo';
+const VERSION = 'v14.7 demo';
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 240) : ''); R.push(l); console.log(l); };
@@ -29,7 +29,7 @@ async function partA(browser) {
   const noSideScroll = () => pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   const shot = async (file, sel) => { await W(250); const h = sel && await pg.$(sel); if (h) { await pg.evaluate(e => e.scrollIntoView({ block: 'start' }), h); await W(150); await h.screenshot({ path: SH + file }); } else await pg.screenshot({ path: SH + file }); };
 
-  const ver = await pg.evaluate(() => document.documentElement.textContent.includes('v14.6 demo'));
+  const ver = await pg.evaluate(() => document.documentElement.textContent.includes('v14.7 demo'));
   ok('site shows ' + VERSION, ver);
 
   const reg = await pg.evaluate(() => ({
@@ -58,7 +58,7 @@ async function partA(browser) {
   const lic = await pg.evaluate(() => (document.getElementById('v7PassportLicV13') || {}).innerText || '');
   ok('Passport names the RN license and the state license the assignment requires', /RN license/i.test(lic) && /Massachusetts/.test(lic) && /Required/i.test(lic), lic.slice(0, 200));
   await shot('01-passport-license.png', '#v7PassportLicV13');
-  await pg.evaluate(() => { completeMissingRequirement('boston-icu'); $('dt').value = isoDaysFromNow(730); addCredentialFromForm(); });
+  await pg.evaluate(() => { completeMissingRequirement('boston-icu'); $('dt').value = isoDaysFromNow(730); $('addExpOkV147').click(); addCredentialFromForm(); });
   await W(300);
   const pend = await pg.evaluate(() => { const c = creds.find(x => x.kind === 'RN_LICENSE' && x.jurisdiction === 'US-MA'); return c && { id: c.id, p: c.primary }; });
   ok('Massachusetts license added and queued', pend && pend.p === 'VERIFYING', JSON.stringify(pend));

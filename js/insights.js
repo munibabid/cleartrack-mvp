@@ -31,7 +31,7 @@ function taskSections(){
   if(!isVerifiedActive(c))return;
   const rn=renewing.has(c.id);if(d!=null&&d<=30)exp30.push({c,d,renewing:rn});else if(d!=null&&d<=90)renew.push({c,d,renewing:rn});else complete.push(c);
  });
- NEWCOMER_BASELINE_KINDS.filter(k=>!creds.some(c=>c.kind===k&&(isCurrentVerified(c)||['VERIFYING','UNVERIFIED'].includes(c.primary)))).forEach(k=>missing.push({kind:k,reason:'Part of your onboarding baseline — not on your Passport'}));
+ NEWCOMER_BASELINE_KINDS.filter(k=>!catalogKind(k)?.notCredential&&!creds.some(c=>c.kind===k&&(isCurrentVerified(c)||['VERIFYING','UNVERIFIED'].includes(c.primary)))).forEach(k=>missing.push({kind:k,reason:'Part of your onboarding baseline — not on your Passport'}));
  return{required:[...blockers.values()],exp30,renew,awaiting,missing,complete};
 }
 /* Rule-derived mismatch alerts for the Verification Console (demo rules). */
@@ -53,7 +53,7 @@ function needsManualReview(c){return['VERIFYING','UNVERIFIED'].includes(c.primar
 /* Clinician "Needs Attention" (handoff §37). */
 function clinicianAttention(){
  const t=taskSections(),out=[];
- t.required.forEach(b=>out.push({sev:1,icon:'○',text:`${b.item.label} — needed for ${b.assignments.map(a=>a.name).join(', ')}`,sub:b.item.note||'Required before submission',action:{label:'Complete',fn:`completeMissingRequirement('${b.assignments[0].id}')`}}));
+ t.required.forEach(b=>out.push({sev:1,icon:'○',text:`${b.item.label} — needed for ${b.assignments.map(a=>a.name).join(', ')}`,sub:b.item.note||'Required before submission',action:b.item.req?.kind==='REF_SPECIALTY'?{label:'Go to References',fn:`showV7View('referencesView')`}:{label:'Complete',fn:`completeMissingRequirement('${b.assignments[0].id}')`}}));
  t.missing.forEach(m=>out.push({sev:1,icon:'⚠',text:m.c?m.c.name:(catalogKind(m.kind)?.label||m.kind),sub:m.reason,action:{label:'Add',fn:`openAddForm({kind:'${m.c?m.c.kind:m.kind}',jurisdiction:'${m.c?.jurisdiction||''}'})`}}));
  t.exp30.filter(x=>!x.renewing).forEach(x=>out.push({sev:2,icon:'⏰',text:`${x.c.name} expires in ${x.d} day${x.d===1?'':'s'}`,sub:'Expiring within 30 days — renew',action:{label:'Renew',fn:`openRenewal(${x.c.id})`}}));
  t.awaiting.forEach(c=>out.push({sev:3,icon:'⏳',text:`${c.name} — awaiting verification`,sub:'In the Verification Console queue (simulated)',action:null}));

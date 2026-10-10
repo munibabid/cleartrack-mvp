@@ -10,6 +10,7 @@
    Run: BASE=http://localhost:8765/ node backend/tests/p144.js */
 const fs = require('fs');
 const path = require('path');
+const EXPOK = () => { const r = document.getElementById('acctExpDateRowV10'), cb = document.getElementById('acctExpOkV147'); if (r && cb && !r.classList.contains('hidden') && !expConfirmValid('acct')) cb.click(); }; /* v14.7: the nurse confirms the expiration */
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); };
@@ -232,7 +233,7 @@ async function partF(browser) {
   await tap('#acctUseDocDateV14'); await W(150);
   const s3 = await st();
   ok('F8 "Use the document\'s date" restores it and the mark', s3.exp === CCRN.throughIso && !s3.mm && /from document/.test(s3.src), JSON.stringify(s3));
-  await tap('#acctScanConfirmV14'); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
+  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
   const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_CCRN').pop(); return c && { exp: c.expires_on, mm: c.metadata.doc && c.metadata.doc.mismatch, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
   ok('F9 saved with the document date (DOCUMENT_DATE_APPLIED), no mismatch flag', saved && saved.exp === CCRN.throughIso && !saved.mm && saved.ev.includes('DOCUMENT_DATE_APPLIED'), JSON.stringify(saved));
   // typed first, then scanned: the typed date is kept and the mismatch is flagged
@@ -241,7 +242,7 @@ async function partF(browser) {
   await (await pg.$('#acctFileV10')).uploadFile(f1); await W(200); await waitScan(); await W(200);
   const s4 = await st();
   ok('F10 a date typed before the scan is never overwritten; mismatch note shown', s4.exp === '2027-01-31' && s4.mm && !/from document/.test(s4.src), JSON.stringify(s4));
-  await tap('#acctScanConfirmV14'); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
+  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
   const saved2 = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_CCRN').pop(); return c && { exp: c.expires_on, mm: c.metadata.doc && c.metadata.doc.mismatch, f: c.metadata.doc && c.metadata.doc.mismatch_fields, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
   ok('F11 saved as typed, flagged for the verifier (DOCUMENT_MISMATCH on expires_on), no DOCUMENT_DATE_APPLIED', saved2 && saved2.exp === '2027-01-31' && saved2.mm && saved2.f.includes('expires_on') && saved2.ev.includes('DOCUMENT_MISMATCH') && !saved2.ev.includes('DOCUMENT_DATE_APPLIED'), JSON.stringify(saved2));
   ok('F12 no page errors', errs.length === 0, errs.join(' | '));

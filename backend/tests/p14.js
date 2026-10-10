@@ -21,10 +21,11 @@
 const fs = require('fs');
 const crypto = require('crypto');
 const puppeteer = require('puppeteer-core');
+const EXPOK = () => { const r = document.getElementById('acctExpDateRowV10'), cb = document.getElementById('acctExpOkV147'); if (r && cb && !r.classList.contains('hidden') && !expConfirmValid('acct')) cb.click(); }; /* v14.7: the nurse confirms the expiration */
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const SH = process.env.SH || '/workspace/pr14-shots/';
 const FIX = '/tmp/p14-fixtures';
-const VERSION = 'v14.6 demo';
+const VERSION = 'v14.7 demo';
 const W = ms => new Promise(r => setTimeout(r, ms));
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); };
@@ -186,7 +187,7 @@ async function partA4(browser) {
   ok('typed May 8 date kept (not overwritten); mismatch note under the one expiration field', mm.exp === '2028-05-08' && /May 8, 2028/.test(mm.t) && /Jun 30, 2028/.test(mm.t) && /flagged for the verifier/.test(mm.t) && mm.btn && !mm.src, mm.t.replace(/\s+/g, ' ').slice(0, 200));
   await shot('03-mismatch-warning.png', '#acctExpDateRowV10');
   // saving without confirming is refused
-  await tap('#acctAddFormV10 button[type=submit]'); await idle();
+  await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
   ok('save is refused until the nurse confirms the details', /I checked these details/.test(await pg.evaluate(() => document.getElementById('acctWsMsgV10')?.textContent || document.getElementById('acctMsgV10')?.textContent || '')));
   await tap('#acctUseDocDateV14'); await W(200);
   const applied = await pg.evaluate(() => ({ exp: document.getElementById('acctExpV10').value, mm: !!document.getElementById('acctMismatchV14') || !!document.getElementById('acctExpMismatchV144') }));
@@ -194,7 +195,7 @@ async function partA4(browser) {
   const marked = await pg.evaluate(() => ({ src: document.getElementById('acctExpSrcV144').innerText, note: document.getElementById('acctExpNoteV144').innerText, mm: !!document.getElementById('acctExpMismatchV144') }));
   ok('expiration field marked "from document, check it" with its confidence; explains month/year renewal = end of month', /from document, check it · \d+%/.test(marked.src) && /end of the month/.test(marked.note) && /June 30, 2028/.test(marked.note) && !marked.mm, JSON.stringify(marked));
   await tap('#acctScanConfirmV14');
-  await tap('#acctAddFormV10 button[type=submit]'); await idle();
+  await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
   const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); return { c, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type), xe: __fakeDb.extraction_events.filter(e => e.credential_id === c.id), msg: document.getElementById('acctWsMsgV10')?.textContent || '' }; });
   ok('saved: VERIFYING, expires June 30, metadata.doc confirmed, status "Details captured, awaiting verification"', saved.c.status === 'VERIFYING' && saved.c.expires_on === '2028-06-30' && saved.c.metadata.doc?.confirmed && saved.c.metadata.doc.fields_confirmed.includes('credential_id') && /Details captured, awaiting verification/.test(saved.msg), saved.msg);
   ok('audit: DOCUMENT_SCANNED + DOCUMENT_DATE_APPLIED; extraction event CONFIRM', saved.ev.includes('DOCUMENT_SCANNED') && saved.ev.includes('DOCUMENT_DATE_APPLIED') && saved.xe.length === 1 && saved.xe[0].event === 'CONFIRM', JSON.stringify(saved.ev));
@@ -211,7 +212,7 @@ async function partA4(browser) {
   ok('NIHSS scan: Test ID, completion + expiration dates', nih.v.credential_id === '99000123' && nih.v.issued_on === '2026-03-14' && nih.v.expires_on === '2028-03-14', JSON.stringify(nih.v));
   ok('NIHSS mismatch vs typed Dec 31, 2028 (note under the expiration field)', /doesn't match the document/.test(nih.mm) && /Dec 31, 2028/.test(nih.mm));
   await shot('07-nihss-scan.png', '#acctScanBoxV14');
-  await tap('#acctScanConfirmV14'); await tap('#acctAddFormV10 button[type=submit]'); await idle();
+  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
   const nihRow = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_NIHSS').pop(); return { flag: c.metadata.doc?.mismatch, src: c.metadata.doc?.source_suggested, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
   ok('saved with mismatch → flagged for the verifier (DOCUMENT_MISMATCH), APEX suggested', nihRow.flag === true && nihRow.src === 'apex-nihss' && nihRow.ev.includes('DOCUMENT_MISMATCH'), JSON.stringify(nihRow));
   // ---- private record: only the expiration date is kept ----
@@ -220,7 +221,7 @@ async function partA4(browser) {
   await (await pg.$('#acctFileV10')).uploadFile(FIX + '/tb-private-text.pdf'); await waitScan();
   const tbBox = await pg.evaluate(() => ({ f: acctScan.res.fieldsWanted, txt: document.getElementById('acctScanBoxV14').innerText }));
   ok('private TB record shows dates only and says nothing else is stored', tbBox.f.join() === 'issued_on,expires_on' && /only the dates are used/.test(tbBox.txt), tbBox.f.join());
-  await tap('#acctUseDocDateV14').catch(() => {}); await tap('#acctScanConfirmV14'); await tap('#acctAddFormV10 button[type=submit]'); await idle();
+  await tap('#acctUseDocDateV14').catch(() => {}); await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
   const tb = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'HEALTH_TB_CURRENT').pop(); return c && { meta: c.metadata, exp: c.expires_on }; });
   ok('private TB record saved with empty metadata and the document date', tb && Object.keys(tb.meta || {}).length === 0 && tb.exp === '2027-04-01', JSON.stringify(tb));
   // ---- re-scan the existing BLS credential (signed URL → fetch → read) ----
@@ -354,7 +355,7 @@ async function partC(browser, db, mask) {
     ok('live: NIHSS read on the phone, APEX suggested, mismatch vs typed Dec 31', sc.v.credential_id === '99000123' && sc.v.expires_on === '2028-03-14' && sc.src === 'apex-nihss' && /doesn't match the document/.test(sc.mm), JSON.stringify({ src: sc.src, exp: sc.v.expires_on }));
     await tap(nurse.pg, '#acctUseDocDateV14'); await W(200);
     await tap(nurse.pg, '#acctScanConfirmV14');
-    await tap(nurse.pg, '#acctAddFormV10 button[type=submit]'); await idle(nurse.pg);
+    await nurse.pg.evaluate(EXPOK); await tap(nurse.pg, '#acctAddFormV10 button[type=submit]'); await idle(nurse.pg);
     const row = (await db.query(`select c.id, c.status::text, c.expires_on::text exp, c.metadata, c.source_document_path p from public.credentials c join public.clinicians k on k.id=c.clinician_id where k.user_id=$1 and c.kind='CERT_NIHSS'`, [nurseU.id])).rows[0];
     docPath = row && row.p;
     ok('live: saved VERIFYING with the document date, document in private storage', row && row.status === 'VERIFYING' && row.exp === '2028-03-14' && !!row.p, JSON.stringify(row && { st: row.status, exp: row.exp }));

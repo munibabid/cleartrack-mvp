@@ -570,7 +570,13 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
  const ambig=d=>d&&d.numeric&&d.dayFirstPossible&&!orderProven;
  const dateConf=(d,re)=>C(d.raw,d.li,{label:labelNear(lines,d.li,re)!=null,factor:(d.garbled?0.6:1)*(ambig(d)?0.85:1)});
  const dateHow=d=>d.garbled?'date (damaged print, check it)':ambig(d)?'date (day and month could be swapped, check it)':'date';
- if(issue&&want.includes('issued_on'))f.issued_on={value:issue.iso,conf:dateConf(issue,RE_ISSUE),how:dateHow(issue)};
+ /* v14.7: the label printed next to the issue date, kept raw (e.g. "Original Issue Date",
+    "Effective"), so the review form can show it as printed. Display only; never stored. */
+ const issueLabel=d=>{const off=labelNear(lines,d.li,RE_ISSUE);if(off==null)return null;const ln=lines[d.li+off]||'',m=RE_ISSUE.exec(ln);if(!m)return null;
+  let st=m.index;const pre=/((?:date|original|initial|first|license)\s+(?:of\s+)?)$/i.exec(ln.slice(0,st));if(pre)st-=pre[1].length;
+  const di=off===0&&d.raw?ln.indexOf(d.raw):-1;let t=(di>st?ln.slice(st,di):ln.slice(st)).replace(/[\s:#\-–—.,]+$/,'').trim();
+  if(!t||t.length>40)t=m[0];return t};
+ if(issue&&want.includes('issued_on'))f.issued_on={value:issue.iso,conf:dateConf(issue,RE_ISSUE),how:dateHow(issue),label:issueLabel(issue)};
  if(profile==='aha_resus'){
   if(renewMy)f.renew_by={value:renewMy.ym,conf:C(renewMy.raw,renewMy.li,{label:labelNear(lines,renewMy.li,RE_EXP)!=null}),how:'month/year'};
   else if(exp&&exp!==issue)f.renew_by={value:exp.iso.slice(0,7),conf:dateConf(exp,RE_EXP)*0.95,how:'full date',exact:exp.iso};

@@ -185,7 +185,7 @@ const CREDENTIAL_CATALOG=[
  {kind:'COMP_VENTILATOR',label:'Ventilator Management Competency',short:'Ventilator Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency vent mechanical ventilation'},
  {kind:'COMP_DYSRHYTHMIA',label:'Dysrhythmia / EKG interpretation competency (employer validated)',short:'Dysrhythmia Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency ekg ecg rhythm telemetry'},
  {kind:'COMP_MODERATE_SEDATION',label:'Moderate (procedural) sedation competency (employer validated)',short:'Moderate Sedation Competency',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Employer competency validation',keywords:'competency conscious sedation procedural'},
- {kind:'REF_SPECIALTY',label:'Specialty Reference Evaluation (manager or charge nurse)',short:'Specialty Reference',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'PRIVATE',issuer:'Reference evaluation (specialty manager)',keywords:'reference evaluation manager charge nurse'},
+ {kind:'REF_SPECIALTY',notCredential:true,label:'Professional references (manager or charge nurse)',short:'References',category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'PRIVATE',issuer:'Reference evaluation (specialty manager)',keywords:'reference evaluation manager charge nurse'},
  {kind:'EDU_BSN',label:'BSN — Bachelor of Science in Nursing',short:'BSN Education',category:'Education',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar'},
  {kind:'EDU_ADN',label:'ADN — Associate Degree in Nursing',short:'ADN Education',category:'Education',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar'},
  {kind:'EDU_CLINICAL_VERIFICATION',label:'Clinical education verification (school, optional)',short:'Clinical Education Verification',category:'Education',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'School / registrar',keywords:'clinical hours school education'},
@@ -225,7 +225,8 @@ function countsForReadiness(kind){return catalogKind(kind)?.readiness!==false}
 /* v14.5: one RN License type. The license scope (multistate vs single-state) is compact_privilege_type,
    stored with the license; RN_LICENSE_MULTISTATE is only read for older entries. */
 const COMPACT_PRIVILEGE_TYPES=['MULTISTATE','SINGLE_STATE'];
-function pickerCatalog(){return CREDENTIAL_CATALOG.filter(k=>!k.legacy)}
+/* v14.7: references are not credentials (notCredential): they live only in the References section. */
+function pickerCatalog(){return CREDENTIAL_CATALOG.filter(k=>!k.legacy&&!k.notCredential)}
 function licenseScopeOf(c){
  if(!c)return null;if(c.kind==='RN_LICENSE_MULTISTATE')return'MULTISTATE';if(c.kind!=='RN_LICENSE')return null;
  const v=c.compact_privilege_type||c.metadata?.compact_privilege_type;return v==='MULTISTATE'?'MULTISTATE':'SINGLE_STATE';
@@ -285,6 +286,6 @@ function licenseCoverage(kind,jur){
 function requirementLabel(r){if(r.kind===RN_AUTHORIZATION)return`${jurisdictionName(r.jurisdiction)} RN License`;return catalogKind(r.kind)?.short||catalogKind(r.kind)?.label||r.kind}
 /* Searchable-dropdown resolution: accepts the option label, the code, or a
    unique case-insensitive partial match. */
-function resolveCatalogKind(text){const t=String(text||'').trim().toLowerCase();if(!t)return null;return CREDENTIAL_CATALOG.find(k=>k.label.toLowerCase()===t||k.kind.toLowerCase()===t)||_unique(CREDENTIAL_CATALOG.filter(k=>(k.label+' '+(k.keywords||'')+' '+k.kind).toLowerCase().includes(t)))}
+function resolveCatalogKind(text){const t=String(text||'').trim().toLowerCase();if(!t)return null;const cat=CREDENTIAL_CATALOG.filter(k=>!k.notCredential);return cat.find(k=>k.label.toLowerCase()===t||k.kind.toLowerCase()===t)||_unique(cat.filter(k=>(k.label+' '+(k.keywords||'')+' '+k.kind).toLowerCase().includes(t)))}
 function resolveJurisdiction(text,list=US_JURISDICTIONS){const t=String(text||'').trim().toLowerCase();if(!t)return null;return list.find(j=>jurisdictionOptionLabel(j).toLowerCase()===t||j.code.toLowerCase()===t||j.name.toLowerCase()===t||j.code.slice(3).toLowerCase()===t)||_unique(list.filter(j=>jurisdictionOptionLabel(j).toLowerCase().includes(t)))}
 function _unique(a){return a.length===1?a[0]:null}

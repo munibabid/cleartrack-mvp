@@ -8,6 +8,7 @@
       nurse's scan box and the verifier's assisted AHA lookup.
    Run: BASE=http://localhost:8765/ node backend/tests/p142.js */
 const fs = require('fs');
+const EXPOK = () => { const r = document.getElementById('acctExpDateRowV10'), cb = document.getElementById('acctExpOkV147'); if (r && cb && !r.classList.contains('hidden') && !expConfirmValid('acct')) cb.click(); }; /* v14.7: the nurse confirms the expiration */
 const BASE = process.env.BASE || 'http://localhost:8765/';
 const R = [];
 const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') + n + (i !== '' && i != null ? ' — ' + String(i).slice(0, 300) : ''); R.push(l); console.log(l); };
@@ -139,7 +140,7 @@ async function partC(browser, cases) {
   ok('C4 nurse: typing the TC ID into the eCard code box is flagged', /looks like the Training Center ID/.test(n2), n2.replace(/\s+/g, ' ').slice(0, 160));
   await setVal('acctScanF-credential_id', '261100000041'); await W(150);
   ok('C5 nurse: a real eCard code clears that note', !/looks like the Training Center ID/.test(await pg.evaluate(() => document.getElementById('acctScanMismatchBoxV14')?.innerText || '')));
-  await tap('#acctScanConfirmV14'); await tap('#acctAddFormV10 button[type=submit]');
+  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]');
   await pg.waitForFunction(() => !document.body.classList.contains('acct-busy-v10'), { timeout: 60000 });
   const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); const xe = __fakeDb.extraction_events.filter(e => e.credential_id === c.id); return { doc: c.metadata.doc, xe, leak: JSON.stringify([c.metadata, xe, __fakeDb.audit_events.map(e => e.detail)]) }; });
   ok('C6 saved: extraction event accepted by the field-name rule (no training_center_id), no values on the server', saved.xe.length === 1 && !saved.xe[0].fields_expected.includes('training_center_id') && !/CA00001|261100000041|Testa/.test(saved.leak), JSON.stringify(saved.xe[0] && saved.xe[0].fields_expected));
