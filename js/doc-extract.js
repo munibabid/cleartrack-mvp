@@ -34,47 +34,30 @@ function lastDay(y,m){return new Date(Date.UTC(y,m,0)).getUTCDate()}
 function monthIndex(s){const t=String(s).toLowerCase().slice(0,3);return MONTHS.findIndex(m=>m.startsWith(t))+1}
 function validDate(y,m,d){return m>=1&&m<=12&&d>=1&&d<=lastDay(y,m)&&y>=1990&&y<=2100}
 function monthName(m){const n=MONTHS[m-1]||'';return n.charAt(0).toUpperCase()+n.slice(1)}
-/* "06/2028" → valid through the end of June 2028 (AHA: cards are valid for
-   two years through the end of the month they were issued). */
-function renewToExpiry(renew){const m=/^(\d{4})-(\d{2})$/.exec(renew||'');if(!m)return null;const y=+m[1],mo=+m[2];return iso(y,mo,lastDay(y,mo))}
-function interpretRenewal(renew){
- const exp=renewToExpiry(renew);if(!exp)return'';
- const [y,m]=renew.split('-').map(Number);
- return`The card shows a recommended renewal date of ${pad(m)}/${y} (month and year only). AHA cards are valid for two years through the end of the month, so Veridun reads it as valid through ${monthName(m)} ${lastDay(y,m)}, ${y}.`;
-}
+/* v14.8: no renew-by → expiration conversion. A "Renew By" / "Recommended Renewal" month is
+   kept as printed (renew_by) and is never an expiration. */
 function addMonths(isoDate,n){const [y,m]=isoDate.split('-').map(Number);const t=y*12+(m-1)+n;return`${Math.floor(t/12)}-${pad(t%12+1)}`}
 
-/* OCR often swaps letters and digits inside a numeric code. */
-function fixDigits(s){return String(s).replace(/[Oo]/g,'0').replace(/[Il|!]/g,'1').replace(/S/g,'5').replace(/B/g,'8').replace(/Z/g,'2').replace(/G/g,'6').replace(/[Tt]/g,'7')}
-function normCode(raw){
- const s=String(raw||'').toUpperCase().replace(/[\s\-–—._]/g,'');
- if(!s)return null;
- const digits=(s.match(/\d/g)||[]).length;
- const fx=fixDigits(s);if(/^\d{12}$/.test(fx))return{code:fx,type:'AHA'};
- if(digits>=9&&s.length-digits<=3){const f=fx.replace(/\D/g,'');if(f.length===12)return{code:f,type:'AHA'};if(f.length>=10&&f.length<=14)return{code:f,type:'AHA',odd:true}}
- if(/^[A-Z0-9]{6,30}$/.test(s)&&/[A-Z]/.test(s)&&/\d/.test(s))return{code:s,type:'ALNUM'};
+/* v14.8: no identifier repair. A code is classified by its printed shape only: no case change,
+   no stripping of spaces/dashes/dots, no O/0 I/1 S/5 B/8 swaps, no digits inferred. */
+function codeShape(raw){
+ const s=String(raw||'').trim();if(!s)return null;
+ if(/^\d{12}$/.test(s)||/^\d{4} \d{4} \d{4}$/.test(s))return{code:s,type:'AHA'};/* spaced eCard codes are kept with their spaces */
+ if(/^[A-Za-z0-9]{6,30}$/.test(s)&&/[A-Za-z]/.test(s)&&/\d/.test(s))return{code:s,type:'ALNUM'};
  return null;
 }
 function codeFromQr(payload){
  if(!payload)return null;const p=String(payload);
  let m=/[?&#](?:ecardcode|ecard|code|cardcode|certificateid|certid|id)=([A-Za-z0-9\-]{6,24})/i.exec(p);
- if(m){const n=normCode(m[1]);if(n)return n}
+ if(m){const n=codeShape(m[1]);if(n)return n}
  m=/(?:^|\D)(\d{12})(?:\D|$)/.exec(p);if(m)return{code:m[1],type:'AHA'};
- m=/\/([A-Za-z0-9]{8,20})\/?(?:$|\?)/.exec(p);if(m&&/\d/.test(m[1])){const n=normCode(m[1]);if(n)return n}
+ m=/\/([A-Za-z0-9]{8,20})\/?(?:$|\?)/.exec(p);if(m&&/\d/.test(m[1])){const n=codeShape(m[1]);if(n)return n}
  return null;
 }
 
 /* ---- text → lines ---- */
 function toLines(text){return String(text||'').split(/\r?\n/).map(l=>l.replace(/[\u00a0\t]+/g,' ').replace(/ {2,}/g,'  ').trim()).filter(Boolean)}
-/* Dates OCR damaged: "01/20:2026", "04012027", "12731/2026" (slashes read as 1 or 7). Used only next to a date label. */
-function garbledDate(s){
- const t=String(s||'');let m=/(?<!\d)(\d{2})[^\d\s]?(\d{2})[^\d\s]?((?:19|20)\d{2})(?!\d)/.exec(t);
- if(m&&validDate(+m[3],+m[1],+m[2]))return{iso:iso(+m[3],+m[1],+m[2]),raw:m[0]};
- m=/(?<!\d)(\d{2})[17](\d{2})[17]((?:19|20)\d{2})(?!\d)/.exec(t);
- if(m&&validDate(+m[3],+m[1],+m[2]))return{iso:iso(+m[3],+m[1],+m[2]),raw:m[0]};
- return null;
-}
-
+/* v14.8: no repair of damaged dates (OCR-garbled dates are not guessed). */
 /* Dates with where they sit, so labels can be matched to values. */
 function findDates(lines){
  const full=[],my=[];
@@ -120,7 +103,7 @@ function cleanName(s){
               checklists: dates only, nothing else is read or kept */
 const ID_LABELS={aha_resus:'eCard code',license:'License number',cert:'Certificate / card ID',record:'Reference ID',dates_only:''};
 const COURSE_PATTERNS={
- CERT_BLS:'\\bBLS\\b|basic\\s+life\\s+support',CERT_ACLS:'\\bACLS\\b|advanced\\s+cardiovascular\\s+life\\s+support|\\bALS\\b',CERT_PALS:'\\bPALS\\b|pediatric\\s+advanced\\s+life\\s+support',
+ CERT_BLS:'\\bBLS\\b|basic\\s+life\\s+support',CERT_ACLS:'\\bACLS\\b|advanced\\s+cardiovascular\\s+life\\s+support',CERT_PALS:'\\bPALS\\b|pediatric\\s+advanced\\s+life\\s+support',
  CERT_NIHSS:'\\bNIHSS\\b|NIH\\s*stroke\\s*scale',CERT_NRP:'\\bNRP\\b|neonatal\\s+resuscitation',CERT_TNCC:'\\bTNCC\\b|trauma\\s+nursing\\s+core\\s+course',CERT_ENPC:'\\bENPC\\b|emergency\\s+nursing\\s+pediatric\\s+course',
  CERT_FETAL_MONITORING:'fetal\\s+heart\\s+monitoring|\\bFHM\\b',CERT_C_EFM:'\\bC-?EFM\\b|electronic\\s+fetal\\s+monitoring',CERT_CCRN:'\\bCCRN\\b|critical\\s+care\\s+registered\\s+nurse',CERT_PCCN:'\\bPCCN\\b|progressive\\s+care\\s+certified',
  CERT_CEN:'\\bCEN\\b|certified\\s+emergency\\s+nurse',CERT_CPEN:'\\bCPEN\\b|certified\\s+pediatric\\s+emergency',CERT_TCRN:'\\bTCRN\\b|trauma\\s+certified\\s+registered',CERT_CFRN:'\\bCFRN\\b|certified\\s+flight\\s+registered',CERT_CTRN:'\\bCTRN\\b|certified\\s+transport\\s+registered',
@@ -136,7 +119,7 @@ function profileFor(kind,catalog){
  if(k.category==='Certifications'||kind==='QUAL_SPECIALTY_CERT')return'cert';
  return'record';
 }
-const PROFILE_FIELDS={aha_resus:['holder_name','credential_id','course','issued_on','renew_by','training_center'],license:['holder_name','credential_id','course','jurisdiction','multistate','issued_on','expires_on'],cert:['holder_name','credential_id','course','issued_on','expires_on'],record:['holder_name','issued_on','expires_on'],dates_only:['issued_on','expires_on']};
+const PROFILE_FIELDS={aha_resus:['holder_name','credential_id','course','issued_on','renew_by','expires_on','training_center'],license:['holder_name','credential_id','course','jurisdiction','multistate','issued_on','expires_on'],cert:['holder_name','credential_id','course','issued_on','expires_on'],record:['holder_name','issued_on','expires_on'],dates_only:['issued_on','expires_on']};
 const PROFILE_REQUIRED={aha_resus:['holder_name','credential_id','course','issued_on','renew_by'],license:['holder_name','credential_id','jurisdiction','expires_on'],cert:['holder_name','course','expires_on'],record:['holder_name','issued_on'],dates_only:['issued_on']};
 function _phraseRe(p){return[...p].map(ch=>/[-.]/.test(ch)?'[-. ]?':/\s/.test(ch)?'\\s+':/[*+?^${}()|[\]\\\/]/.test(ch)?'\\'+ch:ch).join('').replace(/(\\s\+)+/g,'\\s+')}
 const _patCache={};
@@ -166,37 +149,34 @@ function detectSource(flat,kind,sources){
  return null;
 }
 const RE_ISSUE=/issue|issued|completion|completed|date\s+of\s+(course|exam|test|completion|certification)|test\s*date|exam\s*date|administered|date\s+given|collected|certified\s+(since|on)|initial|original|awarded|conferred|earned|effective|course\s+date|class\s+date|read\s+on|date\s+read|signed/i;
-const RE_EXP=/renew|expir|certified\s+(through|thru|until)|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)|exp\.?\s*date|\bdue\b|recertif|good\s+through|valid\s+for|next\s*(test|due)/i;
+/* v14.8: "Renew By", "Recommended Renewal", "Renewed", "Last Renewed", "Renewal Date" and
+   recertification dates are never an expiration (and never an issue date). Dates are only taken
+   from their own printed label: no ordering guesses, no issue/expiration swaps. */
+const RE_RENEW=/renew|recertif/i;
+const RE_EXP=/expir|certified\s+(through|thru|until)|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)\b|exp\.?\s*date|\bexp\b\.?|good\s+through|next\s*(test|due)|\bdue\s+date\b/i;
 function pickDates(lines,{monthYearOk=true}={}){
  const {full,my}=findDates(lines);
- let issue=full.find(d=>labelNear(lines,d.li,RE_ISSUE)===0&&!RE_EXP.test(lines[d.li]))||full.find(d=>labelNear(lines,d.li,RE_ISSUE)!=null&&!RE_EXP.test(lines[d.li]));
- let exp=full.find(d=>d!==issue&&labelNear(lines,d.li,RE_EXP)===0)||full.find(d=>d!==issue&&labelNear(lines,d.li,RE_EXP)!=null&&!RE_ISSUE.test(lines[d.li]));
- let renewMy=monthYearOk?(my.find(d=>labelNear(lines,d.li,RE_EXP)!=null)||(my.length===1?my[0]:null)):null;
- const used=new Set(full.map(d=>d.li));
- for(let li=0;li<lines.length;li++){if(used.has(li))continue;const isE=RE_EXP.test(lines[li]),isI=!isE&&RE_ISSUE.test(lines[li]);if(!isE&&!isI)continue;
-  const g=garbledDate(lines[li]);if(!g)continue;const d={li,pos:0,iso:g.iso,raw:g.raw,garbled:true};full.push(d);
-  if(isE&&!exp)exp=d;if(isI&&!issue)issue=d}
- if(!issue&&exp&&renewMy&&exp.iso.slice(0,7)<renewMy.ym){issue=exp;exp=null}
- const sorted=full.slice().sort((a,b)=>a.iso.localeCompare(b.iso));
- /* v14.4: a second copy of the expiration date (wallet card + certificate) is not an issue date */
- const expOnly=d=>RE_EXP.test(lines[d.li]||'')&&!RE_ISSUE.test(lines[d.li]||'');
- if(!issue&&sorted.length&&(renewMy||exp||sorted.length===1))issue=sorted.find(d=>d!==exp&&!(exp&&d.iso===exp.iso&&expOnly(d)))||null;
- if(!issue&&new Set(sorted.map(d=>d.iso)).size>=2){issue=sorted[0];if(!exp)exp=sorted[sorted.length-1]}
- if(!exp&&!renewMy&&sorted.length>=2&&issue){const later=sorted.filter(d=>d.iso>issue.iso);if(later.length===1)exp=later[0]}
- return{issue,exp,renewMy};
+ const renewLine=li=>RE_RENEW.test(lines[li]||'');
+ const issue=full.find(d=>labelNear(lines,d.li,RE_ISSUE)===0&&!RE_EXP.test(lines[d.li])&&!renewLine(d.li))||full.find(d=>labelNear(lines,d.li,RE_ISSUE)!=null&&!RE_EXP.test(lines[d.li])&&!renewLine(d.li));
+ const exp=full.find(d=>d!==issue&&labelNear(lines,d.li,RE_EXP)===0&&!renewLine(d.li))||full.find(d=>d!==issue&&labelNear(lines,d.li,RE_EXP)!=null&&!RE_ISSUE.test(lines[d.li])&&!renewLine(d.li));
+ const renewMy=monthYearOk?(my.find(d=>labelNear(lines,d.li,RE_RENEW)===0)||my.find(d=>labelNear(lines,d.li,RE_RENEW)!=null)||null):null;
+ const renewFull=full.find(d=>d!==issue&&d!==exp&&labelNear(lines,d.li,RE_RENEW)===0)||null;
+ return{issue,exp,renewMy,renewFull};
 }
 function findId(lines,flat,reLbl,{allowBare12=false,aha=false}={}){
+ /* v14.8: the number is returned exactly as printed (spaces, dashes, dots, case kept). */
  for(let i=0;i<lines.length;i++){
   const m=reLbl.exec(lines[i]);if(!m)continue;
   const after=lines[i].slice(m.index+m[0].length).replace(/^[\s:#.\-]+/,'');
   for(const c of [after,lines[i+1]||'',lines[i-1]||'']){
-   const tok=(/([A-Za-z]{0,4}[\s\-]?[0-9][A-Za-z0-9\-]{2,24})/.exec(c)||[])[1];if(!tok)continue;
-   const raw=tok.replace(/\s+/g,'').toUpperCase();
-   if(!aha&&/^[A-Z]{0,4}-?\d{4,14}[A-Z0-9-]*$/.test(raw))return{code:raw,type:/^\d+$/.test(raw)?'NUM':'ALNUM',how:'label',raw:tok,li:c===after?i:c===lines[i+1]?i+1:i-1};
-   const n=normCode(tok);if(n)return{...n,how:'label',raw:tok,li:i};
+   const cell=String(c).split(/\s{2,}/)[0].trim();
+   const tok=(/^([A-Za-z]{0,4}[\s\-.]?[0-9][A-Za-z0-9\-.?]*(?:\s[0-9][A-Za-z0-9\-.?]*)*)/.exec(cell)||[])[1];if(!tok)continue;
+   const raw=tok.trim(),li=c===after?i:c===lines[i+1]?i+1:i-1;
+   if(!aha&&/^[A-Za-z]{0,4}[\s\-.]?\d[\dA-Za-z\-.? ]{2,30}$/.test(raw))return{code:raw,type:/^\d+$/.test(raw)?'NUM':'ALNUM',how:'label',raw,li};
+   const n=codeShape(raw);if(n)return{...n,how:'label',raw,li:i};
   }
  }
- if(allowBare12){const m=/(?<![\dA-Za-z])(\d{12})(?![\dA-Za-z])/.exec(flat.replace(/(\d{4}) (\d{4}) (\d{4})/g,'$1$2$3'));if(m)return{code:m[1],type:'AHA',how:'pattern'}}
+ if(allowBare12){const m=/(?<![\dA-Za-z])(\d{12})(?![\dA-Za-z])/.exec(flat);if(m)return{code:m[1],type:'AHA',how:'pattern'}}
  return null;
 }
 /* v14.4: certificate numbers on certifications (NIHSS and others). Every value near a
@@ -456,9 +436,8 @@ function geoLabelValues(geo){
 const TC_ID_SHAPE=/^[A-Z]{2}\d{5}$/;
 function tcIdFrom(v){
  for(const t of String(v||'').split(/\s+/)){
-  const u=t.toUpperCase().replace(/[^A-Z0-9]/g,'');if(u.length<4||u.length>12)continue;
-  const fx=/^[A-Z]{2}[0-9OIlSBZ]{5}$/.test(u)?u.slice(0,2)+fixDigits(u.slice(2)):u;
-  if(/\d/.test(fx))return{code:fx,raw:t};
+  const u=t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,'');if(u.length<4||u.length>12)continue;
+  if(/\d/.test(u))return{code:u,raw:t};/* v14.8: as printed, no O→0 "fix" */
  }
  return null;
 }
@@ -467,16 +446,16 @@ function ahaCode(lines,flat,labels,{exclude=new Set(),issueYY=null,redCross=fals
  const bad=c=>!c||exclude.has(c.code)||(!redCross&&TC_ID_SHAPE.test(c.code));
  const cands=[];
  for(const v of labels.ecard||[]){
-  const whole=normCode(v.value);
-  if(whole&&!bad(whole)&&(whole.type==='AHA'&&!whole.odd||!/\s/.test(v.value.trim())))cands.push({...whole,raw:v.value,li:v.li,how:v.how,wc:v.geo?v.wc:null,geo:!!v.geo});
-  else for(const t of v.value.split(/\s+/)){const n=normCode(t);if(n&&!bad(n)){cands.push({...n,raw:t,li:v.li,how:v.how,wc:v.geo?v.wc:null,geo:!!v.geo});break}}
+  const whole=codeShape(v.value);
+  if(whole&&!bad(whole))cands.push({...whole,raw:v.value,li:v.li,how:v.how,wc:v.geo?v.wc:null,geo:!!v.geo});
+  else for(const t of v.value.split(/\s+/)){const n=codeShape(t);if(n&&!bad(n)){cands.push({...n,raw:t,li:v.li,how:v.how,wc:v.geo?v.wc:null,geo:!!v.geo});break}}
  }
  const score=c=>(c.type==='AHA'&&!c.odd?3:c.type==='ALNUM'&&c.code.length>=8?2:1)+(c.how==='label'||c.geo?0.5:0)+(c.geo?0.25:0)+(issueYY&&c.type==='AHA'&&c.code.slice(0,2)===issueYY?0.25:0);
  cands.sort((a,b)=>score(b)-score(a));
  if(cands.length)return cands[0];
  /* No label: a bare 12-digit AHA code (YY + course + 7 digits) not printed as a TC/Instructor ID. */
  const re=/(?<![\dA-Za-z])(\d{4} ?\d{4} ?\d{4})(?![\dA-Za-z])/g;let m;
- for(let li=0;li<lines.length;li++){re.lastIndex=0;while((m=re.exec(lines[li]))){const code=m[1].replace(/ /g,'');if(exclude.has(code))continue;const near=labelHits(lines[li]).some(h=>h.kind==='tc_id'||h.kind==='instructor_id'||h.kind==='tc_info');if(near)continue;return{code,type:'AHA',how:'pattern',raw:m[1],li}}}
+ for(let li=0;li<lines.length;li++){re.lastIndex=0;while((m=re.exec(lines[li]))){const code=m[1];if(exclude.has(code)||exclude.has(code.replace(/ /g,'')))continue;const near=labelHits(lines[li]).some(h=>h.kind==='tc_id'||h.kind==='instructor_id'||h.kind==='tc_info');if(near)continue;return{code,type:'AHA',how:'pattern',raw:m[1],li}}}
  return null;
 }
 
@@ -553,7 +532,7 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   const title=/\b(BLS|ACLS|PALS)\s*(Provider|Instructor)\b/i.exec(flat);
   let course=null,courseHow='',courseRaw='';
   if(title){course=title[1].toUpperCase();courseHow=title[0];courseRaw=title[0]}
-  else{const longs=[[/basic\s+l\w{2,4}\s+su\w*port/i,'BLS'],[/advanced\s+cardio\w*\s+life/i,'ACLS'],[/pediatric\s+advanced\s+l\w{2,4}|\b[a-z]{3,9}i[ct]\s+advanced\s+l\w{2,4}\s+su/i,'PALS'],[/advanced\s+life\s+support/i,'ACLS']].map(([re,c],ix)=>({c,m:re.exec(flat),generic:ix===3})).filter(x=>x.m).map(x=>({...x,i:x.m.index})).sort((a,b)=>(a.generic-b.generic)||(a.i-b.i));
+  else{const longs=[[/basic\s+l\w{2,4}\s+su\w*port/i,'BLS'],[/advanced\s+cardio\w*\s+life/i,'ACLS'],[/pediatric\s+advanced\s+l\w{2,4}|\b[a-z]{3,9}i[ct]\s+advanced\s+l\w{2,4}\s+su/i,'PALS']].map(([re,c])=>({c,m:re.exec(flat),generic:false})).filter(x=>x.m).map(x=>({...x,i:x.m.index})).sort((a,b)=>(a.generic-b.generic)||(a.i-b.i));
    if(longs.length){course=longs[0].c;courseHow='full course name';courseRaw=longs[0].m[0]}else{const ab=/\b(BLS|ACLS|PALS)\b/.exec(flat);if(ab){course=ab[1];courseHow='abbreviation';courseRaw=ab[0]}}}
   if(course){const instr=/instructor/i.test(courseHow);f.course={value:course+(instr?' Instructor':' Provider'),conf:C(courseRaw,lineOf(courseRaw),{factor:courseHow==='abbreviation'?0.9:1}),how:courseHow};if(instr)warnings.push('This looks like an instructor card, not a provider card.')}
  }else if(profile==='cert'){
@@ -561,15 +540,15 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   if(top){const cat=(catalog||_globals().catalog).find(k=>k.kind===top.kind);const re=cat&&kindPattern(cat);const mm=re&&re.exec(flat);const raw=mm?mm[0]:top.short;f.course={value:cat?.short||top.short,conf:C(raw,lineOf(raw),{factor:self?1:0.9}),how:self?'names this credential':'names a different credential',kind:top.kind}}
  }
  // ---- dates ----
- const {issue,exp,renewMy}=pickDates(lines,{monthYearOk:profile==='aha_resus'||profile==='cert'});
+ const {issue,exp,renewMy,renewFull}=pickDates(lines,{monthYearOk:profile==='aha_resus'||profile==='cert'});
  /* Day/month order: AHA prints MM/DD/YYYY (documented card format); elsewhere a
     numeric date like 04/05/2026 is ambiguous unless another date on the same
     document has a day above 12 in the same position. */
  const allNum=findDates(lines).full.filter(d=>d.numeric);
  const orderProven=profile==='aha_resus'||allNum.some(d=>d.monthFirstProven);
  const ambig=d=>d&&d.numeric&&d.dayFirstPossible&&!orderProven;
- const dateConf=(d,re)=>C(d.raw,d.li,{label:labelNear(lines,d.li,re)!=null,factor:(d.garbled?0.6:1)*(ambig(d)?0.85:1)});
- const dateHow=d=>d.garbled?'date (damaged print, check it)':ambig(d)?'date (day and month could be swapped, check it)':'date';
+ const dateConf=(d,re)=>C(d.raw,d.li,{label:labelNear(lines,d.li,re)!=null,factor:ambig(d)?0.85:1});
+ const dateHow=d=>ambig(d)?'date (day and month could be swapped, check it)':'date';
  /* v14.7: the label printed next to the issue date, kept raw (e.g. "Original Issue Date",
     "Effective"), so the review form can show it as printed. Display only; never stored. */
  const issueLabel=d=>{const off=labelNear(lines,d.li,RE_ISSUE);if(off==null)return null;const ln=lines[d.li+off]||'',m=RE_ISSUE.exec(ln);if(!m)return null;
@@ -578,15 +557,16 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   if(!t||t.length>40)t=m[0];return t};
  if(issue&&want.includes('issued_on'))f.issued_on={value:issue.iso,conf:dateConf(issue,RE_ISSUE),how:dateHow(issue),label:issueLabel(issue)};
  if(profile==='aha_resus'){
-  if(renewMy)f.renew_by={value:renewMy.ym,conf:C(renewMy.raw,renewMy.li,{label:labelNear(lines,renewMy.li,RE_EXP)!=null}),how:'month/year'};
-  else if(exp&&exp!==issue)f.renew_by={value:exp.iso.slice(0,7),conf:dateConf(exp,RE_EXP)*0.95,how:'full date',exact:exp.iso};
+  /* printed renewal recommendation only; never an expiration */
+  if(renewMy)f.renew_by={value:renewMy.ym,conf:C(renewMy.raw,renewMy.li,{label:labelNear(lines,renewMy.li,RE_RENEW)!=null}),how:'month/year'};
+  else if(renewFull)f.renew_by={value:renewFull.iso.slice(0,7),conf:dateConf(renewFull,RE_RENEW)*0.95,how:'full date',exact:renewFull.iso};
+  if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp)};
   if(f.issued_on&&f.renew_by&&issuer!=='RED_CROSS'){
    const w2=addMonths(f.issued_on.value,24);
    if(w2===f.renew_by.value){f.issued_on.conf=clamp(f.issued_on.conf+0.03,0,method==='PDF_TEXT'?0.995:OCR_CAP);f.renew_by.conf=clamp(f.renew_by.conf+0.03,0,method==='PDF_TEXT'?0.995:OCR_CAP)}
    else{f.issued_on.conf*=0.8;f.renew_by.conf*=0.8;warnings.push(`The renewal month (${f.renew_by.value}) is not two years after the issue date (${f.issued_on.value}). AHA cards renew two years after issue.`)}
   }
  }else if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp)};
- else if(renewMy&&profile==='cert')f.expires_on={value:renewToExpiry(renewMy.ym),conf:C(renewMy.raw,renewMy.li,{factor:0.9}),how:'month/year → end of month',monthOnly:renewMy.ym};
  if(f.issued_on&&f.expires_on&&f.expires_on.value<=f.issued_on.value){warnings.push('The expiration date is not after the issue date.');f.expires_on.conf*=0.7}
  // ---- AHA labels: Training Center ID, Instructor ID, eCard code ----
  let labels={},ecardBox=null;
@@ -604,7 +584,7 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
  const exclude=new Set();
  if(profile==='aha_resus'){
   for(const v of labels.tc_id||[]){const t=tcIdFrom(v.value);if(t){exclude.add(t.code);if(!f.training_center_id)f.training_center_id={value:t.code,conf:C(t.raw,v.li,{factor:v.how==='label'||v.aligned||v.geo?1:0.9,wc:v.geo?v.wc:null}),how:'Training Center ID label',info:true}}}
-  for(const v of labels.instructor_id||[])for(const t of v.value.split(/\s+/)){const u=t.toUpperCase().replace(/[^A-Z0-9]/g,'');if(u.length>=4){exclude.add(u);exclude.add(fixDigits(u))}}
+  for(const v of labels.instructor_id||[])for(const t of v.value.split(/\s+/)){const u=t.toUpperCase().replace(/[^A-Z0-9]/g,'');if(u.length>=4)exclude.add(u)}
   for(const v of labels.tc_info||[])for(const t of v.value.split(/\s+/)){const u=t.replace(/\D/g,'');if(u.length>=7)exclude.add(u)}
  }
  // ---- credential ID ----
@@ -615,14 +595,12 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
    const reLbl=profile==='license'?/(license|licence|lic\.?|registration|certificate)\s*(number|no\.?|#|num)|\bRN\s*(#|no\.?|number)/i
     :/(e\s*-?\s*card|cert\w*|card|test|credential|verification|member|candidate|course\s*completion)\s*(id|#|number|no\.?|code|num)/i;
    code=profile==='cert'?(certId(lines,/(certificate|certification|cert\.?|credential|test|verification|member|candidate|card|customer|aacn)\s*(id|#|number|no\.?|num|code)\b|e\s*-?\s*card\s*(id|#|code)/i)||findId(lines,flat,reLbl,{})||verifyLineId(lines)):findId(lines,flat,reLbl,{});
-   /* v14.4: OCR reads 0 as O (and 1 as I/l) inside license numbers: "RNO000099" → RN0000099 */
-   if(code&&profile==='license'&&method!=='PDF_TEXT'){const mm=/^([A-Z]{0,4}?)([0-9OIL]{4,})$/.exec(code.code);if(mm&&/[OIL]/.test(mm[2])&&(mm[2].match(/\d/g)||[]).length>=3){code={...code,code:mm[1]+mm[2].replace(/O/g,'0').replace(/[IL]/g,'1'),fixed:true}}}
-   if(!code&&profile==='license'){const m=/\b(RN|R\.N\.)\s*[-#:]?\s*(\d{5,10})\b/.exec(flat);if(m)code={code:'RN'+m[2],type:'ALNUM',how:'pattern',raw:m[0]}}
+   /* v14.8: no OCR letter/digit "fixes" inside license numbers */
+   if(!code&&profile==='license'){const m=/\b(RN|R\.N\.)\s*[-#:]?\s*(\d{5,10})\b/.exec(flat);if(m)code={code:m[0].trim(),type:'ALNUM',how:'pattern',raw:m[0]}}/* as printed: no RN prefix added or removed */
   }
   let q=codeFromQr(qr);if(q&&profile==='aha_resus'&&(exclude.has(q.code)||(issuer!=='RED_CROSS'&&TC_ID_SHAPE.test(q.code))))q=null;
   if(code||q){
    let conf=code?C(code.raw||code.code,code.li!=null?code.li:lineOf(code.raw||code.code),{label:code.how!=='pattern'&&!code.weak,factor:code.how==='pattern'?0.94:code.anchor?0.86:code.weak?0.8:1,wc:code.wc!=null?code.wc:null}):0.97;let how=code?code.how:'qr';
-   if(code&&code.odd&&profile==='aha_resus'){conf*=0.6;warnings.push(`The eCard code read as ${code.code.length} digits; AHA codes have 12.`)}
    if(code&&q){if(q.code===code.code)conf=0.995;else if(profile==='aha_resus'){warnings.push('The code printed on the card and the code in its QR code differ. The QR code was used.');code=q;conf=0.9;how='qr'}}
    else if(!code){code=q}
    if(profile==='aha_resus'&&code.type==='AHA'&&code.code.length===12&&f.issued_on){if(code.code.slice(0,2)===f.issued_on.value.slice(2,4))conf=clamp(conf+0.02,0,how==='qr'||method==='PDF_TEXT'?0.995:OCR_CAP);/* v14.3: no penalty otherwise — real 2026 cards print codes starting with 27 */}
@@ -689,12 +667,11 @@ function documentExpiry(fields,issuer){
  const today=new Date().toISOString().slice(0,10);if(r.value&&r.value<today){r.expired=true;r.text+=' That date has passed: this credential is expired.'}
  return r;
 }
-function _documentExpiry(fields,issuer){
+function _documentExpiry(fields){
+ /* v14.8: only an expiration printed as such. Renew By / Recommended Renewal is never one. */
  const e=fields?.expires_on;
- if(e&&e.value)return{value:e.value,text:e.monthOnly?`The document shows ${e.monthOnly.split('-').reverse().join('/')} (month and year only); Veridun reads it as the end of that month, ${e.value}.`:`The document shows an expiration date of ${e.value}.`};
- const r=fields?.renew_by;if(!r||!r.value)return null;
- if(r.exact)return{value:r.exact,text:`The card shows an expiration date of ${r.exact}.`};
- return{value:renewToExpiry(r.value),text:issuer==='RED_CROSS'?`The card shows ${r.value}; Veridun reads it as the end of that month.`:interpretRenewal(r.value)};
+ if(e&&e.value)return{value:e.value,text:`The document shows an expiration date of ${e.value}.`};
+ return null;
 }
 function nameTokens(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z\s\-']/g,' ').split(/[\s\-']+/).filter(w=>w.length>0&&!/^(rn|bsn|msn|jr|sr|ii|iii|mr|mrs|ms|dr)$/.test(w))}
 function namesMatch(a,b){
@@ -963,16 +940,54 @@ async function extractInner(file,{onProgress=()=>{},profileName='',kind:credKind
 function parseEcardStrip(ws,res){
  const tcid=res.fields.training_center_id&&res.fields.training_center_id.value;
  for(const w of ws){
-  const n=normCode(w.t);if(!n||n.odd||TC_ID_SHAPE.test(n.code)||n.code===tcid)continue;
+  const n=codeShape(w.t);if(!n||TC_ID_SHAPE.test(n.code)||n.code===tcid)continue;
   if(n.type!=='AHA'&&!(n.type==='ALNUM'&&n.code.length>=8))continue;
   const c=Math.min(OCR_CAP,(w.c==null?0.8:w.c)+LABEL_BONUS);
   return{value:n.code,conf:clamp(c,0,OCR_CAP),how:'value under the label (second look)',type:n.type};
  }
  return null;
 }
+/* v14.8 SAFETY SCREEN (P0). Reads the text of every page on this device (text layer; OCR only
+   for a page with almost no text) and hands each page's text to `classify`, which returns only
+   labels (e.g. which credential families the page names). It never returns or keeps the text or
+   any field value: the screen can only BLOCK an unsafe save, never fill or choose anything. */
+async function screenFile(file,{onProgress=()=>{},classify=()=>[],maxPages=10}={}){
+ polyfill();const cap=capabilities(),t0=performance.now();
+ const kind=await sniff(file);
+ if(kind==='other')return{supported:false,reason:'type',pages:0,perPage:[],families:[],readable:false};
+ if((kind==='pdf'&&!cap.pdf)||(kind==='image'&&!cap.image))return{supported:false,reason:'browser',missing:cap.missing,pages:0,perPage:[],families:[],readable:false};
+ const perPage=[];let method='',pages=1,chars=0;
+ DocExtract._progress=(s,p)=>onProgress({label:s,progress:p});
+ try{
+  if(kind==='pdf'){
+   onProgress({label:'Opening the PDF on this device',progress:0.05});
+   const lib=await pdfjs();
+   const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,disableFontFace:true,enableXfa:false}).promise;
+   pages=doc.numPages;
+   for(let p=1;p<=Math.min(pages,maxPages);p++){
+    onProgress({label:`Checking page ${p} of ${pages}`,progress:0.1+0.8*(p-1)/Math.min(pages,maxPages)});
+    const page=await doc.getPage(p);let text=await pdfText(page,null,0);method=method||'PDF_TEXT';
+    if(text.replace(/\s/g,'').length<40){
+     const vp0=page.getViewport({scale:1}),k=Math.min(3,1800/Math.max(vp0.width,vp0.height)),vp=page.getViewport({scale:k});
+     const canvas=canvasOf(vp.width,vp.height),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+     await page.render({canvasContext:ctx,canvas,viewport:vp}).promise;
+     const o=await ocr(canvas);text=o.text||'';method='PDF_OCR';
+    }
+    chars+=text.replace(/\s/g,'').length;perPage.push(classify(text)||[]);text='';
+   }
+   try{doc.destroy()}catch{}
+  }else{
+   onProgress({label:'Opening the image on this device',progress:0.05});
+   const canvas=await imageCanvas(file);const o=await ocr(canvas);method='IMAGE_OCR';
+   chars+=String(o.text||'').replace(/\s/g,'').length;perPage.push(classify(o.text||'')||[]);
+  }
+ }catch(e){if(e&&e.friendly)throw e;throw new ScanError(friendlyError(e),e)}
+ const families=[...new Set(perPage.flat())];
+ return{supported:true,method,pages,pagesRead:perPage.length,perPage,families,readable:chars>=40,ms:Math.round(performance.now()-t0)};
+}
 async function terminate(){if(workerP){try{(await workerP).terminate()}catch{}workerP=null}}
 
-const DocExtract={INFO_FIELDS,NIHSS_INFO_FIELDS,NIHSS_UNDETERMINED,nihssIssuer,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,interpretRenewal,renewToExpiry,namesMatch,normCode,codeFromQr,suggestedSource,extractFromFile,terminate,_progress:null};
+const DocExtract={INFO_FIELDS,NIHSS_INFO_FIELDS,NIHSS_UNDETERMINED,nihssIssuer,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,namesMatch,codeShape,codeFromQr,screenFile,suggestedSource,extractFromFile,terminate,_progress:null};
 root.DocExtract=DocExtract;
 if(typeof module!=='undefined'&&module.exports)module.exports=DocExtract;
 })(typeof window!=='undefined'?window:globalThis);

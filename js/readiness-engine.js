@@ -17,7 +17,7 @@ function satisfactionBasis(req,c){
   if(isRnLicense(c)&&!multi&&c.jurisdiction===t)return'Single-state license';
   if(multi&&nlcCanIssueMultistate(c.jurisdiction)){
    if(c.jurisdiction===t)return'Multistate license (primary state of residence)';
-   if(nlcHonorsCompactIn(t))return`NLC multistate privilege (primary state of residence ${c.jurisdiction})`;
+   if(nlcHonorsCompactIn(t))return`Multistate privilege from your ${jurisdictionName(c.jurisdiction)} license`;
   }
   return null;
  }
@@ -149,7 +149,7 @@ function evaluateRequirement(req,a,list=creds,refStatuses=null){
  else if(matches.some(x=>['VERIFYING','UNVERIFIED'].includes(x.c.primary)))out={req,label,status:'PENDING_VERIFICATION',note:'Added — pending verification'};
  else{
   let note='';
-  if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>licenseRuleKind(c)==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Multistate license (home ${ms.jurisdiction}) not honored here: ${nlcStatusLabel(req.jurisdiction)}`}
+  if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>licenseRuleKind(c)==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Your ${jurisdictionName(ms.jurisdiction)} multistate license isn't accepted here (${jurisdictionName(req.jurisdiction)}: ${nlcStatusLabel(req.jurisdiction).toLowerCase()})`}
   out={req,label,status:'MISSING',note};
  }
  if(req.kind==='REF_SPECIALTY'&&out.status==='MISSING')out.note='References are requested in the References section of the demo; not yet available for signed-in accounts';
@@ -185,7 +185,7 @@ function v81Assignment(a,nurse=null){
  const missing=items.filter(i=>i.status!=='MET').map(i=>i.label+(i.status==='NEEDS_REVIEW'?' — needs review':i.status==='OUTSIDE_WINDOW'?' — outside the NIHSS window':i.status==='GROUP_NOT_ACCEPTED'?' — test group not accepted':'')+(i.status==='WAITING_REFERENCES'?' — waiting on references':'')+(i.status==='EXPIRES_BEFORE_END'?' — renew before submission':i.status==='NOT_RECENT'?' — experience not recent':i.status==='PENDING_VERIFICATION'?' — pending verification':i.status==='LEVEL_TOO_LOW'?' — needs a stronger verification':''));
  return{eligible:true,specialty:sp,ok,total:items.length,missing,ready:missing.length===0,items,reqs};
 }
-function v7Readiness(){const req=creds.filter(c=>c.required),ok=req.filter(reqSatisfied).length;return req.length?Math.round(ok/req.length*100):0}
+function v7Readiness(){return onboarding().pct}/* v14.8: one readiness computation for every widget */
 /* Called after a credential changes state (never from render): records
    ASSIGNMENT_READY once readiness is reached after the clinician started
    working on an assignment. */

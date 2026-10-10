@@ -125,11 +125,13 @@ function acctCredRow(c){
  const s=acctCredStatus(c),priv=catalogPrivacy(c.kind)==='PRIVATE';
  const lic=c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE',home=acct().cache.profile?.home_jurisdiction,m=c.metadata||{};
  const hist=acct().cache.events.filter(e=>e.credential_id===c.id).slice().reverse().map(e=>`${ACCT_EVENT_TEXT[e.event_type]||e.event_type} ${fmtDT(e.occurred_at)}`);
- return`<div class="acct-item-v10" data-cred="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(lic?'RN License · '+(licenseScopeOf(c)==='MULTISTATE'?'multistate':'single-state'):catalogKind(c.kind)?.short||catalogKind(c.kind)?.label||c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''}${c.expires_on?' · expires '+fd(c.expires_on):''}${priv?' · <span class="badge PRIVATE">PRIVATE</span>':''}</div><div class="small">${ec(s.sub)}</div>${acctProvenanceHtml(c,s)}${lic&&c.jurisdiction_code?`<div class="small acct-cov-v11">${ec(licenseCoverage(licenseRuleKind(c),c.jurisdiction_code).text)}${ec(licenseHomeStateHint(licenseRuleKind(c),c.jurisdiction_code,home))}</div>`:''}${catalogKind(c.kind)?.experience&&(m.years!=null||m.recent_months!=null||m.last_worked_on)?`<div class="small">${[m.years!=null?m.years+' yrs':'',m.recent_months!=null?m.recent_months+' months in the last 2 years':'',m.last_worked_on?'last worked '+fd(m.last_worked_on):'',m.last_worked_on?'counts as recent until '+fd(experienceRecentUntil(m.last_worked_on,catalogKind(c.kind)?.recencyMonths))+' (calculated)':''].filter(Boolean).map(ec).join(' · ')}</div>`:''}${isSkillsKind(c.kind)?`<div class="small acct-skills-v144">${m.completed_on?ec('completed '+fd(m.completed_on)+' · suggested redo by '+fd(skillsRedoBy(m.completed_on))+' (calculated; the facility rule is final)'):'completion date not recorded'} · self-attested, never shown as verified</div>`:''}<div class="small acct-hist-v11">History: ${hist.length?ec(hist.join(' · ')):'added'} · not verified by anyone yet</div>
- <div class="small">Document: ${c.source_document_path?`private file · <button class="linkbtn-v10" type="button" data-act="doc-open" data-id="${c.id}">Open (60-second signed link)</button>${c.status!=='VERIFIED'&&/\.(pdf|png|jpe?g|webp)$/i.test(c.source_document_path)?` · <button class="linkbtn-v10" type="button" data-act="doc-rescan" data-id="${c.id}">Re-scan document</button>`:''}`:'none'} · <label class="linkbtn-v10">${c.source_document_path?'Replace':'Upload'} file<input type="file" class="acct-doc-input-v10 sr-only-v10" data-id="${c.id}" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label></div>
- ${acctDocDetailsHtml(c)}${acctExpProvHtml(c)}<div data-scan-slot="${c.id}">${typeof scanBoxHtml==='function'?scanBoxHtml(c.id):''}</div></div>
+ return`<div class="acct-item-v10" data-cred="${c.id}"><div class="acct-item-main-v10"><b>${ec(acctCredName(c))}</b><div class="small">${ec(lic?(jurisdictionName(c.jurisdiction_code)||'')+' RN License · '+(licenseScopeOf(c)==='MULTISTATE'?'Multistate':'Single-state'):catalogKind(c.kind)?.short||catalogKind(c.kind)?.label||'Credential')}${c.expires_on?' · expires '+fd(c.expires_on):''}${priv?' · <span class="badge PRIVATE">PRIVATE</span>':''}</div><div class="small">${ec(s.sub)}</div>${acctProvenanceHtml(c,s)}${lic&&c.jurisdiction_code?`<div class="small acct-cov-v11">${ec(licenseCoverage(licenseRuleKind(c),c.jurisdiction_code).text)}${ec(licenseHomeStateHint(licenseRuleKind(c),c.jurisdiction_code,home))}</div>`:''}${catalogKind(c.kind)?.experience&&(m.years!=null||m.recent_months!=null||m.last_worked_on)?`<div class="small">${[m.years!=null?m.years+' yrs':'',m.recent_months!=null?m.recent_months+' months in the last 2 years':'',m.last_worked_on?'last worked '+fd(m.last_worked_on):'',m.last_worked_on?'counts as recent until '+fd(experienceRecentUntil(m.last_worked_on,catalogKind(c.kind)?.recencyMonths))+' (calculated)':''].filter(Boolean).map(ec).join(' · ')}</div>`:''}${isSkillsKind(c.kind)?`<div class="small acct-skills-v144">${m.completed_on?ec('completed '+fd(m.completed_on)+' · suggested redo by '+fd(skillsRedoBy(m.completed_on))+' (calculated; the facility rule is final)'):'completion date not recorded'} · self-attested, never shown as verified</div>`:''}<div class="small acct-hist-v11">History: ${hist.length?ec(hist.join(' · ')):'added'} · not verified by anyone yet</div>
+ <div class="small">Document: ${c.source_document_path?`private file · <button class="linkbtn-v10" type="button" data-act="doc-open" data-id="${c.id}">View document</button>`:'none'} · <label class="linkbtn-v10">${c.source_document_path?'Replace':'Upload'} file<input type="file" class="acct-doc-input-v10 sr-only-v10" data-id="${c.id}" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label></div>
+ ${acctDocDetailsHtml(c)}${acctExpProvHtml(c)}</div>
  <div class="acct-item-side-v10"><span class="badge ${s.cls}">${ec(s.text)}</span><button class="mini sec" type="button" data-act="cred-delete" data-id="${c.id}">Delete</button></div></div>`;
 }
+/* v14.8: RN licenses are named "<State> RN License · <scope>" (older entries were stored as "Multistate RN License …"). */
+function acctCredName(c){return(c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE')&&c.jurisdiction_code?credentialDisplayName('RN_LICENSE',c.jurisdiction_code,c.display_name,licenseScopeOf(c)):c.display_name}
 function acctAddForm(){
  return`<form id="acctAddFormV10" class="acct-form-v10 acct-add-v10">
  <label>Credential type<select id="acctKindV10" required>${acctKindOptions()}</select></label>
@@ -143,7 +145,7 @@ function acctAddForm(){
  <div class="small hidden" id="acctExpCalcV144"></div>
  <div id="acctExpDateRowV10"><label for="acctExpV10">Expiration date <span class="small">(if it has one)</span> <span id="acctExpSrcV144"></span></label><input type="date" id="acctExpV10"><div id="acctExpNoteV144" class="small"></div>${typeof expConfirmHtml==='function'?expConfirmHtml('acct'):''}</div>
  <label>Source document <span class="small">(optional · PDF, PNG, JPEG, DOC, DOCX · max 10 MB · private)</span><input type="file" id="acctFileV10" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,application/pdf,image/png,image/jpeg"></label>
- <div class="small">PDF and image files are read on this device so you can check the details before saving. Nothing is sent to an AI service.</div>
+ <div class="small">Type every detail exactly as printed on your document; Veridun doesn't fill them in from the file. PDF and image files are checked on this device only for problems (for example, more than one credential in one file). Nothing is sent to an AI service.</div>
  <div id="acctScanSlotV14">${typeof scanBoxHtml==='function'?scanBoxHtml('add'):''}</div>
  <div class="small acct-note-v10" id="acctPrivNoteV10"></div>
  <div class="small acct-note-v10"><b>Staging:</b> use test documents only, no real PHI.</div>
@@ -152,7 +154,7 @@ function acctAddForm(){
 function acctSyncAddForm(){
  const sel=$('acctKindV10');if(!sel)return;const k=catalogKind(sel.value);
  $('acctJurRowV10').classList.toggle('hidden',!k||!k.jurisdiction);$('acctNameRowV10').classList.toggle('hidden',!k||k.kind!=='OTHER');
- if(k&&k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;const cur=$('acctJurV10').value;$('acctJurV10').innerHTML=acctOptions(list.map(j=>[j.code,j.name]),cur||(acct().cache.profile?.home_jurisdiction||''),k.jurisdiction==='NLC_HOME'?'Primary state of residence (compact)…':'Choose a state…')}
+ if(k&&k.jurisdiction){const list=k.jurisdiction==='NLC_HOME'?multistateHomeJurisdictions():US_JURISDICTIONS;const cur=$('acctJurV10').value;$('acctJurV10').innerHTML=acctOptions(list.map(j=>[j.code,j.name]),cur||'',k.jurisdiction==='NLC_HOME'?'Primary state of residence (compact)…':'Choose a state…')}
  $('acctPrivNoteV10').textContent=k?(k.privacy==='PRIVATE'?'Private record: organizations only ever see “Requirement satisfied”, never details, dates or the document.':'Shareable: organizations you share with see the name, issuer, state and expiration, never the document.')+(k.kind==='RN_LICENSE'||k.kind==='RN_LICENSE_MULTISTATE'?' Status stays “Submitted, not verified” until a verifier checks it with '+licensePrimarySource(k.kind,$('acctJurV10').value||acct().cache.profile?.home_jurisdiction)+'.':' '):'';
  const eh=$('acctExpHelpV10');if(eh){eh.classList.toggle('hidden',!k?.experience);eh.innerHTML=k?.experience?ec(experienceHelpText(k.kind)):'';}
  const er=$('acctExpRowV10');if(er)er.classList.toggle('hidden',!k?.experience);
@@ -167,11 +169,22 @@ function acctCalcNotes(){
  const ec2=$('acctExpCalcV144');if(ec2&&k?.experience){const lw=$('acctExpLastV10')?.value,m=k.recencyMonths||EXPERIENCE_DEFAULT_WINDOW_MONTHS,u=experienceRecentUntil(lw,m);ec2.innerHTML=u?`Counts as recent until <b>${ec(fd(u))}</b> <span class="badge">CALCULATED</span> (last worked + ${m} months). Not an expiration; each facility's recency window is final.`:`Enter the last date you worked in this specialty to see until when it counts as recent (last worked + ${m} months, calculated).`}
  const sc=$('acctSkillsCalcV144');if(sc&&k&&isSkillsKind(k.kind)){const d=$('acctSkillsDoneV144')?.value,u=skillsRedoBy(d);sc.innerHTML=u?`Suggested redo by <b>${ec(fd(u))}</b> <span class="badge">CALCULATED</span> (completed + ${SKILLS_DEFAULT_REDO_MONTHS} months). Not an expiration; the facility rule is final (some need a new checklist per assignment).`:''}
 }
-async function acctSubmitCredential(){
- const a=acct(),k=catalogKind(acctLicenseKind()||$('acctKindV10').value);if(!k)throw new Error('Choose a credential type.');
+/* v14.8: the save checks run before anything is sent, and a failed check keeps the form open with
+   what the nurse typed (acctDo re-renders the workspace, which used to close the form). */
+function acctCredentialPrecheck(){
+ const k=catalogKind(acctLicenseKind()||$('acctKindV10').value);if(!k)throw new Error('Choose a credential type.');
  let jur='';if(k.jurisdiction){jur=$('acctJurV10').value;if(!jur)throw new Error('Choose the state for this license.')}
  const custom=$('acctCustomNameV10').value.trim();if(k.kind==='OTHER'&&!custom)throw new Error('Enter a credential name.');
+ const kb=typeof captureSaveBlocker==='function'?captureSaveBlocker('acct',k.kind):null;if(kb)throw new Error(kb);
  const scope=acctIsLicenseKind(k)?acctLicenseScope():null;
+ if(acctIsLicenseKind(k)&&!scope)throw new Error('Choose the license scope printed on your license: Multistate or Single-state.');
+ /* RN licenses always expire; "no expiration date on this document" is not accepted for them */
+ if(acctIsLicenseKind(k)&&!$('acctExpV10').value)throw new Error('Enter the expiration date printed on your license. RN licenses always have one.');
+ const eb=typeof expConfirmBlocker==='function'?expConfirmBlocker('acct'):null;if(eb)throw new Error(eb);
+ return{k,jur,custom,scope};
+}
+async function acctSubmitCredential(){
+ const a=acct(),{k,jur,custom,scope}=acctCredentialPrecheck();
  const name=k.kind==='OTHER'?custom:credentialDisplayName(k.kind,jur,undefined,scope);
  const type=k.kind==='OTHER'?'CUSTOM_'+(custom.toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'CREDENTIAL'):credentialTypeCode(k.kind,jur);
  const file=$('acctFileV10').files[0]||null;
@@ -180,15 +193,12 @@ async function acctSubmitCredential(){
  if(scope==='MULTISTATE'&&jur){const h=a.cache.profile?.home_jurisdiction;if(h&&jur!==h&&!confirm(`Multistate licenses are issued by your primary state of residence (${jurisdictionName(h)}). This license is from ${jurisdictionName(jur)}.\n\nSave it as multistate anyway? (If you moved, update your primary state of residence in your profile.)`))return null}
  if(isSkillsKind(k.kind)&&$('acctSkillsDoneV144')?.value)meta.completed_on=$('acctSkillsDoneV144').value;
  const eb=typeof expConfirmBlocker==='function'?expConfirmBlocker('acct'):null;if(eb)throw new Error(eb);
- const expRec=typeof expConfirmRecord==='function'?expConfirmRecord('acct',$('acctExpV10')?.dataset.origin==='document'?'DOCUMENT_SCAN':'TYPED'):null;
- const sum=typeof scanForAdd==='function'?scanForAdd():null;
- if(sum&&k.privacy!=='PRIVATE')meta.doc=sum.doc;
+ const expRec=typeof expConfirmRecord==='function'?expConfirmRecord('acct','TYPED'):null;
  /* v14.7: expiration confirmation provenance. Private kinds can't hold metadata (database rule), so for them it is only in the audit event. */
  if(expRec&&k.privacy!=='PRIVATE')meta.exp_confirm=expRec;
- const saved=await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:k.experience?null:isSkillsKind(k.kind)?((acctScan?.target==='add'&&acctScan.applyExpiry&&$('acctExpV10').value)||null):($('acctExpV10').value||null),metadata:meta},file);
- if(sum){await scanAfterSave(saved.id,sum,{applied:!!acctScan?.applyExpiry});acctLastScanResult={name,mismatch:sum.ms.length>0}}
+ const saved=await a.addCredential({kind:k.kind,type_code:type,display_name:name,jurisdiction_code:jur||null,expires_on:k.experience||isSkillsKind(k.kind)?null:($('acctExpV10').value||null),metadata:meta},file);
  if(expRec)await a.log('EXPIRATION_CONFIRMED',{credential_id:saved.id,result:expRec.source,detail:{kind:k.kind,source:expRec.source,confirmed_by:'CLINICIAN',confirmed_at:expRec.confirmed_at,has_expiration:expRec.has_expiration}});
- if(acctScan?.target==='add')acctScan=null;
+ if(typeof captureScreenReset==='function')captureScreens.acct=null;
  return name;
 }
 /* RN licenses (v14.5): ONE credential type, "RN License", with ONE license-scope field.
@@ -202,19 +212,14 @@ async function acctSubmitCredential(){
 let acctLicTypeTouched=false,acctLastScanResult=null;
 const acctIsLicenseKind=k=>!!k&&(k.kind==='RN_LICENSE'||k.kind==='RN_LICENSE_MULTISTATE');
 function acctLicenseKind(){const k=catalogKind($('acctKindV10')?.value);return acctIsLicenseKind(k)?'RN_LICENSE':k?.kind||''}
-function acctLicenseDocScope(){
- if(typeof acctScan==='undefined'||!acctScan||acctScan.target!=='add'||acctScan.status!=='done'||!acctScan.res?.supported)return null;
- const f=acctScan.res.fields?.multistate;return f?{scope:f.value==='multistate'?'MULTISTATE':'SINGLE_STATE',conf:f.conf}:null;
-}
+/* v14.8: the license scope never comes from the scanner or a default: the nurse chooses it in compact states. */
+function acctLicenseDocScope(){return null}
 function acctLicenseScope(){
  const jur=$('acctJurV10')?.value||'';if(!jur)return null;
  if(!nlcCanIssueMultistate(jur))return'SINGLE_STATE';
- return document.querySelector('input[name=acctLicTypeV10]:checked')?.value==='MULTI'?'MULTISTATE':'SINGLE_STATE';
+ const v=document.querySelector('input[name=acctLicTypeV10]:checked')?.value;return v==='MULTI'?'MULTISTATE':v==='SINGLE'?'SINGLE_STATE':null;
 }
-function acctLicenseScopeSource(){
- const jur=$('acctJurV10')?.value||'';if(!jur||!nlcCanIssueMultistate(jur))return'automatic';
- const d=acctLicenseDocScope();if(acctLicTypeTouched)return d&&d.scope===acctLicenseScope()?'document':'chosen';return d?'document':'default';
-}
+function acctLicenseScopeSource(){const jur=$('acctJurV10')?.value||'';return!jur||!nlcCanIssueMultistate(jur)?'automatic':'chosen'}
 function acctLicenseNote(){
  const k=catalogKind($('acctKindV10')?.value),box=$('acctLicenseNoteV10'),row=$('acctLicTypeRowV10');if(!box||!row)return;
  if(!acctIsLicenseKind(k)){box.classList.add('hidden');row.classList.add('hidden');return}
@@ -222,20 +227,16 @@ function acctLicenseNote(){
  row.classList.toggle('hidden',!jur);
  if(!jur){box.classList.add('hidden');return}
  const info=licenseScopeInfo(jur,home),doc=acctLicenseDocScope(),fixed=$('acctLicScopeFixedV145'),choice=$('acctLicScopeChoiceV145'),src=$('acctLicScopeSrcV145'),dnote=$('acctLicScopeDocV145');
- const setRadios=sc=>document.querySelectorAll('input[name=acctLicTypeV10]').forEach(r=>r.checked=r.value===(sc==='MULTISTATE'?'MULTI':'SINGLE'));
+ const setRadios=sc=>document.querySelectorAll('input[name=acctLicTypeV10]').forEach(r=>r.checked=!!sc&&r.value===(sc==='MULTISTATE'?'MULTI':'SINGLE'));
  fixed.classList.toggle('hidden',info.choice);choice.classList.toggle('hidden',!info.choice);src.innerHTML='';dnote.innerHTML='';
  if(!info.choice){
-  setRadios('SINGLE_STATE');
-  fixed.innerHTML=`<b>Single-state</b> <span class="small">(set automatically: ${ec(jurisdictionName(jur))} can't issue multistate licenses)</span>`;
-  if(doc&&doc.scope==='MULTISTATE')dnote.innerHTML=`<div class="alert-v81 mismatch-v14" id="acctLicScopeMismatchV145" role="alert">The document says multistate, but ${ec(jurisdictionName(jur))} can't issue multistate licenses. Check the state. If you save it like this, it is flagged for the verifier.</div>`;
+  setRadios(null);/* the scope is fixed by the state (acctLicenseScope), nothing is "chosen" */
+  fixed.innerHTML=`<b>Single-state</b> <span class="small">(${ec(jurisdictionName(jur))} doesn't issue multistate licenses)</span>`;
  }else{
-  if(!acctLicTypeTouched)setRadios(doc?doc.scope:info.defaultScope);
-  const cur=acctLicenseScope(),pct=doc&&doc.conf!=null?' · '+Math.round(doc.conf*100)+'%':'';
-  if(doc&&doc.scope===cur)src.innerHTML=`<span class="conf-v14 conf-${doc.conf>=0.9?'hi':doc.conf>=0.7?'mid':'lo'}" id="acctLicScopeFromDocV145">from document, check it${pct}</span>`;
-  else if(doc)dnote.innerHTML=`<div class="alert-v81 mismatch-v14" id="acctLicScopeMismatchV145" role="alert">The document shows a ${doc.scope==='MULTISTATE'?'multistate':'single-state'} license, but you chose ${cur==='MULTISTATE'?'multistate':'single-state'}. If you save it like this, it is flagged for the verifier. <button type="button" class="sec mini" data-act="lic-use-doc-scope" id="acctLicUseDocScopeV145">Use the document's scope</button></div>`;
-  else if(!acctLicTypeTouched)src.innerHTML=`<span class="conf-v14 conf-none" id="acctLicScopeDefaultV145">${typeof acctScan!=='undefined'&&acctScan?.target==='add'&&acctScan.status==='done'?'not shown on the document · default':'default · not from the document'}</span>`;
+  if(!acctLicTypeTouched)setRadios(null);
+  if(!acctLicenseScope())src.innerHTML='<span class="conf-v14 conf-none" id="acctLicScopeNeededV148">Choose the scope printed on your license</span>';
  }
- const scope=acctLicenseScope(),cov=licenseCoverage(scope==='MULTISTATE'?'RN_LICENSE_MULTISTATE':'RN_LICENSE',jur);
+ const scope=acctLicenseScope()||'SINGLE_STATE',cov=licenseCoverage(scope==='MULTISTATE'?'RN_LICENSE_MULTISTATE':'RN_LICENSE',jur);
  const lines=info.lines.map(ec);
  if(info.choice&&cov.text)lines.push(ec(cov.text));
  lines.push('Verification: not verified yet. A real check would use '+ec(licensePrimarySource(scope==='MULTISTATE'?'RN_LICENSE_MULTISTATE':'RN_LICENSE',jur))+'.');
@@ -243,9 +244,7 @@ function acctLicenseNote(){
 }
 function acctApplyLicenseDefaults(){
  acctLicTypeTouched=false;const k=catalogKind($('acctKindV10')?.value);if(!acctIsLicenseKind(k)){acctLicenseNote();return}
- const home=acct().cache.profile?.home_jurisdiction,sel=$('acctJurV10');
- if(home&&sel&&!sel.value&&[...sel.options].some(o=>o.value===home))sel.value=home;
- acctLicenseNote();
+ acctLicenseNote();/* v14.8: no state preselected from the primary state of residence */
 }
 /* ---------- Shares (clinician) ---------- */
 function acctShareStatus(s){if(s.status==='REVOKED'||s.revoked_at)return'REVOKED';if(s.status==='USED')return'USED';if(s.status==='EXPIRED'||(s.expires_at&&new Date(s.expires_at)<=new Date()))return'EXPIRED';return'ACTIVE'}
@@ -415,7 +414,8 @@ function acctWire(){
   const id=e.target.id;if(!/V10$/.test(id))return;e.preventDefault();
   if(id==='acctProfileFormV10')acctDo(async()=>{const sec=[...document.querySelectorAll('.acctSecSpecV10:checked')].map(x=>x.value);await acct().saveProfile({full_name:$('acctNameV10').value,post_nominals:$('acctPostV10').value,specialty:$('acctSpecV10').value,secondary_specialties:sec,home_jurisdiction:$('acctHomeV10').value});acctEditingProfile=false},'Profile saved to your account.');
   if(id==='acctAddFormV10'){const block=(typeof scanAddBlocker==='function'?scanAddBlocker():null)||(typeof expConfirmBlocker==='function'?expConfirmBlocker('acct'):null);if(block){acctMsg(block,'err');return}}
-  if(id==='acctAddFormV10')acctDo(async()=>{acctLastScanResult=null;const n=await acctSubmitCredential();return n}).then(n=>{if(!n)return;const sr=acctLastScanResult;acctMsg(sr?(sr.mismatch?`${n} saved. Credential mismatch detected: it goes to the verifier's review queue, flagged. Status: ${SCAN_STATUS_TEXT}.`:`${n} saved. Status: ${SCAN_STATUS_TEXT}.`):`${n} saved to your account. Status: Submitted, not verified.`,sr?.mismatch?'err':'ok')});
+  if(id==='acctAddFormV10'){try{acctCredentialPrecheck()}catch(err){acctErr(err);return}}
+  if(id==='acctAddFormV10')acctDo(async()=>{acctLastScanResult=null;const n=await acctSubmitCredential();return n}).then(n=>{if(!n)return;acctMsg(`${n} saved to your account. Status: Awaiting verification.`,'ok')});
   if(id==='acctShareFormV10')acctDo(acctSubmitShare,'Share created. Copy the link or code now.');
   if(id==='acctOrgCreateFormV10')acctDo(async()=>{const o=await acct().createOrganization($('acctOrgNameV10').value);acctOrgId=o.id;acctOrgShares=null},'Organization created. You are its owner.');
   if(id==='acctOpenFormV10')acctDo(()=>acctOpenShare($('acctOpenInputV10').value));
@@ -431,14 +431,14 @@ function acctWire(){
   if(['acctShareDurV10','acctShareStartV10','acctShareEndV10','acctShareCustomV10','acctShareBufferV11'].includes(t.id))acctShareCoverageWarn(e);
   if(t.classList.contains('acctSecSpecV10')&&t.checked){const n=document.querySelectorAll('.acctSecSpecV10:checked').length;if(n>5){t.checked=false;acctMsg('Up to 5 secondary specialties.','err')}}
   if(t.id==='acctOrgPickV10'){acctOrgId=t.value;acctOrgShares=null;acctRenderAll()}
-  if(t.classList.contains('acct-doc-input-v10')&&t.files[0]){const f=t.files[0],id=t.dataset.id;acctDo(()=>acct().uploadDocument(id,f),'Document uploaded to your private folder.').then(()=>{const c=acct().cache.credentials.find(x=>x.id===id);if(c&&c.status!=='VERIFIED'&&typeof scanStart==='function'&&SCANNABLE(f))scanStart(id,f,c.kind)})}
+  if(t.classList.contains('acct-doc-input-v10')&&t.files[0]){const f=t.files[0],id=t.dataset.id;acctDo(()=>acct().uploadDocument(id,f),'Document uploaded to your private folder.').then(()=>{const c=acct().cache.credentials.find(x=>x.id===id);})}
  });
  ws.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act,id=b.dataset.id,a=acct();
   if(act==='edit-profile'){acctEditingProfile=true;acctRenderAll()}
   if(act==='cancel-profile'){acctEditingProfile=false;acctRenderAll()}
   if(act==='lic-use-doc-scope'){const d=acctLicenseDocScope();if(d){document.querySelectorAll('input[name=acctLicTypeV10]').forEach(r=>r.checked=r.value===(d.scope==='MULTISTATE'?'MULTI':'SINGLE'));acctLicTypeTouched=true;acctLicenseNote();if(typeof scanPaintMismatch==='function')scanPaintMismatch()}}
-  if(act==='toggle-add'){$('acctAddWrapV10').classList.toggle('hidden');acctSyncAddForm();acctApplyLicenseDefaults()}
+  if(act==='toggle-add'){$('acctAddWrapV10').classList.toggle('hidden');if(typeof captureScreens!=='undefined')captureScreens.acct=null;const fi=$('acctFileV10');if(fi)fi.value='';acctSyncAddForm();acctApplyLicenseDefaults();if(typeof capturePaint==='function')capturePaint('acct')}
   if(act==='toggle-share'){acctShareDurTouched=false;acctOpenShareForm()}
   if(act==='qr-download')downloadShareQr($('acctQrV11'),'veridun-share-qr.png');
   if(act==='dismiss-created'){acctLastCreated=null;acctRenderAll()}

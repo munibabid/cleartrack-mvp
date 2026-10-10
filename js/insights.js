@@ -9,7 +9,9 @@ function isCurrentVerified(c){const d=daysUntil(credExpiry(c));return isVerified
 function practiceAuthorization(list=creds){
  const set=new Map();
  list.filter(c=>isRnLicense(c)&&isCurrentVerified(c)).forEach(c=>{
-  if(c.kind==='RN_LICENSE')set.set(c.jurisdiction,'single-state license');
+  /* v14.8: since v14.5 every license is stored as RN_LICENSE + scope, so the old kind test called a
+     verified multistate license "single-state" (and the page said "no multistate license"). */
+  if(licenseScopeOf(c)!=='MULTISTATE'){if(!set.has(c.jurisdiction)||set.get(c.jurisdiction)==='NLC privilege')set.set(c.jurisdiction,'single-state license')}
   else if(nlcCanIssueMultistate(c.jurisdiction)){set.set(c.jurisdiction,'multistate home');US_JURISDICTIONS.filter(j=>nlcHonorsCompactIn(j.code)&&!set.has(j.code)).forEach(j=>set.set(j.code,'NLC privilege'))}
  });
  return set;

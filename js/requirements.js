@@ -79,8 +79,20 @@ function layerCounts(reqs){const c={STATE:0,WORK_TYPE:0,SPECIALTY:0,FACILITY:0};
 /* Newcomer onboarding baseline (clinician Home): what the featured Boston
    Travel ICU opportunity asks of an ICU nurse, minus the state license. */
 const NEWCOMER_BASELINE_KINDS=[...workTypeBase('TRAVEL_RN').kinds,...SPECIALTY_MODULES.ICU];
-function isBaselineRequired(kind){if(!NEWCOMER_BASELINE_KINDS.includes(kind))return false;return!creds.some(c=>c.required&&c.kind===kind)}
+/* v14.8: readiness is counted against the REQUIREMENT SET (an RN license + the baseline kinds),
+   never against the credentials the nurse happens to hold. Before v14.8 each credential carried a
+   "required" flag set once when it was added, so deleting a required credential removed it from
+   the total too (100% after deleting the BLS), and a renewal replaced the flagged record with an
+   unflagged one. Everything is recomputed from the saved credentials on every render. */
+function baselineRequirementKinds(){return NEWCOMER_BASELINE_KINDS.filter(k=>!catalogKind(k)?.notCredential)}
 /* XRPL proof is NOT required — a verified, active, unexpired credential counts. */
-function reqSatisfied(c){if(!c.required)return true;if(c.primary!=='VERIFIED'||!c.prov?.active)return false;const exp=c.official_expiration_date||c.expiration;return!(exp&&new Date(exp+'T23:59:59')<new Date())}
+function credSatisfiesRequirement(c){if(!c||c.primary!=='VERIFIED'||!c.prov?.active)return false;const exp=c.official_expiration_date||c.expiration;return!(exp&&new Date(exp+'T23:59:59')<new Date())}
+function reqSatisfied(x){return x&&'ok' in x&&'kind' in x&&!('primary' in x)?!!x.ok:credSatisfiesRequirement(x)}
 /* PR 13: a Passport is only complete with a verified RN license. */
-function onboarding(){const req=creds.filter(c=>c.required),ok=req.filter(reqSatisfied).length,pct=req.length?Math.round(ok/req.length*100):0,license=creds.some(c=>(c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE')&&reqSatisfied({...c,required:true}));return{req,ok,pct,license,ready:req.length>0&&ok===req.length&&license}}
+function onboarding(list=creds){
+ const isLic=c=>c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE';
+ const want=[{kind:'RN_LICENSE',name:'RN license',match:isLic},...baselineRequirementKinds().map(k=>({kind:k,name:catalogKind(k)?.short||catalogKind(k)?.label||k,match:c=>c.kind===k}))];
+ const items=want.map(w=>{const mine=list.filter(w.match),best=mine.find(credSatisfiesRequirement)||mine[0]||null;return{kind:w.kind,name:best?.name||w.name,cred:best,ok:!!best&&credSatisfiesRequirement(best),prov:best?.prov||null,status:!best?'MISSING':credSatisfiesRequirement(best)?'MET':['VERIFYING','UNVERIFIED'].includes(best.primary)?'AWAITING_VERIFICATION':'NOT_CURRENT'}});
+ const ok=items.filter(i=>i.ok).length,total=items.length,pct=total?Math.floor(ok/total*100):0;
+ return{items,req:items,ok,total,pct,license:items[0].ok,ready:total>0&&ok===total};
+}
