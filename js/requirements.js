@@ -86,13 +86,13 @@ const NEWCOMER_BASELINE_KINDS=[...workTypeBase('TRAVEL_RN').kinds,...SPECIALTY_M
    unflagged one. Everything is recomputed from the saved credentials on every render. */
 function baselineRequirementKinds(){return NEWCOMER_BASELINE_KINDS.filter(k=>!catalogKind(k)?.notCredential)}
 /* XRPL proof is NOT required — a verified, active, unexpired credential counts. */
-function credSatisfiesRequirement(c){if(!c||c.primary!=='VERIFIED'||!c.prov?.active)return false;const exp=c.official_expiration_date||c.expiration;return!(exp&&new Date(exp+'T23:59:59')<new Date())}
+function credSatisfiesRequirement(c){if(!c||c.primary!=='VERIFIED'||!c.prov?.active)return false;if((c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE')&&!rnPracticeThrough(c))return false;/* t150u */const exp=c.official_expiration_date||c.expiration;return!(exp&&new Date(exp+'T23:59:59')<new Date())}
 function reqSatisfied(x){return x&&'ok' in x&&'kind' in x&&!('primary' in x)?!!x.ok:credSatisfiesRequirement(x)}
 /* PR 13: a Passport is only complete with a verified RN license. */
 function onboarding(list=creds){
  const isLic=c=>c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE';
  const want=[{kind:'RN_LICENSE',name:'RN license',match:isLic},...baselineRequirementKinds().map(k=>({kind:k,name:catalogKind(k)?.short||catalogKind(k)?.label||k,match:c=>c.kind===k}))];
- const items=want.map(w=>{const mine=list.filter(w.match),best=mine.find(credSatisfiesRequirement)||mine[0]||null;return{kind:w.kind,name:best?.name||w.name,cred:best,ok:!!best&&credSatisfiesRequirement(best),prov:best?.prov||null,status:!best?'MISSING':credSatisfiesRequirement(best)?'MET':['VERIFYING','UNVERIFIED'].includes(best.primary)?'AWAITING_VERIFICATION':'NOT_CURRENT'}});
+ const items=want.map(w=>{const mine=list.filter(w.match),best=mine.find(credSatisfiesRequirement)||mine[0]||null;return{kind:w.kind,name:best?credLabel(best):w.name,cred:best,ok:!!best&&credSatisfiesRequirement(best),prov:best?.prov||null,status:!best?'MISSING':credSatisfiesRequirement(best)?'MET':['VERIFYING','UNVERIFIED'].includes(best.primary)?'AWAITING_VERIFICATION':'NOT_CURRENT'}});
  const ok=items.filter(i=>i.ok).length,total=items.length,pct=total?Math.floor(ok/total*100):0;
  return{items,req:items,ok,total,pct,license:items[0].ok,ready:total>0&&ok===total};
 }

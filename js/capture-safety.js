@@ -7,8 +7,13 @@
    - a Red Cross "Advanced Life Support" card as ACLS → not ACLS
    - a document of a different type than the one chosen → choose the printed type
    - PALS, TNCC, NRP, CEN, ENPC                     → held: not supported in the RN pilot
-   It never stores the document's text or any value read from it. An unreadable document is not
-   blocked (the nurse types the details; a verifier checks the document). */
+   It never stores the document's text or any value read from it.
+   t150u: only a POSITIVE conflict blocks (the document clearly names another credential, an LVN/LPN
+   license, Red Cross ALS for ACLS, or several credentials). A document the check can't read or can't
+   identify is NEVER blocked: the nurse types the supported fields, the credential stays awaiting
+   verification, and it gets no readiness credit until a verifier checks it.
+   While a hold is active the primary save button is disabled and replaced by the corrective action
+   (captureCta), so the screen and this engine can't disagree. */
 const CAPTURE_FAMILIES=[
  {id:'RN',label:'RN license',phrase:/registered\s+(?:professional\s+)?nurse/i},
  {id:'LVN',label:'Licensed Vocational Nurse (LVN) license',phrase:/licensed\s+vocational\s+nurse/i,acro:/(?<![A-Za-z])LVN(?![A-Za-z])/},
@@ -30,6 +35,10 @@ const CAPTURE_UNSUPPORTED_KINDS={CERT_PALS:'PALS',CERT_TNCC:'TNCC',CERT_NRP:'NRP
 const CAPTURE_UNSUPPORTED_FAMILIES=['PALS','TNCC','NRP','CEN','ENPC','ALS'];
 const CAPTURE_LVN_TEXT='Veridun Passport currently supports RN licenses.';
 const CAPTURE_MULTI_TEXT='Please upload each credential separately.';
+/* Munib t150u: approved wording. It must not sound like the credential is invalid. */
+const CAPTURE_PILOT_TEXT='We recognized this credential, but it isn\'t supported in the RN Passport pilot yet.';
+/* The corrective action that replaces the save button while a hold is active. */
+const CAPTURE_CTA={MULTIPLE:'Upload each credential separately',LVN_LPN:'Choose a supported RN credential',UNSUPPORTED_KIND:'Choose a supported RN credential',ALS_NOT_ACLS:'Upload the correct credential',TYPE_MISMATCH:'Upload the correct credential',UNSUPPORTED_DOC:'Upload the correct credential'};
 function captureFamilyLabel(id){return(CAPTURE_FAMILIES.find(f=>f.id===id)||{}).label||id}
 /* Which credential families a page names. Labels only; the text is not kept. */
 function captureFamilies(text){
@@ -40,7 +49,7 @@ function captureKindName(kind){const k=typeof catalogKind==='function'?catalogKi
 /* A chosen type that can't be saved in the RN pilot (no document needed to decide). */
 function captureKindBlock(kind){
  const u=CAPTURE_UNSUPPORTED_KINDS[kind];
- if(u)return{code:'UNSUPPORTED_KIND',message:`Veridun Passport doesn't support ${u} yet in the RN pilot, so it can't be added as a credential. Keep your card; nothing is saved.`};
+ if(u)return{code:'UNSUPPORTED_KIND',message:`${CAPTURE_PILOT_TEXT} ${u} can't be added to your Passport for now. Your card is not affected, and anything you saved before stays as it is.`};
  return null;
 }
 /* The verdict for a chosen type + the on-device check of the file (null = no file). */
@@ -58,7 +67,7 @@ function captureVerdict(kind,screen){
   const f=fams[0],want=CAPTURE_KIND_FAMILY[kind]||null;
   if(f==='ALS'&&kind==='CERT_ACLS')return{state:'blocked',code:'ALS_NOT_ACLS',message:'This card says “Advanced Life Support”, not “Advanced Cardiovascular Life Support (ACLS)”. Veridun can\'t add it as ACLS. If you have an ACLS card, upload that card instead.'};
   if(want&&f!==want){
-   if(CAPTURE_UNSUPPORTED_FAMILIES.includes(f))return{state:'blocked',code:'UNSUPPORTED_DOC',message:`You chose ${captureKindName(kind)}, but this document looks like ${captureFamilyLabel(f)}. Veridun Passport doesn't support ${f==='ALS'?'Advanced Life Support cards':f} yet in the RN pilot. Upload your ${captureKindName(kind)} document instead.`};
+   if(CAPTURE_UNSUPPORTED_FAMILIES.includes(f))return{state:'blocked',code:'UNSUPPORTED_DOC',message:`You chose ${captureKindName(kind)}, but this document looks like ${captureFamilyLabel(f)}. ${CAPTURE_PILOT_TEXT} Upload your ${captureKindName(kind)} document instead.`};
    return{state:'blocked',code:'TYPE_MISMATCH',message:`You chose ${captureKindName(kind)}, but this document looks like ${captureFamilyLabel(f)}. Choose the credential type printed on your document, or upload the right document.`};
   }
  }
@@ -101,8 +110,30 @@ function captureBoxHtml(form){
 }
 function capturePaint(form){
  const f=CAPTURE_FORMS[form],box=$(f.box),html=captureBoxHtml(form);
- if(box){box.outerHTML=html;return}
- const slot=$(f.slot);if(slot)slot.innerHTML=html;
+ if(box)box.outerHTML=html;else{const slot=$(f.slot);if(slot)slot.innerHTML=html}
+ captureCta(form);
+ if(typeof expConfirmSync==='function')try{expConfirmSync(form)}catch(e){}
+}
+/* t150u: the primary save button follows the engine. Hold → the button is disabled and hidden, and the
+   corrective action takes its place. Still checking → disabled. Otherwise → enabled, no corrective action. */
+function captureSaveButton(form){return form==='add'?$('save'):document.querySelector('#acctAddFormV10 button[type=submit]')}
+function captureCta(form){
+ const btn=captureSaveButton(form);if(!btn)return;
+ const id=form==='add'?'addFixV148':'acctFixV148';let fix=$(id);
+ if(!fix){fix=document.createElement('button');fix.type='button';fix.id=id;fix.className='pri hidden capture-fix-v148';fix.dataset.form=form;btn.insertAdjacentElement('afterend',fix)}
+ const v=captureVerdictFor(form),hold=v.state==='blocked';
+ btn.disabled=hold||v.state==='checking';btn.classList.toggle('hidden',hold);btn.setAttribute('aria-hidden',hold?'true':'false');
+ fix.classList.toggle('hidden',!hold);fix.textContent=hold?(CAPTURE_CTA[v.code]||'Upload the correct credential'):'';fix.dataset.code=hold?v.code:'';
+}
+/* the corrective action: pick another file, or another credential type */
+function captureFix(form){
+ const v=captureVerdictFor(form),f=CAPTURE_FORMS[form],fi=$(f.file);
+ if(CAPTURE_CTA[v.code]==='Choose a supported RN credential'){
+  if(fi)fi.value='';captureScreenReset(form);
+  const k=form==='add'?$('kindSearchV82'):$('acctKindV10');if(k){k.focus();if(form==='add'&&k.select)k.select()}
+  return;
+ }
+ if(fi){fi.value='';captureScreenReset(form);fi.click()}
 }
 /* Called before saving. Returns a plain-language reason, or null. */
 function captureSaveBlocker(form,kind){
@@ -119,4 +150,5 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(t.id==='acctKindV10')capturePaint('acct');
  },true);
  document.addEventListener('input',e=>{if(e.target&&e.target.id==='kindSearchV82')capturePaint('add')},true);
+ document.addEventListener('click',e=>{const b=e.target&&e.target.closest&&e.target.closest('.capture-fix-v148');if(b){e.preventDefault();captureFix(b.dataset.form)}});
 });

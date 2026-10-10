@@ -5,9 +5,14 @@
      - a single-state RN license in the assignment's jurisdiction, or
      - a multistate (NLC) license from an NLC home state, when the
        assignment's jurisdiction honors compact licenses. */
-function isVerifiedActive(c){return c.primary==='VERIFIED'&&!!c.prov?.active}
 function credExpiry(c){return c.official_expiration_date||c.expiration||''}
 function isRnLicense(c){return c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE'}
+/* t150u: an RN license counts only with an authoritative current-practice-through date: the date the
+   verifier recorded from the primary source, else the date on the license record (license expiration,
+   or a registration's through date where a state uses registration). The data model can't tell the two
+   apart per jurisdiction, so there is no fallback: no date → no RN readiness credit (fail safe). */
+function rnPracticeThrough(c){return c?.prov?.sourceExpiration||credExpiry(c)||''}
+function isVerifiedActive(c){return c.primary==='VERIFIED'&&!!c.prov?.active&&(!isRnLicense(c)||!!rnPracticeThrough(c))}
 /* Returns a human-readable basis string if credential c could satisfy req
    (ignoring verification state), else null. */
 function satisfactionBasis(req,c){
@@ -163,10 +168,10 @@ function requirementWhy(i,a){
  const r=i.req,c=i.credential,lvl=c?credentialLevel(c):null,p=c?.prov||{};
  const verifiedBy=c?[levelLabel(lvl)+(lvl&&credentialLevelIsDemo(c)?' (demo)':''),p.source?'source: '+p.source:'',p.verifiedAt?'checked '+String(p.verifiedAt).slice(0,10):''].filter(Boolean).join(' · '):'';
  const exp=c?credExpiry(c):'';
- if(i.status==='MET'&&r.kind==='CERT_NIHSS')return`Satisfied by ${c.name}: ${i.basis}. ${verifiedBy}. The certificate prints no expiration; the window comes from the requirement, not from the certificate.`;
- if(i.status==='MET')return`Satisfied by ${c.name} (${i.basis}). ${verifiedBy}. Meets the minimum (${levelLabel(r.minLevel)}).${exp?` Valid through ${exp}`+(a?.end?`, which covers the assignment end (${a.end}).`:'.'):' No expiration.'}`;
- if(i.status==='LEVEL_TOO_LOW')return`${c.name} is verified only as ${levelLabel(lvl)}. ${r.levelRule?.basis||''} It needs ${levelLabel(r.minLevel)} before it counts.`;
- if(i.status==='EXPIRES_BEFORE_END')return`${c.name} expires ${exp}, before the assignment ends (${a?.end}). Renew it, then have the renewal verified.`;
+ if(i.status==='MET'&&r.kind==='CERT_NIHSS')return`Satisfied by ${credLabel(c)}: ${i.basis}. ${verifiedBy}. The certificate prints no expiration; the window comes from the requirement, not from the certificate.`;
+ if(i.status==='MET')return`Satisfied by ${credLabel(c)} (${i.basis}). ${verifiedBy}. Meets the minimum (${levelLabel(r.minLevel)}).${exp?` Valid through ${exp}`+(a?.end?`, which covers the assignment end (${a.end}).`:'.'):' No expiration.'}`;
+ if(i.status==='LEVEL_TOO_LOW')return`${credLabel(c)} is verified only as ${levelLabel(lvl)}. ${r.levelRule?.basis||''} It needs ${levelLabel(r.minLevel)} before it counts.`;
+ if(i.status==='EXPIRES_BEFORE_END')return`${credLabel(c)} expires ${exp}, before the assignment ends (${a?.end}). Renew it, then have the renewal verified.`;
  if(i.status==='NOT_RECENT')return i.note||'Experience is not recent enough.';
  if(['NEEDS_REVIEW','OUTSIDE_WINDOW','GROUP_NOT_ACCEPTED'].includes(i.status))return i.note||REQUIREMENT_DECISIONS[i.status];
  if(i.status==='PENDING_VERIFICATION')return`A matching credential was added but nobody has verified it yet. It needs ${levelLabel(r.minLevel)}.`;

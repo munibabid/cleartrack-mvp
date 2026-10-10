@@ -233,9 +233,7 @@ function licenseScopeOf(c){
 }
 /* the kind the compact rules use: multistate licenses (either storage) → RN_LICENSE_MULTISTATE */
 function licenseRuleKind(c){return licenseScopeOf(c)==='MULTISTATE'?'RN_LICENSE_MULTISTATE':c?.kind}
-/* a shared assertion has kind + label only (no metadata): a multistate RN_LICENSE is named
-   "<State> RN License · Multistate" (v14.8) or, in entries saved before v14.8, "Multistate RN License …". */
-function assertionLicenseRuleKind(x){const l=x.label||'';return x.kind==='RN_LICENSE'&&(/ · Multistate$/.test(l)||/^Multistate RN License/.test(l))?'RN_LICENSE_MULTISTATE':x.kind}
+/* t150u: assertionLicenseRuleKind (which read the scope out of a label) was removed: no logic parses labels. */
 /* The one license-scope explanation (v14.5). It talks about the LICENSE's state; the primary state of
    residence is mentioned only to explain that multistate licenses come from it. */
 function licenseScopeInfo(jur,home,scope){

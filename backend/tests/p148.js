@@ -135,7 +135,7 @@ async function run(browser, name, vp, shots) {
 
     /* ---------- t150u A: RN current-practice-through date ---------- */
     const rnd = await pg.evaluate(() => { initNewcomer(true); render(); const l = creds.find(c => isRnLicense(c)); const v = { ...l, primary: 'VERIFIED', prov: { ...(l.prov || {}), active: true } }; const noDate = { ...v, expiration: '', official_expiration_date: '', prov: { ...v.prov, sourceExpiration: '' } };
-      const before = onboarding().items[0].ok; l.expiration = ''; l.official_expiration_date = ''; if (l.prov) l.prov.sourceExpiration = ''; const after = onboarding(); return { dated: credSatisfiesRequirement(v) && isVerifiedActive(v), undated: credSatisfiesRequirement(noDate) || isVerifiedActive(noDate), before, afterLic: after.items[0].ok, afterReady: after.ready }; });
+      const before = onboarding().items[0].ok; creds.filter(c => isRnLicense(c)).forEach(x => { x.expiration = ''; x.official_expiration_date = ''; if (x.prov) x.prov.sourceExpiration = ''; }); /* every RN license on the Passport loses its date */ const after = onboarding(); return { dated: credSatisfiesRequirement(v) && isVerifiedActive(v), undated: credSatisfiesRequirement(noDate) || isVerifiedActive(noDate), before, afterLic: after.items[0].ok, afterReady: after.ready }; });
     t('t150u A: a verified RN license with a current-practice-through date counts; without one it never gets RN readiness credit', rnd.dated && !rnd.undated && rnd.before === true && rnd.afterLic === false && rnd.afterReady === false, JSON.stringify(rnd));
     await pg.evaluate(() => { initNewcomer(true); render(); });
 
@@ -223,7 +223,7 @@ async function run(browser, name, vp, shots) {
     await pg.evaluate(() => { if ($('add').open) $('add').close(); openAddForm({ kind: 'RN_LICENSE', jurisdiction: 'US-MI' }); });
     await pg.check('#addExpOkV147');
     const nR = await pg.evaluate(() => creds.length); await pg.evaluate(() => $('save').click()); await pg.waitForTimeout(150);
-    const rnN = await pg.evaluate(n => { const c = creds.length > n ? creds[creds.length - 1] : null; if (!c) return null; render(); showV7View('passportView'); return { kind: c.kind, exp: c.expiration || '', scope: licenseScopeOf(c), ok: credSatisfiesRequirement({ ...c, primary: 'VERIFIED', prov: { active: true } }), shown: document.body.innerText.includes('Awaiting primary-source verification') }; }, nR);
+    const rnN = await pg.evaluate(n => { const c = creds.length > n ? creds[creds.length - 1] : null; if (!c) return null; showV7View('homeView'); render(); return { kind: c.kind, exp: c.expiration || '', scope: licenseScopeOf(c), ok: credSatisfiesRequirement({ ...c, primary: 'VERIFIED', prov: { active: true } }), shown: document.body.innerText.includes('Awaiting primary-source verification') }; }, nR);
     t('t150u A (demo): RN license with no printed date → saved with no date (never invented), shows "Awaiting primary-source verification", no RN readiness even if verified', !!rnN && rnN.exp === '' && rnN.scope === 'SINGLE_STATE' && rnN.ok === false && rnN.shown, JSON.stringify(rnN));
     await pg.evaluate(() => { if ($('add').open) $('add').close(); });
 
