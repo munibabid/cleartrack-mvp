@@ -2,6 +2,7 @@ name: Document reader (Chromium, WebKit, Firefox)
 # v14.1: every PR reads a synthetic PDF and image on-device in all three engines,
 # phone + desktop, with and without the newer APIs older Safari lacks.
 # v14.2: also an AHA card where the Training Center ID sits next to the eCard code.
+# v14.8: XRPL credential-ID unit tests + cross-browser ledger-identity suite (in-page mock ledger).
 on:
   pull_request:
   push:
@@ -24,3 +25,6 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit firefox
       - run: node tests/store-test.js
       - run: node tests/xbrowser.js
+      # v14.8: XRPL credential identity (opaque per-credential ledger id; mock ledger, no network)
+      - run: node tests/xrpl-id-test.js
+      - run: node tests/p148x.js
