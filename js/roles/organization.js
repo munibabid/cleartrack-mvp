@@ -174,7 +174,7 @@ function orgMetrics(orgId){
 function renderOrgAttention(om){
  if(!$('orgAttnV85'))return;const out=[];
  om.pairList.filter(p=>!p.r.ready).sort((x,y)=>(x.r.total-x.r.ok)-(y.r.total-y.r.ok)).forEach(p=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">${p.r.total-p.r.ok===1?'◔':'○'}</span><div><b>${ec(p.n.name)} · ${ec(p.a.name)}</b>${p.n.live?'':' <span class="demo-tag-v81">DEMO NURSE</span>'}<div class="small">${p.r.ok}/${p.r.total} · ${ec(p.r.missing.join(', '))}</div></div></div>`));
- om.expiringList.forEach(x=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⏰</span><div><b>${ec(x.n.name)}: ${ec(x.c.name)}</b><div class="small">expires in ${x.d} days (${fd(credExpiry(x.c))})</div></div></div>`));
+ om.expiringList.forEach(x=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⏰</span><div><b>${ec(x.n.name)}: ${ec(credLabel(x.c))}</b><div class="small">expires in ${x.d} days (${fd(credExpiry(x.c))})</div></div></div>`));
  loadShareRequests().filter(r=>r.orgId===orgViewAs&&r.status==='PENDING').forEach(r=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⇆</span><div><b>Extension request pending</b><div class="small">${ec(r.assignmentName)} · through ${fd(r.requestedUntil)} · awaiting clinician</div></div></div>`));
  orgShares(orgViewAs).filter(x=>shareStatus(x)==='EXPIRED').forEach(x=>out.push(`<div class="attn-v85"><span class="attn-ic-v85">⌛</span><div><b>Passport access expired · ${ec(x.assignmentName)}</b><div class="small">Request an extension from Shared Passports</div></div></div>`));
  $('orgAttnV85').innerHTML=out.join('')||'<div class="small">Nothing needs attention for this organization.</div>';

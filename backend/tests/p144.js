@@ -173,8 +173,7 @@ async function partE(browser) {
     out.acctExp = [$('acctExpDateRowV10').classList.contains('hidden'), $('acctExpCalcV144').textContent];
     $('acctKindV10').value = 'CERT_BLS'; try { acctSyncAddForm(); } catch (e) {}
     out.acctBls = !$('acctExpDateRowV10').classList.contains('hidden');
-    acctScan = { target: 'zz', status: 'done', values: {}, orig: {}, res: { supported: true, method: 'PDF_TEXT', ms: 100, profile: 'cert', issuer: 'aha-asa-nihss', fieldsWanted: [], fields: { test_group: { value: 'C', conf: 0.98, raw: 'Test Group C' }, nihss_module: { value: 'initial', conf: 0.9, raw: 'Initial Certification' } }, infoFields: ['test_group', 'nihss_module'], warnings: [], notes: {} } };
-    out.info = scanBoxHtml('zz'); acctScan = null;
+    /* v14.8: E14 retired — the reader's scan box (scanBoxHtml) no longer exists; see LEGACY_TEST_MAP.md */
     out.req = layeredRequirements({ id: 't', jurisdiction: 'US-CA', workType: 'TRAVEL_RN', specialties: ['ICU'], facility: 'Example Hospital', overrides: { skills: { perAssignment: true } } }, 'ICU').find(x => /^SKILLS_/.test(x.kind));
     return out;
   });
@@ -190,12 +189,11 @@ async function partE(browser) {
   ok('E10 demo add form: no expiration box for checklists (Completed on + vendor/self-attested note) or experience; kept for BLS', r.demoSkills[0] && r.demoSkills[1] && /self-attested/.test(r.demoSkills[2]) && /never shown as verified/.test(r.demoSkills[2]) && r.demoExp && r.demoBls, JSON.stringify(r.demoSkills));
   ok('E11 account form: checklist → Completed on + "Suggested redo by … CALCULATED" + agency/vendor note; no expiration box', !r.syncErr && r.acctSkills[0] && r.acctSkills[1] && /Suggested redo by/.test(r.acctSkills[2]) && /CALCULATED/.test(r.acctSkills[2]) && /agency or facility/.test(r.acctSkills[3]) && /never shows them as verified/.test(r.acctSkills[3]), JSON.stringify([r.syncErr, r.acctSkills]));
   ok('E12 account form: experience → "Counts as recent until … CALCULATED", no expiration box; BLS keeps its expiration box', !r.syncErr2 && r.acctExp[0] && /Counts as recent until/.test(r.acctExp[1]) && /CALCULATED/.test(r.acctExp[1]) && /Not an expiration/.test(r.acctExp[1]) && r.acctBls, JSON.stringify([r.syncErr2, r.acctExp]));
-  ok('E14 scan box renders the NIHSS test group and module as values (not template source)', /Group C/.test(r.info) && /As printed \(“Test Group C”\)/.test(r.info) && !/k===/.test(r.info), (r.info || '').slice(0, 300));
   ok('E13 facility "per assignment" override flows into the requirement', r.req && r.req.skills && r.req.skills.perAssignment === true, JSON.stringify(r.req));
   await pg.close();
 }
 
-/* F  v14.4 CCRN-style certificate number (no "Number" label, beside the verification address) and
+/* F  v14.4 CCRN-style certificate number (reader units F1–F3 kept: admin/verifier-side reader behaviour) (no "Number" label, beside the verification address) and
       ONE expiration field on the add form (pre-filled from the document, marked, editable, mismatch note). */
 async function partF(browser) {
   const { ccrnPdf, CCRN } = require('./p144-fixtures.js');
@@ -215,36 +213,21 @@ async function partF(browser) {
   // add form through the in-page fake backend
   const tap = async sel => { await pg.waitForSelector(sel, { timeout: 15000 }); await pg.evaluate(s => document.querySelector(s).scrollIntoView({ block: 'center' }), sel); await W(120); await pg.evaluate(s => document.querySelector(s).click(), sel); };
   const setVal = (id, v) => pg.evaluate((id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, id, v);
-  const waitScan = () => pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }, { timeout: 90000 });
+  /* v14.8 (t150u): the reader only screens the file (#acctScreenBoxV148); it never fills or compares values.
+     F4–F9 retired (document pre-fill / "Use the document's date"); F10–F11 rewritten. See LEGACY_TEST_MAP.md. */
+  const waitScan = () => pg.waitForFunction(() => { const b = document.getElementById('acctScreenBoxV148'); return b && b.dataset.state && b.dataset.state !== 'checking'; }, { timeout: 90000 });
   await pg.evaluate(require('./p14-fake.js'));
   await pg.evaluate(async () => { await store.account.hydrate(); acctShow('acctPassportV10'); }); await W(300);
-  await tap('[data-act="toggle-add"]'); await W(200);
-  await pg.select('#acctKindV10', 'CERT_CCRN');
-  await (await pg.$('#acctFileV10')).uploadFile(f1); await W(200); await waitScan(); await W(200);
-  const st = () => pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, note: $('acctExpNoteV144').innerText, mm: !!$('acctExpMismatchV144'), btn: !!$('acctUseDocDateV14'),
-    box: $('acctScanBoxV14').innerText, expRows: [...document.querySelectorAll('#acctScanBoxV14 .scan-row-v14[data-field="expires_on"]')].map(x => x.classList.contains('hidden')), dateInputs: document.querySelectorAll('#acctAddFormV10 input[type=date]:not(.hidden)').length, id: acctScan.values.credential_id }));
-  const s1 = await st();
-  ok('F4 one expiration field: pre-filled from the document, marked "from document, check it · NN%"', s1.exp === CCRN.throughIso && /^from document, check it · \d+%$/.test(s1.src.trim()) && !s1.mm && !s1.btn, JSON.stringify(s1));
-  ok('F5 the scan box no longer repeats the expiration or a "No expiration entered / Use the date" prompt', s1.expRows.every(Boolean) && !/No expiration entered/.test(s1.box) && !/Use the date from the document/.test(s1.box) && /Expiration date field above/.test(s1.box), s1.box.slice(0, 200));
-  ok('F6 add form: certificate number filled from the scan', s1.id === CCRN.number, s1.id);
-  await setVal('acctExpV10', '2028-12-31'); await W(150);
-  const s2 = await st();
-  ok('F7 editable: a different typed date shows a mismatch note under the field (flagged on save), the "from document" mark goes away', s2.exp === '2028-12-31' && s2.mm && s2.btn && /Dec 31, 2028/.test(s2.note) && /Feb 28, 2028/.test(s2.note) && !s2.src.trim(), JSON.stringify(s2));
-  await tap('#acctUseDocDateV14'); await W(150);
-  const s3 = await st();
-  ok('F8 "Use the document\'s date" restores it and the mark', s3.exp === CCRN.throughIso && !s3.mm && /from document/.test(s3.src), JSON.stringify(s3));
-  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
-  const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_CCRN').pop(); return c && { exp: c.expires_on, mm: c.metadata.doc && c.metadata.doc.mismatch, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
-  ok('F9 saved with the document date (DOCUMENT_DATE_APPLIED), no mismatch flag', saved && saved.exp === CCRN.throughIso && !saved.mm && saved.ev.includes('DOCUMENT_DATE_APPLIED'), JSON.stringify(saved));
-  // typed first, then scanned: the typed date is kept and the mismatch is flagged
+  const st = () => pg.evaluate(() => ({ exp: $('acctExpV10').value, origin: $('acctExpV10').dataset.origin || null, screen: $('acctScreenBoxV148') && $('acctScreenBoxV148').dataset.state, scanBox: !!$('acctScanBoxV14'), useDoc: !!$('acctUseDocDateV14') }));
+  // typed first, then a file attached: the typed date is kept (nothing is ever filled from the document)
   await tap('[data-act="toggle-add"]'); await W(200);
   await pg.select('#acctKindV10', 'CERT_CCRN'); await setVal('acctExpV10', '2027-01-31');
   await (await pg.$('#acctFileV10')).uploadFile(f1); await W(200); await waitScan(); await W(200);
   const s4 = await st();
-  ok('F10 a date typed before the scan is never overwritten; mismatch note shown', s4.exp === '2027-01-31' && s4.mm && !/from document/.test(s4.src), JSON.stringify(s4));
-  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
-  const saved2 = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_CCRN').pop(); return c && { exp: c.expires_on, mm: c.metadata.doc && c.metadata.doc.mismatch, f: c.metadata.doc && c.metadata.doc.mismatch_fields, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
-  ok('F11 saved as typed, flagged for the verifier (DOCUMENT_MISMATCH on expires_on), no DOCUMENT_DATE_APPLIED', saved2 && saved2.exp === '2027-01-31' && saved2.mm && saved2.f.includes('expires_on') && saved2.ev.includes('DOCUMENT_MISMATCH') && !saved2.ev.includes('DOCUMENT_DATE_APPLIED'), JSON.stringify(saved2));
+  ok('F10 (rewritten v14.8) a date typed before the file is attached is never overwritten; no "Use the document\'s date" offer', s4.exp === '2027-01-31' && s4.origin !== 'document' && !s4.scanBox && !s4.useDoc && s4.screen === 'clear', JSON.stringify(s4));
+  await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await W(800);
+  const saved2 = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_CCRN').pop(); return c && { exp: c.expires_on, status: c.status, keys: Object.keys(c.metadata || {}).sort().join(','), ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
+  ok('F11 (rewritten v14.8) saved exactly as typed, not verified, no DOCUMENT_DATE_APPLIED and no document values in metadata', saved2 && saved2.exp === '2027-01-31' && saved2.status !== 'VERIFIED' && !saved2.ev.includes('DOCUMENT_DATE_APPLIED') && !/doc|holder|number|issued/.test(saved2.keys), JSON.stringify(saved2));
   ok('F12 no page errors', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }

@@ -44,7 +44,7 @@ function acctVerifyListHtml(){
  const flag=c=>c.metadata?.doc?.mismatch?0:c.metadata?.doc?.confirmed?1:2;
  const rows=(acctVerifyRows||[]).slice().sort((a,b)=>(a.status==='VERIFYING'?0:1)-(b.status==='VERIFYING'?0:1)||flag(a)-flag(b));
  if(!rows.length)return'<div class="small">No credentials to review.</div>';
- return rows.map(c=>`<button type="button" class="acct-item-v10 acct-verify-pick-v12" data-act="verify-pick" data-id="${c.id}"><div class="acct-item-main-v10"><b>${ec(c.display_name)}</b><div class="small">${ec(c.clinicians?.full_name||'Clinician')} · ${ec(c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''} · ${ec(c.status)}${c.verification_level?' · '+ec(levelLabel(c.verification_level)):''}</div>${c.metadata?.doc?.mismatch?`<div class="small"><span class="badge REVOKED">CREDENTIAL MISMATCH DETECTED</span> ${ec((c.metadata.doc.mismatch_fields||[]).map(f=>f.replace(/_/g,' ')).join(', '))}</div>`:c.metadata?.doc?.confirmed?'<div class="small"><span class="badge PENDING">DETAILS CAPTURED · AWAITING VERIFICATION</span></div>':''}</div></button>`).join('');
+ return rows.map(c=>`<button type="button" class="acct-item-v10 acct-verify-pick-v12" data-act="verify-pick" data-id="${c.id}"><div class="acct-item-main-v10"><b>${ec(acctCredName(c))}</b><div class="small">${ec(c.clinicians?.full_name||'Clinician')} · ${ec(c.kind)}${c.jurisdiction_code?' · '+ec(c.jurisdiction_code):''} · ${ec(c.status)}${c.verification_level?' · '+ec(levelLabel(c.verification_level)):''}</div>${c.metadata?.doc?.mismatch?`<div class="small"><span class="badge REVOKED">CREDENTIAL MISMATCH DETECTED</span> ${ec((c.metadata.doc.mismatch_fields||[]).map(f=>f.replace(/_/g,' ')).join(', '))}</div>`:c.metadata?.doc?.confirmed?'<div class="small"><span class="badge PENDING">DETAILS CAPTURED · AWAITING VERIFICATION</span></div>':''}</div></button>`).join('');
 }
 function acctRenderVerify(){
  const el=$('acctVerifyV12');if(!el)return;
@@ -55,32 +55,32 @@ function acctRenderVerify(){
  const route=c?primaryRouteFor(c.kind,c.jurisdiction_code):null;
  const look=c?lookupForKind(c.kind):null,lic=c&&RN_LICENSE_KINDS.includes(c.kind);
  const floor=c?kindFloor(c.kind):null;
- const doc=c?.metadata?.doc||null,sug=doc?.source_suggested&&srcs.find(x=>x.id===doc.source_suggested);
- const vs=acctVScan&&acctVScan.id===c?.id&&acctVScan.res?acctVScan.res:null,vexp=vs&&DocExtract.documentExpiry(vs.fields,vs.issuer);
- const nihss=c?.kind==='CERT_NIHSS',vsSrc=vs?.source?.id&&srcs.find(x=>x.id===vs.source.id);
- /* v14.4: an NIHSS verifier comes from the issuer printed on the certificate, never a default */
- const pick=vsSrc||sug||(nihss?null:route),docExp=vexp?.value||'',docRef=vs?.fields?.credential_id?.value||'';
+ const nihss=c?.kind==='CERT_NIHSS';
+ /* v14.4: an NIHSS verifier comes from the issuer printed on the certificate, never a default.
+    v14.8: no evidence prefill. The source comes from the registry route only (never from a document
+    read), and the expiration and reference fields start empty: the verifier types what the source shows. */
+ const pick=nihss?null:route;
  el.innerHTML=`<div class="panel-v81"><div class="ph">Record a source check</div><div class="pb">
  <p class="small">Open the official lookup, check the credential there, then record exactly what the source said. That record is the source of truth. The level comes from the <b>Verification Source Registry</b>, not from you: for licenses a state board or Nursys gives <b>Primary Source Verified</b>; for certifications the issuing body (for BLS, ACLS and PALS: AHA eCards, or the Red Cross for Red Cross certificates) gives <b>Issuer Verified</b>. Anchoring on XRPL Testnet afterwards only shows the record was not changed later.</p>
  <div id="acctVerifyListV12">${acctVerifyRows?acctVerifyListHtml():'<div class="small">Loading…</div>'}</div>
  ${c&&srcs.length&&acct().serverV13!==false?`<form id="acctVerifyFormV12" class="acct-form-v10 psv-form-v13" style="margin-top:12px" data-mode="registry">
- <div class="small"><b>${ec(c.display_name)}</b> · ${ec(c.clinicians?.full_name||'')}${c.jurisdiction_code?' · '+ec(jurisdictionName(c.jurisdiction_code)):''} · needs at least ${ec(levelLabel(floor.level))}${floor.locked?' (locked floor)':''}</div>
+ <div class="small"><b>${ec(acctCredName(c))}</b> · ${ec(c.clinicians?.full_name||'')}${c.jurisdiction_code?' · '+ec(jurisdictionName(c.jurisdiction_code)):''} · needs at least ${ec(levelLabel(floor.level))}${floor.locked?' (locked floor)':''}</div>
  <div class="small notice" id="acctVerifyAppliesV14">${ec(acctSourceAppliesText(c,nihss?pick:route))}</div>
 ${acctDocBoxHtml(c)}
 <label>Source (Verification Source Registry)<select id="acctVerifySourceIdV13" required>${nihss&&!pick?'<option value="" selected disabled>Verifier undetermined: choose the issuer printed on the certificate</option>':''}${srcs.map(s=>`<option value="${ec(s.id)}"${pick&&pick.id===s.id?' selected':''}>${ec(s.name)} — ${ec(VERIFICATION_METHODS[s.method].label)} → ${ec(levelLabel(sourceLevel(s)))}</option>`).join('')}</select></label>
  <div class="small" id="acctVerifySourceInfoV13"></div>
  <div class="grid2-v83"><label>Result<select id="acctVerifyResultV12" required><option value="VERIFIED">Verified — the source confirmed it</option><option value="FAILED">Failed — the source did not confirm it</option></select></label>
  <label>Status shown by the source<select id="acctVerifyStatusV13" required>${[['ACTIVE','Active'],['INACTIVE','Inactive / lapsed'],['EXPIRED','Expired'],['PROBATION','On probation'],['SUSPENDED','Suspended'],['REVOKED','Revoked'],['NOT_FOUND','Not found']].map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></label></div>
- <div class="grid2-v83"><label>Expiration shown by the source${lic?'':' (if any)'}<input type="date" id="acctVerifyExpV13" value="${ec(docExp||c.expires_on||'')}"${lic?' required':''}><span class="small" id="acctVerifyExpNoteV14">${acctExpNoteHtml(c,docExp,vexp)}</span></label>
+ <div class="grid2-v83"><label>Expiration shown by the source${lic?'':' (if any)'}<input type="date" id="acctVerifyExpV13" value=""${lic?' required':''}><span class="small" id="acctVerifyExpNoteV14">${acctExpNoteHtml(c)}</span></label>
  <label>Date you checked<input type="date" id="acctVerifyDateV12" required value="${acctToday()}" max="${acctToday()}"></label></div>
  ${lic?`<label>Original issue date from the state board <span class="small">(optional · as the board shows it · kept apart from any date printed on the card, which can be the latest renewal)</span><input type="date" id="acctVerifyOrigIssueV147" max="${acctToday()}"></label>`:''}
- <label>Reference or confirmation number<input id="acctVerifyRefV12" required maxlength="120" value="${ec(docRef)}" placeholder="${lic?'License number / Nursys report or board confirmation':'Card / certificate ID shown by the source'}. Stored off-chain only." autocomplete="off"></label>
+ <label>Reference or confirmation number<input id="acctVerifyRefV12" required maxlength="120" value="" placeholder="${lic?'License number / Nursys report or board confirmation':'Card / certificate ID shown by the source'}. Stored off-chain only." autocomplete="off"></label>
 ${acctDoubleCheckHtml(c)}
  <label>Monitoring after this check<select id="acctVerifyMonV13"><option value="MANUAL_RECHECK">Re-check by hand before each submission</option><option value="NOT_ENROLLED">Not monitored</option>${lic?'<option value="ENROLLED" disabled>Enrolled in Nursys e-Notify (not connected yet)</option>':''}</select></label>
  <button class="pri" type="submit" id="acctVerifySaveV12">Record source check</button>
  <p class="small" id="acctVerifyFootV14">${lic?'Continuous monitoring needs Nursys e-Notify, which needs an institution account and NCSBN API credentials Veridun does not have yet.':`${ec(catalogKind(c.kind)?.short||'This credential')} is not a license, so Nursys does not apply. Re-check it with ${ec((nihss?pick:route)?.name||(nihss?'the issuer printed on the certificate':'the issuer'))} before each submission.`} Nothing here is fetched automatically, and no result is ever filled in for you.</p></form>`
  :c?`<form id="acctVerifyFormV12" class="acct-form-v10" style="margin-top:12px" data-mode="legacy">
- <div class="small"><b>${ec(c.display_name)}</b> · ${ec(c.clinicians?.full_name||'')}</div>
+ <div class="small"><b>${ec(acctCredName(c))}</b> · ${ec(c.clinicians?.full_name||'')}</div>
  <p class="small">${acct().serverV13===false?'The database has not been upgraded to the PR 13 Verification Source Registry yet, so this check is recorded the PR 12 way.':'No approved source in the Verification Source Registry covers this credential yet.'} You can still record what you checked, but it counts only as <b>Document Reviewed</b>, which is below the ${ec(levelLabel(floor.level))} this credential needs for readiness.</p>
  ${look?`<p class="small">Official lookup: <a id="acctLookupLinkV12" href="${ec(look.url)}" target="_blank" rel="noopener">${ec(look.name)}</a></p>`:''}
  <label>Result<select id="acctVerifyResultV12" required><option value="VERIFIED">Verified — the issuer confirmed it</option><option value="FAILED">Failed — the issuer did not confirm it</option></select></label>
@@ -144,7 +144,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(act==='mfa-enroll')acctDo(async()=>{await acct().enrollTotp();acctTab='acctSecurityV12'},'Scan the QR code, then enter the first code.');
   if(act==='mfa-remove'){if(confirm('Remove this authenticator? The next sign-in will only use the email link, until you add an app again.'))acctDo(()=>acct().unenrollTotp(b.dataset.id),'Authenticator removed.');}
   if(act==='verify-pick'){acctVerifyId=b.dataset.id;acctLastRecord=null;acctRenderVerify()}
-  if(act==='verify-read-doc'){const c=(acctVerifyRows||[]).find(x=>x.id===acctVerifyId);if(c)acctVerifierRead(c)}
   if(act==='anchor-now')acctDo(async()=>{const tx=await acctAnchorLast();acctMsg('Anchored on '+tx.network.replace('XRPL_','XRPL ')+'.','ok')});
   if(act==='xrpl-check')acctDo(async()=>{const box=$('acctXrplResultV12')||b.parentElement.insertAdjacentElement('afterend',Object.assign(document.createElement('div'),{id:'acctXrplResultV12',className:'small'}));await acctPaintXrpl(b.dataset.id,box)});
   if(act==='log-anchor')acctDo(async()=>{const prep=await acct().prepareActivityAnchor();const tx=await submitAnchor(prep.commitment,XRPL_ANCHOR.memoActivity);await acct().attachActivityAnchor({anchorId:prep.anchor_id,txHash:tx.txHash,ledger:tx.ledger,address:tx.address,network:tx.network});acctActivityAnchorId=prep.anchor_id;const box=$('acctLogResultV12');acctLogNoteV12='Activity log anchored on '+tx.network+' · '+tx.txHash.slice(0,10)+'… Newer events are not part of this fingerprint.';if(box)box.textContent=acctLogNoteV12});
@@ -171,60 +170,20 @@ function acctSourceAppliesText(c,route){
  const priv=k?.privacy==='PRIVATE';
  return`${short}: check it with ${route?.name||'the issuer'}${route?.type==='CERTIFYING_BODY'?' (the issuing body)':''}.${priv?' This is a private record: organizations only ever see “requirement satisfied”.':''} Nursys does not apply.`;
 }
-/* The verifier reads the document on THIS device (signed link → pdf.js /
-   OCR here). Extracted values are never stored on the server; only the
-   nurse's confirmation flags are. */
-/* Expiration note: once the document has been read, its date wins and both dates are shown. */
-function acctExpNoteHtml(c,docExp,vexp){
- const typed=c?.expires_on||'',flagged=(c?.metadata?.doc?.mismatch_fields||[]).includes('expires_on');
- if(docExp){
-  const both=`<span class="expboth-v14"><span>Document: <b id="acctExpDocV14">${ec(fd(docExp))}</b>${vexp?.basis==='renew_by'||/end of/.test(vexp?.text||'')?' (month/year card: end of that month)':''}</span><span>Nurse typed: <b id="acctExpTypedV14">${typed?ec(fd(typed)):'nothing'}</b></span></span>`;
-  return docExp!==typed?`<span class="badge REVOKED">DATES DIFFER</span> Prefilled with the document date. ${both} Change it to what the source shows.`:`Prefilled from the document; it matches what the nurse typed. ${both}`;
- }
- if(c?.source_document_path)return`Prefilled with what the nurse typed (${typed?ec(fd(typed)):'nothing'}); not compared with the document yet${flagged?' and the nurse’s own scan flagged the date':''}. Use “Read the document on this device” to compare, then enter what the source shows.`;
- return'Prefilled with what the nurse typed. Change it to what the source shows.';
-}
-let acctVScan=null;/* {id,status,label,res,error} */
-async function acctVerifierRead(c){
- acctVScan={id:c.id,status:'scanning',label:'Getting the document with a 60-second private link'};acctRenderVerify();
- try{
-  const url=await acct().verifierDocumentUrl(c.source_document_path,60);
-  const r=await fetch(url);if(!r.ok)throw new Error('Could not download the document ('+r.status+').');
-  const blob=await r.blob(),name=c.source_document_path.split('/').pop();
-  const res=await DocExtract.extractFromFile(new File([blob],name,{type:blob.type||''}),{kind:c.kind,profileName:c.clinicians?.full_name||'',onProgress:x=>{if(acctVScan?.id!==c.id)return;acctVScan.label=x.label;const l=$('acctVScanLabelV14');if(l)l.textContent=x.label}});
-  if(acctVScan?.id!==c.id)return;acctVScan={id:c.id,status:'done',res};
- }catch(e){acctVScan={id:c.id,status:'error',error:DocExtract.friendlyError(e)}}
- acctRenderVerify();
+/* v14.8: the verifier's evidence fields are never prefilled and there is no on-device document reader
+   on this screen. The nurse's own entry is shown beside the field for comparison only. */
+function acctExpNoteHtml(c){
+ const typed=c?.expires_on||'';
+ return typed?`For comparison only: the nurse entered <b id="acctExpTypedV14">${ec(fd(typed))}</b>. Enter the date the source shows.`:`The nurse didn't enter an expiration date. Enter the date the source shows.`;
 }
 function acctDocBoxHtml(c){
- const d=c.metadata?.doc,v=acctVScan&&acctVScan.id===c.id?acctVScan:null,res=v?.res;
- const nm=k=>(DocExtract.FIELD_LABEL[k]||k).toLowerCase();
- const head=d?.confirmed?`<div class="small">The nurse read the document on their device and confirmed ${ec((d.fields_confirmed||[]).map(nm).join(', ')||'it')}${(d.corrected||[]).length?` (corrected: ${ec(d.corrected.map(nm).join(', '))})`:''}.${d.mismatch?` <span class="badge REVOKED">CREDENTIAL MISMATCH DETECTED</span> ${ec((d.mismatch_fields||[]).map(nm).join(', '))}`:''}</div>`:`<div class="small">${c.source_document_path?'The nurse has not confirmed details from the document.':'No document uploaded.'}</div>`;
- const btn=c.source_document_path&&/\.(pdf|png|jpe?g|webp)$/i.test(c.source_document_path)?`<button type="button" class="mini sec" data-act="verify-read-doc" id="acctVReadV14">${res?'Read again':'Read the document on this device'}</button>`:'';
- let body='';
- if(v?.status==='scanning')body=`<div class="scan-bar-v14"><div style="width:40%"></div></div><div class="small" id="acctVScanLabelV14">${ec(v.label||'')}</div>`;
- else if(v?.status==='error')body=`<div class="small alert-v81" id="acctVScanErrV14">${ec(v.error)} Open the document and check it by eye at the source.</div>`;
- else if(res&&!res.supported)body=`<div class="small">${ec(res.warnings[0]||'This file type cannot be read.')} Open the document and check it by eye at the source.</div>`;
- else if(res){
-  const f=res.fields,aha=res.profile==='aha_resus',code=f.credential_id?.value||'',rqi=aha&&(/[A-Za-z]/.test(code)||res.issuer==='AHA_RQI'),rc=res.issuer==='RED_CROSS';
-  const src=res.source&&verificationSource(res.source.id);
-  const lbl=k=>k==='credential_id'?(aha?(rc?'Certificate ID':rqi?'RQI code':'eCard code'):res.profile==='license'?'License number':'ID'):(DocExtract.FIELD_LABEL[k]||k);
-  const exp=DocExtract.documentExpiry(f,res.issuer);
-  const ms=DocExtract.compareToEntered(Object.fromEntries(Object.entries(f).map(([k,x])=>[k,x.value])),{kind:c.kind,expires_on:c.expires_on,profileName:c.clinicians?.full_name||'',issuer:res.issuer,jurisdiction:c.jurisdiction_code}).filter(m=>m.severity==='mismatch');
-  /* v14.2: the Training Center ID is shown for context only; the lookup uses the eCard code */
-  const tcRow=f.training_center_id?`<div>${ec(DocExtract.FIELD_LABEL.training_center_id)}</div><div id="acctVTcIdV142">${ec(f.training_center_id.value)} <span class="small">· ${ec(DocExtract.TC_ID_NOTE)}</span></div>`:'';
-  const noCode=aha&&!rc&&!f.credential_id?`<div class="small alert-v81" id="acctVNoCodeV142">${ec(res.notes?.credential_id||DocExtract.ECARD_NOT_FOUND)} Ask the nurse for the eCard code, or read it from the document by eye. The Training Center ID can't be used to look the card up.</div>`:'';
-  const how=aha&&!rc?(rqi?`<li>This code has letters, so it is an RQI card: open <a href="https://www.heart.org/RQIverify" target="_blank" rel="noopener" id="acctOpenRqiV14">heart.org/RQIverify</a> and enter the code.</li>`:`<li>Copy the eCard code, open <a href="https://ecards.heart.org/student/myecards?pid=ahaecard.employerStudentSearch" target="_blank" rel="noopener" id="acctOpenAhaV14">AHA eCards → Employer</a> and paste it (up to 20 codes at a time).</li><li>Compare the name, course, issue date and renewal date AHA shows. If AHA can't find a code with letters, use <a href="https://www.heart.org/RQIverify" target="_blank" rel="noopener">heart.org/RQIverify</a> (RQI cards).</li>`)
-   :rc?`<li>Open <a href="https://www.redcross.org/take-a-class/digital-certificate" target="_blank" rel="noopener" id="acctOpenRcV14">Red Cross digital certificate lookup</a> and enter the certificate ID.</li>`
-   :src?.lookupUrl?`<li>Open <a href="${ec(src.lookupUrl)}" target="_blank" rel="noopener" id="acctOpenSrcV14">${ec(src.name)}</a>.</li>`:'';
-  body=`<div class="why-grid-v13">${res.fieldsWanted.filter(k=>f[k]).map(k=>`<div>${ec(lbl(k))}</div><div>${ec(f[k].value)}${k==='credential_id'?` <button type="button" class="mini sec" data-act="copy-code" data-code="${ec(f[k].value)}" id="acctCopyCodeV14">Copy</button>`:''} <span class="small">· ${Math.round(f[k].conf*100)}%</span></div>`).join('')}${tcRow}${f.test_group?`<div>${ec(DocExtract.FIELD_LABEL.test_group)}</div><div id="acctVTestGroupV144">Group ${ec(f.test_group.value)} <span class="small">· ${Math.round(f.test_group.conf*100)}% · as printed</span></div>`:''}${f.nihss_module?`<div>${ec(DocExtract.FIELD_LABEL.nihss_module)}</div><div id="acctVModuleV144">${ec(f.nihss_module.value)} <span class="small">· ${Math.round(f.nihss_module.conf*100)}% · as printed</span></div>`:''}${res.calculated?.suggested_renewal?`<div>${ec(DocExtract.FIELD_LABEL.suggested_renewal)}</div><div id="acctVSuggestV144">${ec(fd(res.calculated.suggested_renewal.value))} <span class="small">· calculated (12 months from completion), not printed, not verified; the facility rule is final</span></div>`:''}${res.notes?.verifier?`<div>Verifier</div><div class="small alert-v81" id="acctVVerifierV144">${ec(res.notes.verifier)}</div>`:''}<div>Expiration (typed by the nurse)</div><div>${c.expires_on?ec(fd(c.expires_on)):'—'}</div></div>${noCode}
-  ${exp?`<div class="small">${ec(exp.text)}</div>`:''}
-  ${ms.length?`<div class="small alert-v81"><b>Credential mismatch detected</b><br>${ms.map(m=>ec(m.text)).join('<br>')}</div>`:''}
-  ${how?`<ol class="small">${how}<li>Record exactly what the source shows below.</li></ol>`:''}`;
- }
- const aha=['CERT_BLS','CERT_ACLS','CERT_PALS'].includes(c.kind);
- return`<div class="docbox-v14" id="acctDocBoxV14"><div><b>Document details</b> <span class="small">(read from the document, not verified; nothing read here is saved)</span></div>${head}${btn}${body}
- ${aha?'<div class="small">Assisted, not automatic: AHA has no public verification API, and its Terms of Service do not allow making its services available through another system without written authorization. Veridun prepares the code and opens the page; you do the lookup.</div>':''}</div>`;
+ const aha=['CERT_BLS','CERT_ACLS','CERT_PALS'].includes(c.kind),route=primaryRouteFor(c.kind,c.jurisdiction_code),src=route&&verificationSource(route.id);
+ const head=`<div class="small">${c.source_document_path?'The nurse uploaded a document. Open it with “View document” and compare it by eye with what the source shows.':'No document uploaded.'}</div>`;
+ const how=aha?`<li>AHA eCards (12-digit code): open <a href="https://ecards.heart.org/student/myecards?pid=ahaecard.employerStudentSearch" target="_blank" rel="noopener" id="acctOpenAhaV14">AHA eCards → Employer</a> and enter the code printed on the card.</li><li>Codes with letters are RQI cards: open <a href="https://www.heart.org/RQIverify" target="_blank" rel="noopener" id="acctOpenRqiV14">heart.org/RQIverify</a>.</li><li>Red Cross certificates: open the <a href="https://www.redcross.org/take-a-class/digital-certificate" target="_blank" rel="noopener" id="acctOpenRcV14">Red Cross digital certificate lookup</a>.</li>`
+  :src?.lookupUrl?`<li>Open <a href="${ec(src.lookupUrl)}" target="_blank" rel="noopener" id="acctOpenSrcV14">${ec(src.name)}</a>.</li>`:'';
+ return`<div class="docbox-v14" id="acctDocBoxV14"><div><b>Document</b></div>${head}
+ ${how?`<ol class="small">${how}<li>Record exactly what the source shows below.</li></ol>`:''}
+ ${aha?'<div class="small">Assisted, not automatic: AHA has no public verification API, and its Terms of Service do not allow making its services available through another system without written authorization. You do the lookup.</div>':''}</div>`;
 }
 function acctDoubleCheckHtml(c){
  const d=c.metadata?.doc;if(!d)return'';

@@ -218,7 +218,7 @@ function jurisdictionName(code){return jurisdiction(code)?.name||code||''}
 function jurisdictionOptionLabel(j){return `${j.name} (${j.code})`}
 function nlcHonorsCompactIn(code){const n=jurisdiction(code)?.nlc;return n==='IMPLEMENTED'||n==='PARTIAL'}
 function nlcCanIssueMultistate(code){return jurisdiction(code)?.nlc==='IMPLEMENTED'}
-function nlcStatusLabel(code){return({IMPLEMENTED:'NLC member',PARTIAL:'NLC — partial implementation',PENDING:'NLC enacted, not yet in effect'})[jurisdiction(code)?.nlc]||'Not an NLC jurisdiction'}
+function nlcStatusLabel(code){return({IMPLEMENTED:'Nurse Licensure Compact state',PARTIAL:'Compact: partly in effect',PENDING:'Compact enacted, not yet in effect'})[jurisdiction(code)?.nlc]||'Not in the Nurse Licensure Compact'}
 function multistateHomeJurisdictions(){return US_JURISDICTIONS.filter(j=>j.nlc==='IMPLEMENTED')}
 function catalogPrivacy(kind){return catalogKind(kind)?.privacy||'PRIVATE'}
 function countsForReadiness(kind){return catalogKind(kind)?.readiness!==false}
@@ -233,8 +233,7 @@ function licenseScopeOf(c){
 }
 /* the kind the compact rules use: multistate licenses (either storage) → RN_LICENSE_MULTISTATE */
 function licenseRuleKind(c){return licenseScopeOf(c)==='MULTISTATE'?'RN_LICENSE_MULTISTATE':c?.kind}
-/* a shared assertion has kind + label only (no metadata): a multistate RN_LICENSE is named "Multistate RN License …" */
-function assertionLicenseRuleKind(x){return x.kind==='RN_LICENSE'&&/^Multistate RN License/.test(x.label||'')?'RN_LICENSE_MULTISTATE':x.kind}
+/* t150u: assertionLicenseRuleKind (which read the scope out of a label) was removed: no logic parses labels. */
 /* The one license-scope explanation (v14.5). It talks about the LICENSE's state; the primary state of
    residence is mentioned only to explain that multistate licenses come from it. */
 function licenseScopeInfo(jur,home,scope){
@@ -249,9 +248,11 @@ function licenseScopeInfo(jur,home,scope){
  if(h&&h.code!==j.code)lines.push(`Multistate licenses are issued by your primary state of residence (${h.name}). This license is from ${j.name}, so it is usually single-state (${j.name} only). Choose multistate only if the license says so, or update your primary state of residence.`);
  else if(!h)lines.push(`${j.name} is a compact state: its licenses can be multistate or single-state. Multistate licenses are issued by your primary state of residence; set it in your profile.`);
  else lines.push(`${j.name} is a compact state and your primary state of residence: a license from ${j.name} can be multistate or single-state.`);
- return{choice:true,scope:scope||(h&&h.code===j.code?'MULTISTATE':'SINGLE_STATE'),defaultScope:h&&h.code===j.code?'MULTISTATE':'SINGLE_STATE',lines};
+ /* v14.8: no default scope (the home state used to preselect Multistate). The nurse chooses what the license says. */
+ return{choice:true,scope:scope||null,lines};
 }
-function credentialDisplayName(kind,jur,fallback,scope){const k=catalogKind(kind);if(kind==='RN_LICENSE'&&scope==='MULTISTATE')return`Multistate RN License (NLC · home: ${jurisdictionName(jur)})`;if(kind==='RN_LICENSE')return`${jurisdictionName(jur)} RN License`;if(kind==='RN_LICENSE_MULTISTATE')return`Multistate RN License (NLC · home: ${jurisdictionName(jur)})`;if(kind==='OTHER'||!k)return fallback||'Credential';return k.short||k.label}
+/* v14.8: one name pattern for every RN license: "<State> RN License · <Multistate|Single-state>". */
+function credentialDisplayName(kind,jur,fallback,scope){const k=catalogKind(kind);if(kind==='RN_LICENSE_MULTISTATE'||(kind==='RN_LICENSE'&&scope==='MULTISTATE'))return`${jurisdictionName(jur)} RN License · Multistate`;if(kind==='RN_LICENSE'&&scope==='SINGLE_STATE')return`${jurisdictionName(jur)} RN License · Single-state`;if(kind==='RN_LICENSE')return`${jurisdictionName(jur)} RN License`;if(kind==='OTHER'||!k)return fallback||'Credential';return k.short||k.label}
 /* Machine-readable type (also used as the XRPL CredentialType). */
 function credentialTypeCode(kind,jur){return(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTATE')?`${kind}:${normalizeJurisdictionCode(jur)}`:kind}
 function issuerFor(kind,jur){if(kind==='RN_LICENSE'||kind==='RN_LICENSE_MULTISTATE')return jurisdiction(jur)?.issuer||'State board of nursing';return catalogKind(kind)?.issuer||'Issuer'}
