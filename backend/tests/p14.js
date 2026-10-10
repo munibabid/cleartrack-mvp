@@ -143,8 +143,11 @@ async function partA3(browser) {
   console.log('  benchmark:', summary.allRequired + '/' + summary.documents, Object.entries(f).map(([k, s]) => k + ' ' + pct(s.accuracy)).join(', '));
   console.log('  per kind:', summary.kinds.map(k => `${k.label} ${k.allRequired}/${k.n} (${pct(k.accuracy)})`).join('; '));
   ok('benchmark covers AHA + NIHSS + at least 2 other non-AHA kinds', summary.kinds.filter(k => !/AHA/.test(k.label)).length >= 3 && summary.kinds.some(k => /NIHSS/.test(k.label)), summary.kinds.map(k => k.label).join(', '));
-  ok('benchmark: ≥ 90% of documents need no correction', summary.allRequired / summary.documents >= 0.9, summary.allRequired + '/' + summary.documents);
-  ok('benchmark: every required field ≥ 90%', Object.entries(f).filter(([k]) => k !== 'training_center').every(([, s]) => s.accuracy >= 0.9), JSON.stringify(Object.fromEntries(Object.entries(f).map(([k, s]) => [k, pct(s.accuracy)]))));
+  /* v14.8: "≥ 90% of documents need no correction" and "every required field ≥ 90%" retired: they measured pre-fill
+     quality, and nothing is pre-filled any more. Unlabelled/ordering-guessed dates are deliberately left unread, so
+     recall dropped; the invariant that remains is that the reader is never wrong on dates or identifiers. */
+  const wrong = k => (f[k] && f[k].wrong) || 0;
+  ok('(rewritten v14.8) benchmark: dates and identifiers are never read wrong (left unread instead)', ['issued_on', 'expires_on', 'renew_by', 'credential_id'].every(k => wrong(k) === 0), JSON.stringify(Object.fromEntries(Object.entries(f).map(([k, s]) => [k, { correct: s.correct, wrong: s.wrong, notFound: s.n - s.found }]))));
   ok('benchmark: text PDFs 100%', summary.variants.find(v => v.variant === 'PDF (text)').allRequired === summary.variants.find(v => v.variant === 'PDF (text)').n);
   return summary;
 }
@@ -153,11 +156,12 @@ async function partA4(browser) {
   step('A4 start'); const { pg, errs, reqs } = await phone(browser); step('A4 page');
   const shot = async (file, sel) => { await W(250); const h = sel && await pg.$(sel); if (h) { await pg.evaluate(e => e.scrollIntoView({ block: 'start' }), h); await W(150); await h.screenshot({ path: SH + file }); } else await pg.screenshot({ path: SH + file }); };
   const idle = (ms = 60000) => pg.waitForFunction(() => !document.body.classList.contains('acct-busy-v10'), { timeout: ms });
-  const waitScan = (ms = 90000) => pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }, { timeout: ms });
+  /* v14.8 (t150u): the reader only screens the file on the device (#acctScreenBoxV148). It never fills, compares
+     or re-scans; the verifier types the evidence. Retired tests are listed in LEGACY_TEST_MAP.md. */
+  const waitScan = (ms = 90000) => pg.waitForFunction(() => { const b = document.getElementById('acctScreenBoxV148'); return b && b.dataset.state && b.dataset.state !== 'checking'; }, { timeout: ms });
   const tap = async sel => { await pg.waitForSelector(sel, { timeout: 15000 }); await pg.evaluate(s => { const e = document.querySelector(s); e.scrollIntoView({ block: 'center' }); }, sel); await W(120); await pg.evaluate(s => document.querySelector(s).click(), sel); };
   const setVal = (id, v) => pg.evaluate((id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); }, id, v);
   await pg.evaluate(require('./p14-fake.js')); step('fake in');
-  // Munib-like existing credential: typed May 8 2028, card renews 06/2028
   const blsPdf = fs.readFileSync(FIX + '/01-bls-text.pdf').toString('base64');
   const seeded = await pg.evaluate(async b64 => {
     const f = new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'BLS- exp 6-2028.pdf', { type: 'application/pdf' });
@@ -167,111 +171,65 @@ async function partA4(browser) {
   }, blsPdf);
   await W(400); step('seeded');
   const reqStart = reqs.length;
-  // ---- add a new credential with a scan ----
+  // ---- add a new credential with a document: the nurse types, the device only screens the file ----
   await tap('[data-act="toggle-add"]'); await W(200);
   await pg.select('#acctKindV10', 'CERT_BLS'); await W(150);
   await setVal('acctExpV10', '2028-05-08');
-  const input = await pg.$('#acctFileV10');
-  await input.uploadFile(FIX + '/01-bls-skewed-noisy.jpg');
-  await pg.waitForSelector('#acctScanBoxV14[data-state="scanning"]', { timeout: 10000 });
-  await pg.waitForFunction(() => /OCR|text|QR/i.test((document.getElementById('acctScanLabelV14') || {}).textContent || ''), { timeout: 30000 }).catch(() => {});
-  await shot('01-scan-progress.png', '#acctAddFormV10');
+  await (await pg.$('#acctFileV10')).uploadFile(FIX + '/01-bls-skewed-noisy.jpg');
   await waitScan();
-  const sc = await pg.evaluate(() => ({ state: acctScan.status, vals: acctScan.values, chips: document.querySelectorAll('#acctScanBoxV14 .conf-v14').length, wanted: acctScan.res.fieldsWanted.length, src: acctScan.res.source && acctScan.res.source.id, box: document.getElementById('acctScanBoxV14').innerText }));
-  ok('scan reads the BLS card on the device: code, course, dates, name', sc.vals.credential_id === '261100000017' && sc.vals.course === 'BLS Provider' && sc.vals.issued_on === '2026-06-12' && sc.vals.renew_by === '2028-06' && /Testa Fakename/i.test(sc.vals.holder_name), JSON.stringify(sc.vals));
-  ok('each field shows a confidence', sc.chips === sc.wanted, sc.chips + '/' + sc.wanted);
-  ok('scan box no longer repeats the expiration (moved to the one Expiration date field)', /in the Expiration date field above/.test(sc.box) && !/No expiration entered/.test(sc.box) && !/Use the date from the document/.test(sc.box), sc.box.slice(0, 120));
-  await shot('02-extracted-fields.png', '#acctScanBoxV14');
-  const mm = await pg.evaluate(() => ({ t: (document.getElementById('acctExpMismatchV144') || {}).innerText || '', btn: !!document.getElementById('acctUseDocDateV14'), exp: document.getElementById('acctExpV10').value, src: document.getElementById('acctExpSrcV144').innerText }));
-  ok('typed May 8 date kept (not overwritten); mismatch note under the one expiration field', mm.exp === '2028-05-08' && /May 8, 2028/.test(mm.t) && /Jun 30, 2028/.test(mm.t) && /flagged for the verifier/.test(mm.t) && mm.btn && !mm.src, mm.t.replace(/\s+/g, ' ').slice(0, 200));
-  await shot('03-mismatch-warning.png', '#acctExpDateRowV10');
-  // saving without confirming is refused
+  await shot('01-screen-on-device.png', '#acctAddFormV10');
+  const sc = await pg.evaluate(() => ({ screen: document.getElementById('acctScreenBoxV148').dataset.state, exp: document.getElementById('acctExpV10').value, scanBox: !!document.getElementById('acctScanBoxV14'), useDoc: !!document.getElementById('acctUseDocDateV14'), mm: !!document.getElementById('acctExpMismatchV144') }));
+  ok('(rewritten v14.8) typed May 8 date kept; the file is only screened (no read-back box, no "Use the document\'s date", no document comparison)', sc.exp === '2028-05-08' && ['clear', 'unreadable'].includes(sc.screen) && !sc.scanBox && !sc.useDoc && !sc.mm, JSON.stringify(sc));
   await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
-  ok('save is refused until the nurse confirms the details', /I checked these details/.test(await pg.evaluate(() => document.getElementById('acctWsMsgV10')?.textContent || document.getElementById('acctMsgV10')?.textContent || '')));
-  await tap('#acctUseDocDateV14'); await W(200);
-  const applied = await pg.evaluate(() => ({ exp: document.getElementById('acctExpV10').value, mm: !!document.getElementById('acctMismatchV14') || !!document.getElementById('acctExpMismatchV144') }));
-  ok('"Use the document\'s date" sets June 30, 2028 and clears the mismatch', applied.exp === '2028-06-30' && !applied.mm, JSON.stringify(applied));
-  const marked = await pg.evaluate(() => ({ src: document.getElementById('acctExpSrcV144').innerText, note: document.getElementById('acctExpNoteV144').innerText, mm: !!document.getElementById('acctExpMismatchV144') }));
-  ok('expiration field marked "from document, check it" with its confidence; explains month/year renewal = end of month', /from document, check it · \d+%/.test(marked.src) && /end of the month/.test(marked.note) && /June 30, 2028/.test(marked.note) && !marked.mm, JSON.stringify(marked));
-  await tap('#acctScanConfirmV14');
-  await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
-  const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); return { c, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type), xe: __fakeDb.extraction_events.filter(e => e.credential_id === c.id), msg: document.getElementById('acctWsMsgV10')?.textContent || '' }; });
-  ok('saved: VERIFYING, expires June 30, metadata.doc confirmed, status "Details captured, awaiting verification"', saved.c.status === 'VERIFYING' && saved.c.expires_on === '2028-06-30' && saved.c.metadata.doc?.confirmed && saved.c.metadata.doc.fields_confirmed.includes('credential_id') && /Details captured, awaiting verification/.test(saved.msg), saved.msg);
-  ok('audit: DOCUMENT_SCANNED + DOCUMENT_DATE_APPLIED; extraction event CONFIRM', saved.ev.includes('DOCUMENT_SCANNED') && saved.ev.includes('DOCUMENT_DATE_APPLIED') && saved.xe.length === 1 && saved.xe[0].event === 'CONFIRM', JSON.stringify(saved.ev));
+  const saved = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_BLS').pop(); return { c, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type), xe: (__fakeDb.extraction_events || []).filter(e => e.credential_id === c.id), msg: document.getElementById('acctWsMsgV10')?.textContent || document.getElementById('acctMsgV10')?.textContent || '' }; });
+  ok('(rewritten v14.8) saved: VERIFYING, expires as typed (May 8, 2028), no document values in metadata, never DOCUMENT_DATE_APPLIED', saved.c.status === 'VERIFYING' && saved.c.expires_on === '2028-05-08' && !saved.c.metadata.doc && !saved.ev.includes('DOCUMENT_DATE_APPLIED'), JSON.stringify({ st: saved.c.status, exp: saved.c.expires_on, meta: saved.c.metadata, ev: saved.ev, msg: saved.msg }));
   const leak = JSON.stringify([saved.xe, saved.c.metadata, (await pg.evaluate(() => __fakeDb.audit_events.map(e => e.detail)))]);
-  ok('extracted values stay off the server: metadata, audit and telemetry hold field names only', !/Testa|Fakename|261100000017|2026-06-12|2028-06/.test(leak), leak.slice(0, 160));
+  ok('extracted values stay off the server: metadata, audit and telemetry hold no document values', !/Testa|Fakename|261100000017|2026-06-12|2028-06-/.test(leak.replace(/2028-05-08/g, '')), leak.slice(0, 160));
   const badge = await pg.evaluate(id => document.querySelector(`[data-cred="${id}"] .badge`)?.textContent, saved.c.id);
-  ok('credential row badge: DETAILS CAPTURED · AWAITING VERIFICATION (never VERIFIED)', /DETAILS CAPTURED/.test(badge) && !/^VERIFIED/.test(badge), badge);
-  // ---- NIHSS with a mismatch, saved anyway → flagged ----
-  await tap('[data-act="toggle-add"]'); await W(200);
-  await pg.select('#acctKindV10', 'CERT_NIHSS'); await setVal('acctExpV10', '2028-12-31');
-  await (await pg.$('#acctFileV10')).uploadFile(FIX + '/nihss-apex-clean.png');
-  await pg.waitForSelector('#acctScanBoxV14[data-state="scanning"]', { timeout: 10000 }).catch(() => {}); await waitScan();
-  const nih = await pg.evaluate(() => ({ v: acctScan.values, lbl: [...document.querySelectorAll('#acctScanBoxV14 .scan-lbl-v14')].map(x => x.textContent).join('|'), mm: (document.getElementById('acctExpMismatchV144') || {}).innerText || '' }));
-  ok('NIHSS scan: Test ID, completion + expiration dates', nih.v.credential_id === '99000123' && nih.v.issued_on === '2026-03-14' && nih.v.expires_on === '2028-03-14', JSON.stringify(nih.v));
-  ok('NIHSS mismatch vs typed Dec 31, 2028 (note under the expiration field)', /doesn't match the document/.test(nih.mm) && /Dec 31, 2028/.test(nih.mm));
-  await shot('07-nihss-scan.png', '#acctScanBoxV14');
-  await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
-  const nihRow = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'CERT_NIHSS').pop(); return { flag: c.metadata.doc?.mismatch, src: c.metadata.doc?.source_suggested, ev: __fakeDb.audit_events.filter(e => e.credential_id === c.id).map(e => e.event_type) }; });
-  ok('saved with mismatch → flagged for the verifier (DOCUMENT_MISMATCH), APEX suggested', nihRow.flag === true && nihRow.src === 'apex-nihss' && nihRow.ev.includes('DOCUMENT_MISMATCH'), JSON.stringify(nihRow));
-  // ---- private record: only the expiration date is kept ----
+  ok('(rewritten v14.8) credential row badge says not verified (never VERIFIED)', /NOT VERIFIED|AWAITING VERIFICATION/.test(badge) && !/^VERIFIED/.test(badge), badge);
+  // ---- private record: only the date the nurse typed is kept ----
   await tap('[data-act="toggle-add"]'); await W(200);
   await pg.select('#acctKindV10', 'HEALTH_TB_CURRENT');
   await (await pg.$('#acctFileV10')).uploadFile(FIX + '/tb-private-text.pdf'); await waitScan();
-  const tbBox = await pg.evaluate(() => ({ f: acctScan.res.fieldsWanted, txt: document.getElementById('acctScanBoxV14').innerText }));
-  ok('private TB record shows dates only and says nothing else is stored', tbBox.f.join() === 'issued_on,expires_on' && /only the dates are used/.test(tbBox.txt), tbBox.f.join());
-  await tap('#acctUseDocDateV14').catch(() => {}); await tap('#acctScanConfirmV14'); await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
+  await setVal('acctExpV10', '2027-04-01');
+  await pg.evaluate(EXPOK); await tap('#acctAddFormV10 button[type=submit]'); await idle();
   const tb = await pg.evaluate(() => { const c = __fakeDb.credentials.filter(x => x.kind === 'HEALTH_TB_CURRENT').pop(); return c && { meta: c.metadata, exp: c.expires_on }; });
-  ok('private TB record saved with empty metadata and the document date', tb && Object.keys(tb.meta || {}).length === 0 && tb.exp === '2027-04-01', JSON.stringify(tb));
-  // ---- re-scan the existing BLS credential (signed URL → fetch → read) ----
-  await pg.evaluate(id => document.querySelector(`[data-act="doc-rescan"][data-id="${id}"]`).scrollIntoView(), seeded.id);
-  await tap(`[data-act="doc-rescan"][data-id="${seeded.id}"]`);
-  await waitScan();
-  const rs = await pg.evaluate(() => ({ v: acctScan.values, mm: (document.getElementById('acctMismatchV14') || {}).innerText || '', m: acctScan.res.method }));
-  ok('Re-scan document reads the saved PDF (text layer) and flags May 8 vs June 30', rs.m === 'PDF_TEXT' && rs.v.renew_by === '2028-06' && /May 8, 2028/.test(rs.mm), JSON.stringify(rs.v));
-  await shot('08-rescan-existing.png', `[data-cred="${seeded.id}"]`);
-  await tap('#acctUseDocDateV14'); await tap('#acctScanConfirmV14'); await tap('#acctScanSaveV14'); await idle();
-  const rsSaved = await pg.evaluate(id => { const c = __fakeDb.credentials.find(x => x.id === id); return { exp: c.expires_on, doc: !!c.metadata.doc, st: c.status }; }, seeded.id);
-  ok('re-scan saves the document date (June 30, 2028) and stays unverified', rsSaved.exp === '2028-06-30' && rsSaved.doc && rsSaved.st === 'VERIFYING', JSON.stringify(rsSaved));
+  ok('(rewritten v14.8) private TB record saved with the typed date and no document data in metadata', tb && tb.exp === '2027-04-01' && !Object.keys(tb.meta || {}).some(k => k !== 'exp_confirm'), JSON.stringify(tb));
+  const rescan = await pg.evaluate(id => !!document.querySelector(`[data-act="doc-rescan"][data-id="${id}"]`), seeded.id);
   const outside = reqs.slice(reqStart).filter(u => !u.startsWith(BASE) && !u.startsWith('blob:') && !u.startsWith('data:'));
-  ok('nothing left the page while scanning (no outside AI, no upload)', outside.length === 0, outside.slice(0, 3).join(' '));
-  // ---- verifier form ----
+  ok('nothing left the page while screening (no outside AI, no upload)', outside.length === 0, outside.slice(0, 3).join(' '));
+  // ---- verifier form: the verifier types what the source shows ----
   await tap('.acctTab[data-target="acctVerifyV12"]'); await W(300);
   await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), { timeout: 20000 }, seeded.id);
-  const order = await pg.evaluate(() => [...document.querySelectorAll('.acct-verify-pick-v12')].map(b => b.innerText.replace(/\s+/g, ' ').slice(0, 80)));
-  ok('queue lists the mismatched credential first, flagged', /MISMATCH/.test(order[0]) && /NIH/.test(order[0]), order.slice(0, 2).join(' || '));
   await tap(`.acct-verify-pick-v12[data-id="${seeded.id}"]`);
   await pg.waitForSelector('#acctVerifyFormV12[data-mode="registry"]', { timeout: 15000 });
-  await tap('#acctVReadV14');
-  await pg.waitForSelector('#acctCopyCodeV14', { timeout: 60000 });
-  const vf = await pg.evaluate(() => ({ opts: [...document.querySelectorAll('#acctVerifySourceIdV13 option')].map(o => o.value), sel: document.getElementById('acctVerifySourceIdV13').value, applies: document.getElementById('acctVerifyAppliesV14').innerText, mon: [...document.querySelectorAll('#acctVerifyMonV13 option')].map(o => o.value), foot: document.getElementById('acctVerifyFootV14').innerText, exp: document.getElementById('acctVerifyExpV13').value, ref: document.getElementById('acctVerifyRefV12').value, aha: document.getElementById('acctOpenAhaV14')?.href, copy: !!document.getElementById('acctCopyCodeV14'), box: document.getElementById('acctDocBoxV14').innerText, side: document.documentElement.scrollWidth <= window.innerWidth + 1 }));
+  const vf = await pg.evaluate(() => ({ opts: [...document.querySelectorAll('#acctVerifySourceIdV13 option')].map(o => o.value), sel: document.getElementById('acctVerifySourceIdV13').value, applies: document.getElementById('acctVerifyAppliesV14').innerText, mon: [...document.querySelectorAll('#acctVerifyMonV13 option')].map(o => o.value), foot: document.getElementById('acctVerifyFootV14')?.innerText || '', exp: document.getElementById('acctVerifyExpV13').value, ref: document.getElementById('acctVerifyRefV12').value, aha: document.getElementById('acctOpenAhaV14')?.href || '', reader: !!document.getElementById('acctVReadV14'), side: document.documentElement.scrollWidth <= window.innerWidth + 1 }));
   ok('BLS verifier form: AHA eCards preselected; RQI and Red Cross offered; no Nursys', vf.sel === 'aha-ecards' && vf.opts.includes('aha-rqi') && vf.opts.includes('redcross-certificate') && !vf.opts.some(o => /nursys|board-/.test(o)), JSON.stringify(vf.opts));
   ok('form text names the applicable source and says Nursys does not apply', /AHA eCards/.test(vf.applies) && /Nursys does not apply/.test(vf.applies) && /not a license/.test(vf.foot));
   ok('no Nursys e-Notify monitoring option for BLS', !vf.mon.includes('ENROLLED'), vf.mon.join());
-  ok('expiration prefilled from the document; reference = eCard code; copy + open AHA', vf.exp === '2028-06-30' && vf.ref === '261100000017' && /ecards\.heart\.org/.test(vf.aha || '') && vf.copy, JSON.stringify({ exp: vf.exp, ref: vf.ref, aha: vf.aha }));
-  ok('verifier reads the document on their own device; not saved; mismatch shown; assisted (ToS) note', /nothing read here is saved/.test(vf.box) && /Credential mismatch detected/.test(vf.box) === false && /Assisted, not automatic/.test(vf.box), vf.box.replace(/\s+/g,' ').slice(0,200));
+  ok('(rewritten v14.8) verifier form: expiration and reference start empty, no on-device reader; the official AHA lookup link is offered', vf.exp === '' && vf.ref === '' && !vf.reader && /ecards\.heart\.org/.test(vf.aha), JSON.stringify({ exp: vf.exp, ref: vf.ref, aha: vf.aha, reader: vf.reader }));
   ok('verifier form fits a phone (no sideways scroll)', vf.side);
   await shot('04-verifier-aha-source.png', '#acctVerifyFormV12');
-  await pg.evaluate(() => document.querySelectorAll('.acctDblV14').forEach(x => { if (x.value !== 'active') x.checked = true; }));
+  await setVal('acctVerifyExpV13', '2028-06-30'); await setVal('acctVerifyRefV12', '261100000017');
   await setVal('acctVerifyResultV12', 'VERIFIED');
   await tap('#acctVerifySaveV12'); await idle();
-  const vc = await pg.evaluate(id => ({ xe: __fakeDb.extraction_events.filter(e => e.event === 'VERIFIER_CHECK' && e.credential_id === id), au: __fakeDb.audit_events.filter(e => e.event_type === 'VERIFIER_CHECK').length, lvl: __fakeDb.credentials.find(x => x.id === id).verification_level }), seeded.id);
-  ok('verifier double-check logged (fields matched at AHA) and the level comes from the registry', vc.xe.length === 1 && vc.xe[0].fields_confirmed.includes('credential_id') && vc.au === 1 && vc.lvl === 'ISSUER_VERIFIED', JSON.stringify({ n: vc.xe.length, lvl: vc.lvl }));
+  const vc = await pg.evaluate(id => ({ lvl: __fakeDb.credentials.find(x => x.id === id).verification_level, st: __fakeDb.credentials.find(x => x.id === id).status }), seeded.id);
+  ok('(rewritten v14.8) the verifier records what the source showed; the level comes from the registry (AHA eCards → ISSUER_VERIFIED)', vc.lvl === 'ISSUER_VERIFIED' && vc.st === 'VERIFIED', JSON.stringify(vc));
   // license credential still routes to the board / Nursys
   await pg.evaluate(() => { acctVerifyRows = null; acctRenderVerify(); }); await W(300);
   await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), { timeout: 20000 }, seeded.lic);
   await tap(`.acct-verify-pick-v12[data-id="${seeded.lic}"]`); await W(300);
   const lf = await pg.evaluate(() => ({ opts: [...document.querySelectorAll('#acctVerifySourceIdV13 option')].map(o => o.value), mon: [...document.querySelectorAll('#acctVerifyMonV13 option')].map(o => o.value), applies: document.getElementById('acctVerifyAppliesV14').innerText }));
   ok('RN license form: board + Nursys only, e-Notify listed', lf.opts.every(o => /^(board-US-CA|nursys-quickconfirm)$/.test(o)) && lf.mon.includes('ENROLLED') && /board of nursing or Nursys/.test(lf.applies), JSON.stringify(lf.opts));
-  // ---- live accuracy panel (extraction_events, then the audit-log fallback) ----
+  // ---- live accuracy panel: reads extraction_events, falls back to the audit log without migration 9 ----
   await tap('[data-act="acc-load"]'); await idle();
-  const acc = await pg.evaluate(() => ({ scans: document.getElementById('accScansV14')?.textContent, ver: document.getElementById('accVerV14')?.textContent, rows: document.querySelectorAll('#accFieldTableV14 tr').length, kinds: document.getElementById('accKindTableV14')?.innerText || '', from: acctAccStatsV14 && acctAccStatsV14.from }));
-  ok('live accuracy panel: per-field + per-kind tables from extraction_events', acc.from === 'extraction_events' && +acc.scans === 4 && acc.rows > 3 && /BLS/.test(acc.kinds) && /NIHSS/.test(acc.kinds) && acc.ver === '100.0%', JSON.stringify(acc));
-  await shot('05-accuracy-live.png', '#acctAccuracyV14');
+  const acc = await pg.evaluate(() => ({ from: acctAccStatsV14 && acctAccStatsV14.from, panel: !!document.getElementById('acctAccuracyV14') }));
+  ok('(rewritten v14.8) live accuracy panel loads from extraction_events', acc.from === 'extraction_events' && acc.panel, JSON.stringify(acc));
   await pg.evaluate(() => { __fakeOpts.extractionTable = false; store.account.extractionTable = undefined; });
   await tap('[data-act="acc-load"]'); await idle();
-  const fb = await pg.evaluate(() => ({ from: acctAccStatsV14.from, scans: document.getElementById('accScansV14')?.textContent }));
-  ok('without migration 9 the panel falls back to the audit log', fb.from === 'audit_events' && +fb.scans === 4, JSON.stringify(fb));
+  const fb = await pg.evaluate(() => ({ from: acctAccStatsV14.from }));
+  ok('(rewritten v14.8) without migration 9 the panel falls back to the audit log', fb.from === 'audit_events', JSON.stringify(fb));
+  ok('(v14.8) no "Re-scan document" on saved credentials', !rescan);
   ok('account UI: no page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await pg.close();
 }
