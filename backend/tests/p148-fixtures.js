@@ -35,6 +35,9 @@ const CASES = [
   { id: 'bls-ok', kind: 'CERT_BLS', expect: 'CLEAR', pages: [BLS] },
   { id: 'acls-claimed-bls', kind: 'CERT_BLS', expect: 'TYPE_MISMATCH', pages: [ACLS] },
   { id: 'pals-claimed-bls', kind: 'CERT_BLS', expect: 'BLOCK_ANY', pages: [PALS] },
+  // t150u: a document the check can't identify (no credential named) is NOT a conflict: manual path, never a hard block
+  { id: 'unrecognized-doc', kind: 'CERT_BLS', expect: 'CLEAR', secrets: ['2031-01-01'], pages: [['Community Health Newsletter', 'Spring edition', 'Upcoming classes and parking information', 'Printed: 01/01/2031']] },
+  { id: 'unrecognized-rn', kind: 'RN_LICENSE', jur: 'US-MI', expect: 'CLEAR', pages: [['Wallet card', 'Keep this card with you', NAME]] },
   { id: 'pals-claimed-pals', kind: 'CERT_PALS', expect: 'UNSUPPORTED_KIND', pages: [PALS] },
 ];
 for (const c of CASES) c.pdf = pdf(...c.pages);
