@@ -154,6 +154,36 @@ The entry screen has a **Your account · staging** card under the three demo wor
 - **Licenses follow the assignment:** the Passport needs an RN license. A state license that a pursued assignment needs and that your home/compact license doesn't cover is marked **Required** (e.g. Massachusetts for Boston).
 - **Accounts: manual primary-source check.** A verifier at AAL2 picks the approved source for the credential (the board for that state, or Nursys QuickConfirm), opens its lookup, and records the result, status at source, expiration, reference and monitoring state. The **database** sets the level (`record_source_check`), and the credential then shows *PRIMARY SOURCE VERIFIED · Source · Checked*. Nobody can set a level from the browser.
 
+### Professional references (v14.6, demo only)
+
+**Demo only. Nothing is sent and nothing is stored in the database.** References live in this browser (`veridun_references`; answers under their own key, `veridun_reference_responses`) and are cleared by Reset Demo Data.
+
+- **Nurse (Clinician › References, or Menu › Professional References):** adds a reference with name, job title, facility, unit (optional) and work email (required). A phone number is optional, with "OK to text" / "OK to call" boxes that only turn on once a number is typed. Email is the main channel.
+- **Requests:** "Send request by email" creates a private link (`?ref=<random 128-bit code>`). In the demo the link is opened in the same app ("Open as the reference (demo)"). Text and call buttons appear only when a phone number was given, and they say "demo — not sent" / "no call is made".
+- **Status the nurse sees:** Not requested yet, Requested, Opened, Completed, Expired, Declined, with sent/opened/expiry times. **The nurse never sees the answers.** The nurse screens, activity log and reference list never contain them.
+- **Reminders and expiry:** requests expire after 14 days. A reminder hint shows after 7 days without an answer. "Send reminder (demo)" is counted, and "Send a new link" / "Resend request" replaces the old link (the old one then says it was replaced). "Demo: skip ahead 15 days" shows expiry without waiting.
+- **The reference's form:** when you worked together (month/year, or still working together), role relative to the nurse, five ratings (clinical skills, professionalism, teamwork, reliability, communication; Excellent to Poor, or Not observed), would work with or rehire again (yes/no/unsure), comments, and a confirmation that the answers are their own. They can also decline; no reason is asked for.
+- **Phone references:** Verification Console › Reference Calls lists references the nurse allowed to be called. The caller fills in the same questions plus their name, organization, call time and how they reached the person (the facility's main number, the number the nurse gave, or other with a note).
+- **How the reference was confirmed (never more than what was checked):**
+  - Work email at the facility's email domain on file: "stronger", but it doesn't prove who filled in the form. In the demo, no email was sent, so mailbox control isn't shown either.
+  - Personal email (gmail.com etc.), facility domain not on file, or a domain that doesn't match: "weaker / needs a closer look".
+  - Phone: reached through the facility's main number is "stronger". The nurse's number, or text, is "weaker".
+  - The facility domain directory is a short demo list on `.example` domains.
+- **Provenance on each completed reference:** channel, sent, opened, completed, who entered the answers (the reference, or the named caller during the call), and the caller's name, organization, call time and method.
+- **Organizations (through sharing):** the share dialog has a "Professional references" choice. The default is not included. The other options are "who, and how each was confirmed (no answers)" and "with their answers". The organization's view of an active share (and the share link page) shows completed references at that level, live. Revoked or expired shares show nothing. Changing the level is logged.
+- **Not in accounts yet:** signed-in (staging) accounts don't have references. They need the database work below.
+
+**What it would take to make references real** (none of this is done; the database is frozen pending approval):
+- **Database (needs approval):** new tables for references, requests and responses, with row-level security so the clinician can't read responses. Only hashed link codes are stored, as with share links. Organizations would read responses only through a share function that checks the grant and the references level. Audit events and a migration would be needed, plus the share-grant field for the references level.
+- **Server-side sending:** an Edge Function (or similar) that emails the private link from a Veridun domain. The staging project's built-in email sends sign-in links only, so this needs a transactional email provider with SPF/DKIM on a sending domain (check the provider's current pricing and limits). A scheduled job is needed for the 14-day expiry and reminders.
+- **Text and calls:** a paid SMS/voice provider (e.g. Twilio, as discussed) plus consent records for texting and calling references (TCPA). Calls could stay manual (a recruiter dials) with only the record kept in Veridun.
+- **Facility email domains:** a maintained directory of facility domains (or verification of a facility domain by the organization). The demo list is fictional.
+- **Policy and legal review:** what a reference may disclose, the nurse not seeing answers, consent wording on the form, retention, and the reusable validity window (often 12 months; each agency its own).
+
+**Also in v14.6:** the landing page's illustrative "Licenses & Certifications" table is now built from the same demo seed as Alex's Passport, instead of hard-coded rows. The NIHSS row no longer shows a stuck "Proof: securing…". It reads "Proof ✓" like the other rows. A proof still being issued now reads "Proof in progress" (internal state names are unchanged).
+
+**Proof timing (v14.6).** XRPL normally confirms in 3–5 seconds. The app now signs first and saves the transaction hash, so a proof is never left in limbo: while submitting it reads *Proof in progress*; after ~30 s without confirmation it reads *Proof delayed — retrying* and looks the transaction up by hash on a validated ledger (every 10 s, up to 12 tries). If the ledger shows it failed, or it is not found after its last valid ledger, the proof is rolled back with *Proof didn't go through — try again*. On page load, any unfinished proof is re-checked. A validated issue that is waiting for the nurse's Accept reads *Proof issued — accept to finish*.
+
 ### Simulated (looks real, isn't)
 - **Monitoring, revocation and manual review** are simulated local actions. No issuer is polled.
 - **Primary-source verification in the demo.** "Run Simulated Primary-Source Check" uses the registry's route and level, but no board, Nursys, AHA or issuer is contacted. Provenance says `simulated lookup (DEMO)` and the reference is `DEMO-…`. In accounts, a verifier records a real manual lookup (PR 12/13). Nothing is automated: Nursys e-Notify is not connected.
@@ -243,6 +273,7 @@ js/insights.js             dashboard/task/alert derivations: task sections, mism
 js/verification.js         simulated verification + provenance/proof dialog
 js/xrpl.js                 XRPL Devnet issue/accept/live check
 js/sharing.js              Passport QR + assignment-scoped live shares (durations, enforcement, revoke, extension requests)
+js/references.js           v14.6 professional references (demo only): requests, private reference form, expiry/reminders, phone-call entry, identity confidence, shared view
 js/roles/clinician.js      clinician workspace views
 js/roles/organization.js   organization workspace
 js/roles/verifier.js       Verification Console

@@ -1,7 +1,15 @@
 /* App shell: role routing, event wiring, and boot. Loaded last. */
-function v81ShowRole(role){document.body.classList.toggle('role-clinician',role==='clinician');$('accountWorkspace')?.classList.remove('active');$('landing').classList.add('hidden');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');if(role==='clinician'){$('app').classList.remove('hidden');render()}if(role==='organization'){$('organizationWorkspace').classList.add('active');v81RenderRoles()}if(role==='verification'){$('verificationWorkspace').classList.add('active');v81RenderRoles()}}
-function v81RolePicker(){document.body.classList.remove('role-clinician');$('accountWorkspace')?.classList.remove('active');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');$('landing').classList.remove('hidden');window.scrollTo(0,0)}
+function v81ShowRole(role){document.body.classList.toggle('role-clinician',role==='clinician');$('refPublic')?.classList.add('hidden');$('accountWorkspace')?.classList.remove('active');$('landing').classList.add('hidden');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');if(role==='clinician'){$('app').classList.remove('hidden');render()}if(role==='organization'){$('organizationWorkspace').classList.add('active');v81RenderRoles()}if(role==='verification'){$('verificationWorkspace').classList.add('active');v81RenderRoles()}}
+function v81RolePicker(){document.body.classList.remove('role-clinician');$('refPublic')?.classList.add('hidden');$('accountWorkspace')?.classList.remove('active');$('app').classList.add('hidden');$('organizationWorkspace').classList.remove('active');$('verificationWorkspace').classList.remove('active');$('landing').classList.remove('hidden');window.scrollTo(0,0)}
 function v81Tabs(btnClass,panelClass,target){document.querySelectorAll('.'+panelClass).forEach(x=>x.classList.toggle('hidden',x.id!==target));document.querySelectorAll('.'+btnClass).forEach(x=>x.classList.toggle('active',x.dataset.target===target));const ab=document.querySelector('.'+btnClass+'.active');if(ab&&ab.parentElement&&ab.parentElement.scrollWidth>ab.parentElement.clientWidth)ab.parentElement.scrollLeft=Math.max(0,ab.offsetLeft-ab.parentElement.offsetLeft-12)}
+/* v14.6: the landing page's illustrative "Licenses & Certifications" table is built from the
+   same demo seed as Alex's Passport (license and certification items), instead of hard-coded rows.
+   It stays an illustration: every row reads VERIFIED · DEMO and Proof ✓, like the rest of the sample. */
+function renderLandingSampleV146(){
+ const t=$('landingLicTableV146');if(!t||typeof DEMO_SEED==='undefined')return;
+ const rows=DEMO_SEED.filter(([k])=>['Licenses','Certifications'].includes(catalogKind(k)?.category)).map(([k,j,,,x])=>x?.name||credentialDisplayName(k,j));
+ if(rows.length)t.innerHTML=rows.map(n=>`<tr><td>${ec(n)}</td><td><span class="badge VERIFIED">VERIFIED · DEMO</span></td><td><span class="proof-label-v84">Proof ✓</span></td></tr>`).join('');
+}
 function v81RenderRoles(){if(!creds.length)return;creds=creds.map(v81Normalize);const x=v81RoleContext();v81RenderOrganization(x);v81RenderVerifier(x)}
 document.addEventListener('DOMContentLoaded',()=>{
 $('roleClinician').onclick=()=>v81ShowRole('clinician');
@@ -49,7 +57,7 @@ document.querySelectorAll('.navLinkV83').forEach(b=>{b.onclick=()=>showV7View(b.
 $('passBtn').onclick=openPass;
 $('toPass').onclick=()=>{$('proof').close();openPass()};
 $('onboardBtn').onclick=openOnboard;
-initAddForm();v81SyncAddForm();
+initAddForm();v81SyncAddForm();renderLandingSampleV146();
 if($('backendStatusTextV88'))$('backendStatusTextV88').textContent=store.backend.description+(store.backend.warning?' · config ignored: '+store.backend.warning:'');
-initNewcomer();sweepExpiredShares();v81RenderRoles();let params=new URLSearchParams(location.search);if(params.get('share'))publicShareView(params.get('share'));else if(params.get('sharev7')&&location.hash){publicShareV7(location.hash.slice(1))}else if(params.get('passport'))publicView(params.get('passport'),false);else if(params.get('onboarding'))publicView(params.get('onboarding'),true);else render();
+initNewcomer();sweepExpiredShares();v81RenderRoles();if(typeof recheckStaleProofs==='function'&&creds.some(c=>c.proofPending))setTimeout(()=>recheckStaleProofs({force:true}),0);let params=new URLSearchParams(location.search);if(params.get('ref'))publicReferenceView(params.get('ref'));else if(params.get('share'))publicShareView(params.get('share'));else if(params.get('sharev7')&&location.hash){publicShareV7(location.hash.slice(1))}else if(params.get('passport'))publicView(params.get('passport'),false);else if(params.get('onboarding'))publicView(params.get('onboarding'),true);else render();
 });

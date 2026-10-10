@@ -1,12 +1,13 @@
 /* Clinician workspace: Home, Passport, Tasks, Opportunities, onboarding dialog. */
 function setBusy(s){$('busy').textContent=s||''}
-function render(){creds=creds.map(v81Normalize);const ob=onboarding();$('onboardPct').textContent=ob.pct+'%';$('vcount').textContent=creds.filter(c=>c.primary==='VERIFIED').length;$('acount').textContent=creds.filter(c=>c.chain==='ACCEPTED').length;$('ncount').textContent=clinicianAttention().length;$('onboardBar').style.width=ob.pct+'%';$('onboardSummaryText').textContent=`${ob.ok} of ${ob.req.length} required items satisfied`;$('readyBadge').textContent=ob.ready?'ONBOARDING READY':'IN PROGRESS';$('readyBadge').className='badge '+(ob.ready?'READY':'PENDING');let a=filter==='all'?creds:creds.filter(c=>c.section===filter);$('empty').classList.toggle('hidden',a.length>0);$('tbl').classList.toggle('hidden',!a.length);$('rows').innerHTML=a.map(c=>{let z=`<button class="mini details" data-id="${c.id}">Details</button>`;if(c.primary==='UNVERIFIED')z+=`<button class="mini verify" data-id="${c.id}">Submit for Verification</button>`;if(c.primary==='VERIFYING')z+=`<button class="mini" disabled>Verification in Progress</button>`;if(eligible(c))z+=`<button class="mini chainbtn issue" data-id="${c.id}" title="Optional: issue an XRPL Devnet proof">Add Proof (optional)</button>`;if(c.chain==='SECURING')z+=`<button class="mini goodbtn accept" data-id="${c.id}">Accept</button>`;if(['SECURING','ACCEPTED'].includes(c.chain))z+=`<button class="mini showproof" data-id="${c.id}">XRPL Proof</button>`;z+=`<button class="mini del" data-id="${c.id}">Delete</button>`;let prov=c.prov?.verifiedAt?`${ec(c.prov.source)}<div class="source">${ec(c.prov.method)} · ${new Date(c.prov.verifiedAt).toLocaleDateString()}</div>`:'Not yet verified';return `<tr><td class="td-name"><b>${ec(c.name)}</b>${c.privateOnly?'<div class="small">Private/off-chain only</div>':''}</td><td class="mono td-type" data-label="Type">${ec(c.type)}</td><td data-label="Required">${requirementRoleHtml(c)}</td><td data-label="Verification">${verificationBadgeHtml(c)}</td><td data-label="Proof">${proofLabelHtml(c)}</td><td data-label="Expires">${fd(c.expiration)}</td><td class="td-prov" data-label="Provenance">${prov}</td><td class="td-act"><div class="rowact">${z}</div></td></tr>`}).join('');document.querySelectorAll('.verify').forEach(b=>b.onclick=()=>openVerify(+b.dataset.id));document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>issue(+b.dataset.id));document.querySelectorAll('.accept').forEach(b=>b.onclick=()=>accept(+b.dataset.id));document.querySelectorAll('.showproof,.details').forEach(b=>b.onclick=()=>showProof(+b.dataset.id));document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{creds=creds.filter(c=>c.id!=b.dataset.id);save();render()});renderV7Views()}
+function render(){creds=creds.map(v81Normalize);const ob=onboarding();$('onboardPct').textContent=ob.pct+'%';$('vcount').textContent=creds.filter(c=>c.primary==='VERIFIED').length;$('acount').textContent=creds.filter(c=>c.chain==='ACCEPTED').length;$('ncount').textContent=clinicianAttention().length;$('onboardBar').style.width=ob.pct+'%';$('onboardSummaryText').textContent=`${ob.ok} of ${ob.req.length} required items satisfied`;$('readyBadge').textContent=ob.ready?'ONBOARDING READY':'IN PROGRESS';$('readyBadge').className='badge '+(ob.ready?'READY':'PENDING');let a=filter==='all'?creds:creds.filter(c=>c.section===filter);$('empty').classList.toggle('hidden',a.length>0);$('tbl').classList.toggle('hidden',!a.length);$('rows').innerHTML=a.map(c=>{let z=`<button class="mini details" data-id="${c.id}">Details</button>`;if(c.primary==='UNVERIFIED')z+=`<button class="mini verify" data-id="${c.id}">Submit for Verification</button>`;if(c.primary==='VERIFYING')z+=`<button class="mini" disabled>Verification in Progress</button>`;if(eligible(c))z+=`<button class="mini chainbtn issue" data-id="${c.id}" title="Optional: issue an XRPL Devnet proof">Add Proof (optional)</button>`;if(c.chain==='SECURING'&&!c.proofPending)z+=`<button class="mini goodbtn accept" data-id="${c.id}">Accept</button>`;if(['SECURING','ACCEPTED'].includes(c.chain))z+=`<button class="mini showproof" data-id="${c.id}">XRPL Proof</button>`;z+=`<button class="mini del" data-id="${c.id}">Delete</button>`;let prov=c.prov?.verifiedAt?`${ec(c.prov.source)}<div class="source">${ec(c.prov.method)} · ${new Date(c.prov.verifiedAt).toLocaleDateString()}</div>`:'Not yet verified';return `<tr><td class="td-name"><b>${ec(c.name)}</b>${c.privateOnly?'<div class="small">Private/off-chain only</div>':''}</td><td class="mono td-type" data-label="Type">${ec(c.type)}</td><td data-label="Required">${requirementRoleHtml(c)}</td><td data-label="Verification">${verificationBadgeHtml(c)}</td><td data-label="Proof">${proofLabelHtml(c)}</td><td data-label="Expires">${fd(c.expiration)}</td><td class="td-prov" data-label="Provenance">${prov}</td><td class="td-act"><div class="rowact">${z}</div></td></tr>`}).join('');document.querySelectorAll('.verify').forEach(b=>b.onclick=()=>openVerify(+b.dataset.id));document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>issue(+b.dataset.id));document.querySelectorAll('.accept').forEach(b=>b.onclick=()=>accept(+b.dataset.id));document.querySelectorAll('.showproof,.details').forEach(b=>b.onclick=()=>showProof(+b.dataset.id));document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{creds=creds.filter(c=>c.id!=b.dataset.id);save();render()});renderV7Views()}
 function showV7View(id){
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));
  document.querySelectorAll('.v7nav').forEach(b=>b.classList.toggle('active',b.dataset.view===id));
  window.scrollTo({top:0,behavior:'smooth'});
  if(id==='shareView')sweepExpiredShares();
  if(['passportView','tasksView','opportunitiesView','shareView'].includes(id))renderV7Views()
+ if(id==='referencesView'&&typeof renderReferencesView==='function')renderReferencesView()
 }
 function renderV7Views(){
  const ready=v7Readiness();if($('v7PassportReady'))$('v7PassportReady').textContent=ready+'%';
@@ -15,6 +16,7 @@ function renderV7Views(){
  renderHomeDashboard();
  renderOpportunities();
  renderShareAccess();
+ if(typeof renderRefPassportCard==='function')renderRefPassportCard();
  document.querySelectorAll('.details').forEach(btn=>btn.onclick=()=>showProof(+btn.dataset.id))
 }
 function openOnboard(){const ob=onboarding();$('onboardRows').innerHTML=ob.req.map(c=>`<div class="reqrow"><div><b>${ec(c.name)}</b><div class="source">${ec(c.prov?.source||'Primary source pending')}</div></div><span class="badge ${reqSatisfied(c)?'READY':'PENDING'}">${reqSatisfied(c)?'SATISFIED':'PENDING'}</span></div>`).join('');$('onboard').showModal()}
@@ -110,6 +112,7 @@ function openShareDialog(pre={}){
  const a0=pre.assignmentId?getAssignment(pre.assignmentId):featuredAssignment();
  $('shareOrgV83').value=pre.orgId||a0.orgId;fillShareAssignments(a0.id);
  durationOptions($('shareV7Duration'));$('shareV7Duration').value='THROUGH_ASSIGNMENT_END';$('shareCustomV83').value='';
+ if(typeof refEnsureShareControl==='function')refEnsureShareControl('NONE');
  refreshShareOptions();$('shareFormV83').classList.remove('hidden');$('shareV7Result').classList.add('hidden');$('shareV7').showModal();
 }
 function fillShareAssignments(selectId){const list=getAssignments().filter(a=>a.orgId===$('shareOrgV83').value&&assignmentAccepts(a,DEMO_PROFILE.specialty));$('shareAssignV83').innerHTML=list.map(a=>`<option value="${a.id}">${ec(a.name)} · ${a.start} → ${a.end}</option>`).join('');if(selectId&&list.some(a=>a.id===selectId))$('shareAssignV83').value=selectId}
@@ -125,7 +128,7 @@ function selectedAssertions(){return[...document.querySelectorAll('.shareChkV83:
 function updateShareReview(){
  const a=getAssignment($('shareAssignV83').value),d=$('shareV7Duration').value;$('shareCustomRowV83').classList.toggle('hidden',d!=='CUSTOM_DATE');
  const exp=computeExpiry(d,a,$('shareCustomV83').value),sel=selectedAssertions(),priv=sel.filter(x=>x.mode==='REQUIREMENT_SATISFIED').length;
- $('shareReviewV83').innerHTML=`<b>Review before approving</b><br>Organization: <b>${ec(organization($('shareOrgV83').value)?.name||'')}</b> · Assignment: <b>${ec(a?.name||'')}</b><br>Sharing <b>${sel.length}</b> live assertion${sel.length===1?'':'s'} (${priv} as “Requirement Satisfied” only) · Source documents: <b>NOT SHARED</b><br>Access: <b>${ec(durationLabel(d))}</b> — ${d==='UNTIL_REVOKED'?'no expiration; you can revoke at any time':d==='CUSTOM_DATE'&&!exp?'choose a date':'expires '+ec(fmtDT(exp?.toISOString()))}${d==='ONE_TIME'?' or after the first view':''}. Views are logged. You can modify or revoke access at any time.`;
+ $('shareReviewV83').innerHTML=`<b>Review before approving</b><br>Organization: <b>${ec(organization($('shareOrgV83').value)?.name||'')}</b> · Assignment: <b>${ec(a?.name||'')}</b><br>Sharing <b>${sel.length}</b> live assertion${sel.length===1?'':'s'} (${priv} as “Requirement Satisfied” only) · Source documents: <b>NOT SHARED</b>${typeof refSelectedScope==='function'?'<br>Professional references: <b>'+ec(refScopeLabel(refSelectedScope()))+'</b>':''}<br>Access: <b>${ec(durationLabel(d))}</b> — ${d==='UNTIL_REVOKED'?'no expiration; you can revoke at any time':d==='CUSTOM_DATE'&&!exp?'choose a date':'expires '+ec(fmtDT(exp?.toISOString()))}${d==='ONE_TIME'?' or after the first view':''}. Views are logged. You can modify or revoke access at any time.`;
  const gap=a?shareCoverageGap(exp,a.end,d):'';$('shareWarnV11').textContent=gap;$('shareWarnV11').classList.toggle('hidden',!gap);
 }
 function approveShare(){
@@ -134,8 +137,8 @@ function approveShare(){
  if(!sel.length){alert('Select at least one assertion to share.');return}
  if(d==='CUSTOM_DATE'&&(!cd||endOfDay(cd)<=new Date())){alert('Choose a future end date for custom access.');return}
  const gap=shareCoverageGap(computeExpiry(d,a,cd),a.end,d);if(gap&&!confirm(gap+'\n\nShare anyway?'))return;
- if(shareEditId){modifyShare(shareEditId,{assertions:sel,duration:d,customDate:cd});$('shareV7').close();render();return}
- const s=createShare({orgId:$('shareOrgV83').value,assignmentId:a.id,assertions:sel,duration:d,customDate:cd});
+ if(shareEditId){modifyShare(shareEditId,{assertions:sel,duration:d,customDate:cd,referencesScope:typeof refSelectedScope==='function'?refSelectedScope():undefined});$('shareV7').close();render();return}
+ const s=createShare({orgId:$('shareOrgV83').value,assignmentId:a.id,assertions:sel,duration:d,customDate:cd,referencesScope:typeof refSelectedScope==='function'?refSelectedScope():'NONE'});
  const url=shareUrl(s);$('shareDoneV83').innerHTML=`<b>Shared with ${ec(s.orgName)}</b> for ${ec(s.assignmentName)} · ${sel.length} assertions · access ${ec(durationLabel(d))} (expires ${ec(expiryText(s))}).`;
  $('shareV7Link').textContent=url;$('shareFormV83').classList.add('hidden');$('shareV7Result').classList.remove('hidden');
  drawShareQr($('shareV7QR'),url);render();
@@ -143,7 +146,7 @@ function approveShare(){
 function openModifyShare(id){
  const s=loadShares().find(x=>x.id===id);if(!s)return;openShareDialog({orgId:s.orgId,assignmentId:s.assignmentId});
  shareEditId=id;$('shareTitleV83').textContent='MODIFY ACCESS';$('generateV7Share').textContent='Save Changes';$('shareOrgV83').disabled=true;$('shareAssignV83').disabled=true;
- $('shareV7Duration').value=s.duration;$('shareCustomV83').value=s.customDate||'';refreshShareOptions(s.assertions);
+ $('shareV7Duration').value=s.duration;$('shareCustomV83').value=s.customDate||'';if(typeof refEnsureShareControl==='function')refEnsureShareControl(s.referencesScope||'NONE');refreshShareOptions(s.assertions);
 }
 let extendId=null;
 function openExtend(id){const s=loadShares().find(x=>x.id===id);if(!s)return;extendId=id;durationOptions($('extendDurV83'),false);$('extendDurV83').value='THROUGH_ASSIGNMENT_END';$('extendCustomV83').value='';$('extendCustomRowV83').classList.add('hidden');$('extendInfoV83').innerHTML=`${ec(s.orgName)} · ${ec(s.assignmentName)}<br>Currently: ${ec(durationLabel(s.duration))} · expires ${ec(expiryText(s))}`;$('extendDlgV83').showModal()}
@@ -166,7 +169,7 @@ function shareCardHtml(s,st,pendingReq){
  if(st==='EXPIRED')acts.push(`<button class="mini shareAct" data-act="extend" data-id="${s.id}">Extend</button>`);
  return`<div class="share-card-v83"><div style="display:flex;justify-content:space-between;gap:8px"><div><b>${ec(s.orgName)}</b><div class="small">${ec(s.assignmentName)}</div></div><span class="badge ${st==='ACTIVE'?'ACCEPTED':st==='EXPIRED'?'PENDING':'REVOKED'}">${st}</span></div>
 <div class="meta"><div>Assertions<br><b>${s.assertions.length}</b></div><div>Started<br><b>${ec(fmtDT(s.createdAt))}</b></div><div>Expires<br><b>${ec(st==='REVOKED'?'Revoked '+fmtDT(s.revokedAt):expiryText(s))}</b></div><div>Access<br><b>${ec(durationLabel(s.duration))}</b></div><div>Last accessed<br><b>${ec(fmtDT(s.lastAccessedAt))}</b></div><div>Status<br><b>${st}${pendingReq?' · extension requested':''}</b></div></div>
-<details><summary class="small">Shared assertions</summary><div class="small">${s.assertions.map(x=>ec(x.label)+(x.mode==='REQUIREMENT_SATISFIED'?' (Requirement Satisfied)':'')).join(' · ')} · Source documents: NOT SHARED</div></details><div class="acts" style="margin-top:8px">${acts.join('')}</div></div>`;
+<details><summary class="small">Shared assertions</summary><div class="small">${s.assertions.map(x=>ec(x.label)+(x.mode==='REQUIREMENT_SATISFIED'?' (Requirement Satisfied)':'')).join(' · ')} · Source documents: NOT SHARED${s.referencesScope&&s.referencesScope!=='NONE'?' · Professional references: '+ec(refScopeLabel(s.referencesScope)):''}</div></details><div class="acts" style="margin-top:8px">${acts.join('')}</div></div>`;
 }
 function renderShareAccess(){
  if(!$('shareActiveV83'))return;
@@ -197,7 +200,10 @@ function activityText(e){
   CREDENTIAL_UPLOADED:`Added ${cn}`,CLASSIFICATION_COMPLETED:`Classified ${cn} as ${d.kind||''}${d.jurisdiction?' · '+d.jurisdiction:''}`,
   VERIFICATION_STARTED:`${cn} entered the verification queue`,VERIFICATION_SUCCEEDED:`${cn} verified (simulated check)`,VERIFICATION_FAILED:`${cn} verification failed (${plainCode(e.result)})`,SOURCE_CHECK_COMPLETED:`Simulated source check completed for ${cn}`,
   ASSIGNMENT_INTEREST:`Started completing ${getAssignment(e.assignment_id)?.name||e.assignment_id} (${plainCode(e.result)})`,ASSIGNMENT_READY:`${getAssignment(e.assignment_id)?.name||e.assignment_id} is assignment ready (${plainCode(e.result)})`,
-  DEMO_SEEDED:'Demo data seeded'
+  DEMO_SEEDED:'Demo data seeded',
+  REFERENCE_ADDED:`Added ${d.referee||'a reference'} (${d.facility||''}) as a reference`,REFERENCE_REQUESTED:`Reference request to ${d.referee} by ${(REF_CHANNEL_LABEL?.[d.channel]||d.channel||'').toLowerCase()} (demo, not sent)`,REFERENCE_RESENT:`New reference link for ${d.referee} by ${(REF_CHANNEL_LABEL?.[d.channel]||d.channel||'').toLowerCase()} (demo, not sent)`,
+  REFERENCE_REMINDER:`Reminder to ${d.referee} (demo, not sent)`,REFERENCE_OPENED:`${d.referee} opened the reference request`,REFERENCE_COMPLETED:`${d.referee} completed a reference${d.channel==='CALL'?' by phone'+(d.caller?' with '+d.caller:''):''}`,REFERENCE_DECLINED:`${d.referee} declined to give a reference`,REFERENCE_EXPIRED:`Reference request to ${d.referee} expired`,REFERENCE_REMOVED:`Removed ${d.referee} from references`,
+  SHARE_REFERENCES_CHANGED:`Changed what ${w} can see of your references: ${typeof refScopeLabel==='function'?refScopeLabel(d.to):d.to||''}`
  })[e.event_type]||e.event_type;
 }
 

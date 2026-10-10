@@ -88,16 +88,16 @@ function shareSummaryDetail(s){return{share_id:s.id,org:s.orgName,assignment:s.a
 /* Persist + log expiry for shares whose time ran out (called on access
    attempts and navigation, never from render). */
 function sweepExpiredShares(){const sh=loadShares();let ch=false;sh.forEach(s=>{if(s.status==='ACTIVE'&&shareStatus(s)==='EXPIRED'){s.status='EXPIRED';s.expiredAt=new Date().toISOString();s.expiredReason='TIME';ch=true;v81Log('SHARE_EXPIRED',null,{assignment_id:s.assignmentId,actor_type:'SYSTEM',result:'TIME',detail:shareSummaryDetail(s)})}});if(ch)saveShares(sh)}
-function createShare({orgId,assignmentId,assertions,duration,customDate}){
+function createShare({orgId,assignmentId,assertions,duration,customDate,referencesScope='NONE'}){
  const a=getAssignment(assignmentId),o=organization(orgId),now=new Date(),exp=computeExpiry(duration,a,customDate,now);
- const s={id:'sh'+Date.now(),token:randomShareToken(),orgId,orgName:o.name,assignmentId,assignmentName:a.name,assertions,duration,customDate:customDate||null,createdAt:now.toISOString(),expiresAt:exp?exp.toISOString():null,status:'ACTIVE',lastAccessedAt:null,views:0,documentsShared:false};
+ const s={id:'sh'+Date.now(),token:randomShareToken(),orgId,orgName:o.name,assignmentId,assignmentName:a.name,assertions,duration,customDate:customDate||null,createdAt:now.toISOString(),expiresAt:exp?exp.toISOString():null,status:'ACTIVE',lastAccessedAt:null,views:0,documentsShared:false,referencesScope};
  const sh=loadShares();sh.push(s);saveShares(sh);
- v81Log('SHARE_CREATED',null,{assignment_id:assignmentId,actor_type:'CLINICIAN',result:durationLabel(duration),detail:{...shareSummaryDetail(s),assertions:assertions.map(x=>x.label),expiresAt:s.expiresAt,documents:'NOT_SHARED'}});
+ v81Log('SHARE_CREATED',null,{assignment_id:assignmentId,actor_type:'CLINICIAN',result:durationLabel(duration),detail:{...shareSummaryDetail(s),assertions:assertions.map(x=>x.label),expiresAt:s.expiresAt,documents:'NOT_SHARED',references:referencesScope}});
  return s;
 }
 function updateShare(id,fn){const sh=loadShares(),s=sh.find(x=>x.id===id);if(!s)return null;fn(s);saveShares(sh);return s}
-function modifyShare(id,{assertions,duration,customDate}){
- return updateShare(id,s=>{const a=getAssignment(s.assignmentId),before=s.assertions.map(x=>x.label),after=assertions.map(x=>x.label),exp=computeExpiry(duration,a,customDate);
+function modifyShare(id,{assertions,duration,customDate,referencesScope}){
+ return updateShare(id,s=>{if(referencesScope&&referencesScope!==(s.referencesScope||'NONE')){v81Log('SHARE_REFERENCES_CHANGED',null,{assignment_id:s.assignmentId,actor_type:'CLINICIAN',detail:{...shareSummaryDetail(s),from:s.referencesScope||'NONE',to:referencesScope}});s.referencesScope=referencesScope}const a=getAssignment(s.assignmentId),before=s.assertions.map(x=>x.label),after=assertions.map(x=>x.label),exp=computeExpiry(duration,a,customDate);
   const d={...shareSummaryDetail(s),added:after.filter(x=>!before.includes(x)),removed:before.filter(x=>!after.includes(x)),durationFrom:s.duration,durationTo:duration,expiresFrom:s.expiresAt,expiresTo:exp?exp.toISOString():null};
   s.assertions=assertions;s.duration=duration;s.customDate=customDate||null;s.expiresAt=d.expiresTo;
   v81Log('SHARE_SCOPE_CHANGED',null,{assignment_id:s.assignmentId,actor_type:'CLINICIAN',detail:d});});
@@ -135,10 +135,12 @@ function accessShare(token,actor='ORGANIZATION'){
  s.views=(s.views||0)+1;s.lastAccessedAt=new Date().toISOString();
  if(s.duration==='ONE_TIME'){s.status='EXPIRED';s.expiredAt=s.lastAccessedAt;s.expiredReason='ONE_TIME_USED'}
  saveShares(sh);
- v81Log('SHARE_VIEWED',null,{assignment_id:s.assignmentId,actor_type:actor,result:`${live.filter(x=>x.current).length}/${live.length} current`,detail:{...shareSummaryDetail(s),assertionsAccessed:live.map(x=>x.label),documents:'NOT_SHARED'}});
+ v81Log('SHARE_VIEWED',null,{assignment_id:s.assignmentId,actor_type:actor,result:`${live.filter(x=>x.current).length}/${live.length} current`,detail:{...shareSummaryDetail(s),assertionsAccessed:live.map(x=>x.label),documents:'NOT_SHARED',references:s.referencesScope||'NONE'}});
  return{ok:true,share:s,live};
 }
 function shareUrl(s){return location.origin+location.pathname+'?share='+s.token}
+/* v14.6: completed demo references, at the level the clinician chose for this share. */
+function shareReferencesHtml(s){return typeof sharedReferencesHtml==='function'?sharedReferencesHtml(s):''}
 function liveAssertionsHtml(live){return live.map(x=>`<div class="passrow"><div><b>${ec(x.label)}</b><div class="small">${ec(x.detail)}</div></div><span class="badge ${x.current?'ACCEPTED':'REVOKED'}">${ec(x.status)}</span></div>`).join('')}
 function refusalHtml(r){
  if(r.reason==='REVOKED')return`<b>PASSPORT ACCESS REVOKED BY CLINICIAN</b><div class="small" style="margin-top:4px">Revoked ${ec(fmtDT(r.share.revokedAt))}. Veridun no longer provides this Passport to ${ec(r.share.orgName)}.</div>`;
@@ -153,7 +155,7 @@ function publicShareView(token){
  if(!r.ok){$('pubStatus').innerHTML=refusalHtml(r);$('pubStatus').className='notice alert-v81';$('pubRows').innerHTML='';$('pubScore').textContent='—';$('pubOnboard').innerHTML='';return}
  const s=r.share;
  $('pubStatus').className='notice';$('pubStatus').innerHTML=`<b>Shared with ${ec(s.orgName)} for ${ec(s.assignmentName)}</b><div class="small" style="margin-top:4px">Access: ${ec(durationLabel(s.duration))} · expires ${ec(expiryText(s))} · this view is logged.</div>`;
- $('pubRows').innerHTML=liveAssertionsHtml(r.live);
+ $('pubRows').innerHTML=liveAssertionsHtml(r.live)+shareReferencesHtml(s);
  $('pubScore').textContent=`${r.live.filter(x=>x.current).length}/${r.live.length} current`;
  $('pubOnboard').innerHTML=`<b>Source documents: NOT SHARED</b><div class="small" style="margin-top:5px">Assertions are live: they reflect the clinician's current Passport each time this page is opened. Demo: stored in this browser only.</div>`;
 }

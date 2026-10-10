@@ -16,6 +16,7 @@ function menuGo(key){
  else if(key==='shares'){if(acc)acctShow('acctSharesV10');else showV7View('shareView')}
  else if(key==='settings'){renderSettingsViewV11();showV7View('settingsViewV11')}
  else if(key==='advanced'){v81ShowRole('verification');v81Tabs('verifyTab','verifyPanel','verifyProofsV81');v81RenderVerifier(v81RoleContext());menuProofsBanner()}
+ else if(key==='references')showV7View('referencesView')
  else if(key==='storage'){renderStorageViewV11();showV7View('storageViewV11')}
 }
 function menuProofsBanner(){

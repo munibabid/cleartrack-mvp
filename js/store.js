@@ -17,7 +17,7 @@
      Service-role / secret keys are refused.
 
    Staging only: this is a pre-compliance backend. Do not store real PHI. */
-const STORE_KEYS={credentials:'nursecredx_v2',events:'nursecredx_v81_events',shares:'veridun_shares',shareRequests:'veridun_share_requests',customAssignments:'veridun_custom_assignments',demoAnchor:'veridun_demo_anchor',seedVersion:'veridun_demo_seed_version',xrplWallets:'nursecredx_wallets_v2',pendingShare:'veridun_pending_share_token',prefs:'veridun_preferences'};
+const STORE_KEYS={credentials:'nursecredx_v2',events:'nursecredx_v81_events',shares:'veridun_shares',shareRequests:'veridun_share_requests',customAssignments:'veridun_custom_assignments',demoAnchor:'veridun_demo_anchor',seedVersion:'veridun_demo_seed_version',xrplWallets:'nursecredx_wallets_v2',pendingShare:'veridun_pending_share_token',prefs:'veridun_preferences',references:'veridun_references',referenceResponses:'veridun_reference_responses'};
 const SUPABASE_JS={src:'js/vendor/supabase-js-2.117.2.umd.js',integrity:'sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok',version:'2.117.2'};
 
 class LocalStorageAdapter{
@@ -410,6 +410,10 @@ function createStore(cfg,deps={}){
   shares:{load:list(K.shares),save:put(K.shares)},
   shareRequests:{load:list(K.shareRequests),save:put(K.shareRequests)},
   customAssignments:{load:list(K.customAssignments),save:put(K.customAssignments)},
+  /* v14.6 demo references. Answers are kept under their own key; the
+     nurse-facing screens never read it. */
+  references:{load:list(K.references),save:put(K.references)},
+  referenceResponses:{load:()=>adapter.readJSON(K.referenceResponses,{}),save:put(K.referenceResponses)},
   /* Demo reminder / notification preferences (this browser). Signed-in
      preferences are saved to the account instead (account.savePreferences). */
   prefs:{load:()=>adapter.readJSON(K.prefs,null),save:v=>adapter.writeJSON(K.prefs,v)},
@@ -417,8 +421,8 @@ function createStore(cfg,deps={}){
    demoAnchor:()=>adapter.readText(K.demoAnchor),setDemoAnchor:v=>adapter.writeText(K.demoAnchor,v),
    seedVersion:()=>adapter.readText(K.seedVersion),setSeedVersion:v=>adapter.writeText(K.seedVersion,v)
   },
-  /* Reset Demo Data: shares, access requests and published demo assignments. */
-  clearDemoSharingAndBuilder(){[K.shares,K.shareRequests,K.customAssignments].forEach(k=>adapter.remove(k))},
+  /* Reset Demo Data: shares, access requests, published demo assignments and demo references. */
+  clearDemoSharingAndBuilder(){[K.shares,K.shareRequests,K.customAssignments,K.references,K.referenceResponses].forEach(k=>adapter.remove(k))},
   session:{xrplWallets:()=>adapter.sessionGet(K.xrplWallets),setXrplWallets:v=>adapter.sessionSet(K.xrplWallets,v)}
  };
 }

@@ -80,7 +80,7 @@ function renderOrgAccess(){
 }
 function orgOpenShare(id){
  const s=loadShares().find(x=>x.id===id);if(!s)return;const r=accessShare(s.token,'ORGANIZATION');
- $('orgShareViewBodyV83').innerHTML=r.ok?`<div class="notice" style="margin:0 0 10px"><b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · shared with ${ec(s.orgName)} for ${ec(s.assignmentName)}<br>Access expires ${ec(expiryText(r.share))} · this view is logged and visible to the clinician.</div>${liveAssertionsHtml(r.live)}<div class="share-option"><span><b>Source documents</b></span><span class="badge REVOKED">NOT SHARED</span></div>`:`<div class="alert-v81">${refusalHtml(r)}</div>`;
+ $('orgShareViewBodyV83').innerHTML=r.ok?`<div class="notice" style="margin:0 0 10px"><b>${ec(DEMO_PROFILE.name)}, ${ec(DEMO_PROFILE.credentials)}</b> · shared with ${ec(s.orgName)} for ${ec(s.assignmentName)}<br>Access expires ${ec(expiryText(r.share))} · this view is logged and visible to the clinician.</div>${liveAssertionsHtml(r.live)}${shareReferencesHtml(r.share)}<div class="share-option"><span><b>Source documents</b></span><span class="badge REVOKED">NOT SHARED</span></div>`:`<div class="alert-v81">${refusalHtml(r)}</div>`;
  $('orgShareViewDlgV83').showModal();v81RenderRoles();
 }
 let extReqShareId=null;
