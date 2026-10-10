@@ -123,6 +123,8 @@ async function cleanup(db, users, extraIds = []) {
 }
 
 (async () => {
+  /* v14.8: this suite writes to the staging database (throwaway users), so it is opt-in (P12_LIVE=1). */
+  if (process.env.P12_LIVE !== '1') { console.log('SKIP p12 live suite — opt-in (P12_LIVE=1); default runs never touch a live database\n\n0/0 passed, 1 skipped'); process.exit(0); }
   fs.mkdirSync(SH, { recursive: true });
   const db = await client();
   console.log('staging DB via ' + await mode());
