@@ -148,13 +148,19 @@ function detectSource(flat,kind,sources){
  for(const s of list){try{if(new RegExp(s.docIssuer,'i').test(flat))return{id:s.id,name:s.name,how:'named on the document'}}catch{}}
  return null;
 }
-const RE_ISSUE=/issue|issued|completion|completed|date\s+of\s+(course|exam|test|completion|certification|registration)|test\s*date|exam\s*date|administered|date\s+given|collected|certified\s+(since|on)|initial|original|awarded|conferred|earned|effective|course\s+date|class\s+date|read\s+on|date\s+read|signed/i;
+const RE_ISSUE=/issue|issued|completion|completed|date\s+of\s+(course|exam|test|completion|certification)|test\s*date|exam\s*date|administered|date\s+given|collected|certified\s+(since|on)|initial|original|awarded|conferred|earned|effective|course\s+date|class\s+date|read\s+on|date\s+read|signed/i;
 /* v14.8: "Renew By", "Recommended Renewal", "Renewed", "Last Renewed", "Renewal Date" and
    recertification dates are never an expiration (and never an issue date). Dates are only taken
    from their own printed label: no ordering guesses, no issue/expiration swaps.
    t150u: a time-limited registration's printed "Registered through" / "Registration valid through"
    date is that license's current-practice-through date (labelled, so it is read as the expiration). */
 const RE_RENEW=/renew|recertif/i;
+/* Munib t151u C/D: "Registered through" / "Registration valid through" / "Current registration through"
+   fill the expires_on COMPATIBILITY slot as the current-practice-through date, but keep the source label
+   and basis REGISTRATION so no screen calls it a licence expiration. "Date of registration" is NOT an
+   issue date (registration start and original licence issue can differ); it is not read at all. */
+const RE_REG_THROUGH=/(?:current\s+)?regist(?:ered|ration)\s+(?:valid\s+)?(?:through|thru|until)|registration\s+expires?/i;
+function expBasis(lines,d){const off=labelNear(lines,d.li,RE_EXP);const ln=off==null?'':(lines[d.li+off]||'');const m=RE_REG_THROUGH.exec(ln);return m?{basis:'REGISTRATION',source_label:m[0].replace(/\s+/g,' ').trim()}:{basis:'LICENSE_OR_CARD',source_label:((RE_EXP.exec(ln)||[])[0]||'').trim()||null}}
 const RE_EXP=/expir|certified\s+(through|thru|until)|registered\s+(through|thru|until)|registration\s+(valid\s+)?(through|thru|until|expires?)|ex[pb]\w{0,2}r\w{0,2}ation|valid\s*(until|through|thru|to)\b|exp\.?\s*date|\bexp\b\.?|good\s+through|next\s*(test|due)|\bdue\s+date\b/i;
 function pickDates(lines,{monthYearOk=true}={}){
  const {full,my}=findDates(lines);
@@ -562,13 +568,13 @@ function parseCardText(text,{kind='CERT_BLS',method='PDF_TEXT',qr=null,ocrConf=n
   /* printed renewal recommendation only; never an expiration */
   if(renewMy)f.renew_by={value:renewMy.ym,conf:C(renewMy.raw,renewMy.li,{label:labelNear(lines,renewMy.li,RE_RENEW)!=null}),how:'month/year'};
   else if(renewFull)f.renew_by={value:renewFull.iso.slice(0,7),conf:dateConf(renewFull,RE_RENEW)*0.95,how:'full date',exact:renewFull.iso};
-  if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp)};
+  if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp),...expBasis(lines,exp)};
   if(f.issued_on&&f.renew_by&&issuer!=='RED_CROSS'){
    const w2=addMonths(f.issued_on.value,24);
    if(w2===f.renew_by.value){f.issued_on.conf=clamp(f.issued_on.conf+0.03,0,method==='PDF_TEXT'?0.995:OCR_CAP);f.renew_by.conf=clamp(f.renew_by.conf+0.03,0,method==='PDF_TEXT'?0.995:OCR_CAP)}
    else{f.issued_on.conf*=0.8;f.renew_by.conf*=0.8;warnings.push(`The renewal month (${f.renew_by.value}) is not two years after the issue date (${f.issued_on.value}). AHA cards renew two years after issue.`)}
   }
- }else if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp)};
+ }else if(exp&&exp!==issue)f.expires_on={value:exp.iso,conf:dateConf(exp,RE_EXP),how:dateHow(exp),...expBasis(lines,exp)};
  if(f.issued_on&&f.expires_on&&f.expires_on.value<=f.issued_on.value){warnings.push('The expiration date is not after the issue date.');f.expires_on.conf*=0.7}
  // ---- AHA labels: Training Center ID, Instructor ID, eCard code ----
  let labels={},ecardBox=null;
@@ -666,12 +672,17 @@ function _routeFor(kind,jur,sources){
 function documentExpiry(fields,issuer){
  /* v14.4: a printed expiration that has passed is shown as expired */
  const r=_documentExpiry(fields,issuer);if(!r)return r;
- const today=new Date().toISOString().slice(0,10);if(r.value&&r.value<today){r.expired=true;r.text+=' That date has passed: this credential is expired.'}
+ const today=new Date().toISOString().slice(0,10);if(r.value&&r.value<today){r.expired=true;r.text+=r.basis==='REGISTRATION'?' That date has passed: the registration is no longer current for practice.':' That date has passed: this credential is expired.'}
  return r;
+}
+function fieldLabel(k,f){
+ if(k==='expires_on'&&f&&f.basis==='REGISTRATION')return'Registration valid through (current-practice-through date)';
+ return FIELD_LABEL[k]||k;
 }
 function _documentExpiry(fields){
  /* v14.8: only an expiration printed as such. Renew By / Recommended Renewal is never one. */
  const e=fields?.expires_on;
+ if(e&&e.value&&e.basis==='REGISTRATION')return{value:e.value,basis:'REGISTRATION',source_label:e.source_label||null,text:`The document shows "${e.source_label||'Registered through'}" ${e.value}: Registration valid through ${e.value} (the current-practice-through date). It is shown under its printed registration label.`};
  if(e&&e.value)return{value:e.value,text:`The document shows an expiration date of ${e.value}.`};
  return null;
 }
@@ -989,7 +1000,7 @@ async function screenFile(file,{onProgress=()=>{},classify=()=>[],maxPages=10}={
 }
 async function terminate(){if(workerP){try{(await workerP).terminate()}catch{}workerP=null}}
 
-const DocExtract={INFO_FIELDS,NIHSS_INFO_FIELDS,NIHSS_UNDETERMINED,nihssIssuer,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,namesMatch,codeShape,codeFromQr,screenFile,suggestedSource,extractFromFile,terminate,_progress:null};
+const DocExtract={INFO_FIELDS,NIHSS_INFO_FIELDS,NIHSS_UNDETERMINED,nihssIssuer,ECARD_NOT_FOUND,TC_ID_NOTE,ahaLabelValues,capabilities,friendlyError,polyfill,ScanError,FIELDS,FIELD_LABEL,fieldLabel,REQUIRED_FIELDS,PROFILE_FIELDS,PROFILE_REQUIRED,ID_LABELS,COURSE_PATTERNS,profileFor,detectKinds,detectSource,kindPattern,COURSE_KIND,KIND_COURSE,parseCardText,compareToEntered,documentExpiry,namesMatch,codeShape,codeFromQr,screenFile,suggestedSource,extractFromFile,terminate,_progress:null};
 root.DocExtract=DocExtract;
 if(typeof module!=='undefined'&&module.exports)module.exports=DocExtract;
 })(typeof window!=='undefined'?window:globalThis);

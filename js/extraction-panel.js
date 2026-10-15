@@ -62,7 +62,7 @@ function renderExtractionPanelV14(){
    tryStatsV14.n++;tryStatsV14.fields+=r.fieldsWanted.length;tryStatsV14.found+=r.fieldsWanted.filter(k=>r.fields[k]).length;
    const exp=DocExtract.documentExpiry(r.fields,r.issuer),src=r.source&&verificationSource(r.source.id);
    out.innerHTML=`<div class="scan-v14" id="tryResultV14"><div><b>${ec(catalogKind(kind)?.short||kind)}</b> · ${ec(r.method)} · ${(r.ms/1000).toFixed(1)} s${r.rotated?' · turned '+r.rotated+'°':''}${r.qrFound?' · QR read':''}</div>
-   <table class="v81-table">${r.fieldsWanted.map(k=>{const x=r.fields[k];return`<tr><td>${ec(EXTRACT_FIELD_NAMES[k]||k)}</td><td>${x?ec(x.value):'<i>not found</i>'}</td><td>${x?scanConfChip(x.conf):''}</td></tr>`}).join('')}</table>
+   <table class="v81-table">${r.fieldsWanted.map(k=>{const x=r.fields[k];return`<tr><td>${ec(x&&x.basis==='REGISTRATION'?DocExtract.fieldLabel(k,x):(EXTRACT_FIELD_NAMES[k]||k))}</td><td>${x?ec(x.value):'<i>not found</i>'}</td><td>${x?scanConfChip(x.conf):''}</td></tr>`}).join('')}</table>
    ${exp?`<div>${ec(exp.text)}</div>`:''}${r.warnings.map(w=>`<div class="notice">${ec(w)}</div>`).join('')}
    <div>Verification source for this kind: <b>${ec(src?.name||'—')}</b>${src?.lookupUrl?` · <a href="${ec(src.lookupUrl)}" target="_blank" rel="noopener">official lookup</a>`:''}</div>
    <div>This session: ${tryStatsV14.n} document(s), ${tryStatsV14.found}/${tryStatsV14.fields} needed fields found. Nothing was uploaded or saved.</div></div>`;

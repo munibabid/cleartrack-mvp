@@ -174,7 +174,7 @@ function acctSourceAppliesText(c,route){
    on this screen. The nurse's own entry is shown beside the field for comparison only. */
 function acctExpNoteHtml(c){
  const typed=c?.expires_on||'';
- return typed?`For comparison only: the nurse entered <b id="acctExpTypedV14">${ec(fd(typed))}</b>. Enter the date the source shows.`:`The nurse didn't enter an expiration date. Enter the date the source shows.`;
+ return typed?`For comparison only: the nurse entered <b id="acctExpTypedV14">${ec(fd(typed))}</b>. Enter the date the source shows.`:(c&&(c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE')?`The nurse didn't enter a current-practice-through date (license expiration, or "Registration valid through" where the state uses registration). Enter the date the source shows.`:`The nurse didn't enter an expiration date. Enter the date the source shows.`);
 }
 function acctDocBoxHtml(c){
  const aha=['CERT_BLS','CERT_ACLS','CERT_PALS'].includes(c.kind),route=primaryRouteFor(c.kind,c.jurisdiction_code),src=route&&verificationSource(route.id);

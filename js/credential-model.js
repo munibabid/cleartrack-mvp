@@ -31,7 +31,7 @@ function verificationBadge(c){
  if(/^SKILLS_/.test(String(c.kind||''))&&c.primary==='VERIFIED')return{cls:'PENDING',text:'SELF-ATTESTED · NOT VERIFIED'};
  if(c.primary==='VERIFIED'&&c.prov?.active){const l=typeof credentialLevel==='function'?credentialLevel(c):null;return{cls:'VERIFIED',text:(l?levelLabel(l).toUpperCase():'VERIFIED')+' · DEMO'}}
  if(c.primary==='VERIFIED')return{cls:'PENDING',text:'NEEDS RE-VERIFICATION'};
- if(c.primary==='VERIFYING')return{cls:'PENDING',text:'PENDING VERIFICATION'};
+ if(c.primary==='VERIFYING')return{cls:'PENDING',text:'Details captured · Awaiting verification'}; /* t151u A: nurse-facing state */
  if(c.primary==='REVOKED')return{cls:'REVOKED',text:'REVOKED BY ISSUER · DEMO'};
  if(c.primary==='REJECTED')return{cls:'REVOKED',text:'REJECTED AFTER REVIEW'};
  if(c.primary==='EXPIRED')return{cls:'REVOKED',text:'EXPIRED'};

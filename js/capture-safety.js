@@ -3,7 +3,7 @@
    details or chooses its type from the document. The nurse types every detail as printed.
    The on-device check below may only BLOCK an unsafe save:
    - more than one credential in one file          → "Please upload each credential separately."
-   - an LVN / LPN license                           → "Veridun Passport currently supports RN licenses."
+   - an LVN / LPN license (credential-bearing evidence only, t151u B) → "Veridun Passport currently supports RN licenses."
    - a Red Cross "Advanced Life Support" card as ACLS → not ACLS
    - a document of a different type than the one chosen → choose the printed type
    - PALS, TNCC, NRP, CEN, ENPC                     → held: not supported in the RN pilot
@@ -41,9 +41,18 @@ const CAPTURE_PILOT_TEXT='We recognized this credential, but it isn\'t supported
 const CAPTURE_CTA={MULTIPLE:'Upload each credential separately',LVN_LPN:'Choose a supported RN credential',UNSUPPORTED_KIND:'Choose a supported RN credential',ALS_NOT_ACLS:'Upload the correct credential',TYPE_MISMATCH:'Upload the correct credential',UNSUPPORTED_DOC:'Upload the correct credential'};
 function captureFamilyLabel(id){return(CAPTURE_FAMILIES.find(f=>f.id===id)||{}).label||id}
 /* Which credential families a page names. Labels only; the text is not kept. */
+/* Munib t151u B: LPN/LVN counts only on CREDENTIAL-BEARING evidence: a title line naming the licence
+   ("Licensed Practical Nurse", "LVN License"), a labelled field ("License Type: LPN", "Class: LVN",
+   "Profession: Licensed Vocational Nurse"), or "licensed as a Licensed Practical Nurse". Incidental
+   mentions ("RN/LPN Department", board text, footers, explanations) are NOT evidence: no hold, the
+   nurse takes the normal manual path and a verifier checks the document. */
+const CAPTURE_PN_EVIDENCE={
+ LPN:[/^[ \t]*(?:state\s+of\s+[a-z ]+\s+)?licensed\s+practical\s+nurse(?:\s*\(LPN\))?(?:\s+licen[cs]e)?[ \t]*$/im,/^[ \t]*LPN(?:\s+licen[cs]e)?[ \t]*$/im,/\b(?:licen[cs]e|credential)\s*(?:type|class|category)\s*[:#\-]\s*(?:LPN\b|licensed\s+practical)/i,/^[ \t]*(?:class|designation|profession|occupation|type)\s*[:#\-]\s*(?:LPN\b|licensed\s+practical)/im,/licensed\s+(?:to\s+practice\s+)?as\s+an?\s+(?:LPN\b|licensed\s+practical)/i],
+ LVN:[/^[ \t]*(?:state\s+of\s+[a-z ]+\s+)?licensed\s+vocational\s+nurse(?:\s*\(LVN\))?(?:\s+licen[cs]e)?[ \t]*$/im,/^[ \t]*LVN(?:\s+licen[cs]e)?[ \t]*$/im,/\b(?:licen[cs]e|credential)\s*(?:type|class|category)\s*[:#\-]\s*(?:LVN\b|licensed\s+vocational)/i,/^[ \t]*(?:class|designation|profession|occupation|type)\s*[:#\-]\s*(?:LVN\b|licensed\s+vocational)/im,/licensed\s+(?:to\s+practice\s+)?as\s+an?\s+(?:LVN\b|licensed\s+vocational)/i]
+};
 function captureFamilies(text){
  const t=String(text||'');
- return CAPTURE_FAMILIES.filter(f=>(f.phrase&&f.phrase.test(t))||(f.acro&&f.acro.test(t))).map(f=>f.id);
+ return CAPTURE_FAMILIES.filter(f=>CAPTURE_PN_EVIDENCE[f.id]?CAPTURE_PN_EVIDENCE[f.id].some(re=>re.test(t)):((f.phrase&&f.phrase.test(t))||(f.acro&&f.acro.test(t)))).map(f=>f.id);
 }
 function captureKindName(kind){const k=typeof catalogKind==='function'?catalogKind(kind):null;return k?(k.short||k.label):'this credential'}
 /* A chosen type that can't be saved in the RN pilot (no document needed to decide). */

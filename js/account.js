@@ -6,7 +6,7 @@
    Honesty rules: nothing in an account is shown as verified unless a real
    verifier changed it server-side (clients can't). Revocation is final.
    Organizations can only ask for more time; the clinician decides. */
-const ACCT_STATUS_TEXT={VERIFYING:'SUBMITTED · NOT VERIFIED',UNVERIFIED:'SUBMITTED · NOT VERIFIED',VERIFIED:'VERIFIED',REJECTED:'REJECTED',REVOKED:'REVOKED BY ISSUER',EXPIRED:'EXPIRED'};
+const ACCT_STATUS_TEXT={VERIFYING:'Details captured · Awaiting verification',UNVERIFIED:'Details captured · Awaiting verification',VERIFIED:'VERIFIED',REJECTED:'REJECTED',REVOKED:'REVOKED BY ISSUER',EXPIRED:'EXPIRED'};
 let acctTab='acctPassportV10',acctOrgList=null,acctOrgId=null,acctOrgShares=null,acctLastCreated=null,acctOrgResult=null,acctBusy=false;
 const acct=()=>store.account;
 function acctToday(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -59,7 +59,9 @@ function acctProfileForm(p){
 let acctEditingProfile=false;
 function acctCredStatus(c){
  const expired=c.expires_on&&c.expires_on<acctToday();
- if(expired)return{cls:'REVOKED',text:'EXPIRED',sub:'Expired '+fd(c.expires_on)};
+ if(expired){/* t151u C: for an RN licence this date may be a registration's through date: never say the licence expired */
+  if(c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE')return{cls:'REVOKED',text:'CURRENT-PRACTICE DATE PASSED',sub:'Current-practice-through date passed '+fd(c.expires_on)+'. Renew or upload the current document.'};
+  return{cls:'REVOKED',text:'EXPIRED',sub:'Expired '+fd(c.expires_on)}}
  const text=ACCT_STATUS_TEXT[c.status]||c.status;
  const cls=c.status==='VERIFIED'?'VERIFIED':(c.status==='VERIFYING'||c.status==='UNVERIFIED')?'PENDING':'REVOKED';
  const lic=c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE';
@@ -504,6 +506,6 @@ function acctExpProvHtml(c){
 }
 function acctDocDetailsHtml(c){
  const d=c.metadata?.doc;if(!d||!d.confirmed)return'';
- const nm=k=>(k==='issued_on'&&typeof scanIssueDateLabel==='function'?scanIssueDateLabel({profile:d.profile},c.kind).replace(/\s*\(.*\)$/,''):(DocExtract.FIELD_LABEL[k]||k)).toLowerCase();
+ const nm=k=>(k==='expires_on'&&(c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE')?'Current-practice-through date':k==='issued_on'&&typeof scanIssueDateLabel==='function'?scanIssueDateLabel({profile:d.profile},c.kind).replace(/\s*\(.*\)$/,''):(DocExtract.FIELD_LABEL[k]||k)).toLowerCase();
  return`<div class="small acct-docdet-v14">Document read on this device ${ec(fmtDT(d.read_at))}: ${ec((d.fields_confirmed||[]).map(nm).join(', ')||'no fields')} confirmed${(d.corrected||[]).length?` (${ec(d.corrected.map(nm).join(', '))} corrected)`:''}.${d.mismatch?` <span class="badge REVOKED">MISMATCH</span> ${ec((d.mismatch_fields||[]).map(nm).join(', '))}`:''} The values stay on your device; the verifier reads the document again.</div>`;
 }

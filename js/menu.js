@@ -47,7 +47,7 @@ function renderProfileViewV11(){
 }
 function menuShowSignIn(){v81RolePicker();const c=$('acctCardV10');if(c){c.scrollIntoView({block:'center'});setTimeout(()=>$('acctEmailV10')?.focus(),50)}}
 /* ---------- Submitted credentials (demo) ---------- */
-const MENU_STATUS={VERIFIED:'VERIFIED · DEMO',VERIFYING:'PENDING VERIFICATION',UNVERIFIED:'SUBMITTED, NOT VERIFIED',REJECTED:'REJECTED',FAILED:'FAILED',REVOKED:'REVOKED',EXPIRED:'EXPIRED'};
+const MENU_STATUS={VERIFIED:'VERIFIED · DEMO',VERIFYING:'Details captured · Awaiting verification',UNVERIFIED:'Details captured · Awaiting verification',REJECTED:'REJECTED',FAILED:'FAILED',REVOKED:'REVOKED',EXPIRED:'EXPIRED'};
 function renderCredentialsViewV11(){
  const ev=store.events.list();
  const rows=creds.slice().sort((x,y)=>(y.id||0)-(x.id||0)).map(c=>{
