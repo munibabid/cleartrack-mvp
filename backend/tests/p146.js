@@ -57,7 +57,7 @@ async function run(browser, name, vp, shots) {
   };
   try {
     await pg.goto(BASE, { waitUntil: 'networkidle' });
-    t('version label v14.7', await pg.evaluate(() => document.documentElement.textContent.includes('v14.7 demo')));
+    t('version label v14.8', await pg.evaluate(() => document.documentElement.textContent.includes('v14.8 demo') && !document.documentElement.textContent.includes('v14.7 demo')));
     // v14.7: the demo seeds two completed example references (References section, not credentials); start this flow from none
     const seeded = await pg.evaluate(() => { const a = loadReferences(); const r = { n: a.length, done: a.filter(x => refStatus(x) === 'COMPLETED' && x.seed).length, cred: creds.some(c => c.kind === 'REF_SPECIALTY') }; store.references.save([]); store.referenceResponses.save({}); return r; });
     t('demo seed: 2 completed example references, no reference in the credential list', seeded.n === 2 && seeded.done === 2 && !seeded.cred, JSON.stringify(seeded));
