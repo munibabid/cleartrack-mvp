@@ -22,6 +22,7 @@ async function mode() {
 }
 async function reachable() { return (await mode()) !== 'none'; }
 async function client() {
+  require('./lib/live-guard.js').assertOptedIn('staging database client'); // t151u E
   const m = await mode();
   if (m === 'pg') { const { Client } = require('pg'); const c = new Client({ connectionString: pgUrl(), ssl: { rejectUnauthorized: false } }); await c.connect(); return c; }
   if (m === 'api') return api.client();

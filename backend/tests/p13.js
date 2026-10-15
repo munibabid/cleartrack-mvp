@@ -222,6 +222,8 @@ async function partB(browser) {
   }
 }
 
+/* t151u E: credentials without P13_LIVE=1 → refuse loudly (exit 2) before any work. */
+require('./lib/live-guard.js').guard('p13', 'P13_LIVE');
 (async () => {
   fs.mkdirSync(SH, { recursive: true });
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: 'new' });
