@@ -186,7 +186,7 @@ async function partA4(browser) {
   const leak = JSON.stringify([saved.xe, saved.c.metadata, (await pg.evaluate(() => __fakeDb.audit_events.map(e => e.detail)))]);
   ok('extracted values stay off the server: metadata, audit and telemetry hold no document values', !/Testa|Fakename|261100000017|2026-06-12|2028-06-/.test(leak.replace(/2028-05-08/g, '')), leak.slice(0, 160));
   const badge = await pg.evaluate(id => document.querySelector(`[data-cred="${id}"] .badge`)?.textContent, saved.c.id);
-  ok('(rewritten v14.8) credential row badge says not verified (never VERIFIED)', /NOT VERIFIED|AWAITING VERIFICATION/.test(badge) && !/^VERIFIED/.test(badge), badge);
+  ok('(rewritten v14.8) credential row badge says not verified (never VERIFIED)', /Awaiting verification/i.test(badge) && !/^VERIFIED/.test(badge), badge);
   // ---- private record: only the date the nurse typed is kept ----
   await tap('[data-act="toggle-add"]'); await W(200);
   await pg.select('#acctKindV10', 'HEALTH_TB_CURRENT');

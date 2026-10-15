@@ -109,9 +109,54 @@ async function run(browser, name, vp, shots) {
     t('"Renew By" never becomes the expiration', !pr.renewBy.expires_on && !(pr.renewBy._exp && pr.renewBy._exp.value), JSON.stringify(pr.renewBy));
     t('"Renewed" is not the expiration; the printed Expires date is', pr.renewed.expires_on === '2028-01-31' && pr.renewed.issued_on !== '2026-01-15', JSON.stringify(pr.renewed));
     t('"Last Renewed" / "Renewal Date" alone → no expiration', !pr.renewedOnly.expires_on && !(pr.renewedOnly._exp && pr.renewedOnly._exp.value), JSON.stringify(pr.renewedOnly));
-    t('t150u A: a time-limited registration\'s printed "Registered through" date is read as its current-practice-through date; "Date of registration" never is', pr.registered.expires_on === '2028-08-31' && pr.registered.issued_on === '2022-09-01', JSON.stringify(pr.registered));
+    t('t151u D: "Registered through" is read as the current-practice-through date; "Date of registration" is NOT the license issue date', pr.registered.expires_on === '2028-08-31' && !pr.registered.issued_on, JSON.stringify(pr.registered));
     t('no issue/expiration swap (dates stay under their printed labels)', pr.swap.expires_on === '2024-01-31' && pr.swap.issued_on === '2026-01-31', JSON.stringify(pr.swap));
     t('repair helpers are gone from the reader API', pr.repairFns.length === 0, pr.repairFns.join());
+
+    /* ---------- Munib t151u: A badge, B RN vs LPN/LVN evidence, C registration wording, D issue-date labels ---------- */
+    const u = await pg.evaluate(() => {
+      const F = (txt, kind) => { const r = DocExtract.parseCardText(txt, { kind, method: 'PDF_TEXT' }); const o = {}; for (const [k, f] of Object.entries(r.fields || {})) o[k] = f && { v: f.value, basis: f.basis || null, src: f.source_label || null }; return o; };
+      const NY = 'THE UNIVERSITY OF THE STATE OF NEW YORK\nRegistered Professional Nurse\nName: Testa Fakename\nLicense No. 000999888\n';
+      const fam = txt => captureFamilies(txt);
+      const regF = F(NY + 'Date of registration: 09/01/2022\nRegistered through: 08/31/2028', 'RN_LICENSE');
+      return {
+        reg: regF,
+        valid: F(NY + 'Registration valid through: 08/31/2028', 'RN_LICENSE'),
+        cur: F(NY + 'Current registration through: 08/31/2028', 'RN_LICENSE'),
+        lic: F(NY + 'Expiration Date: 08/31/2028', 'RN_LICENSE'),
+        dateIssued: F(NY + 'Date issued: 09/01/2022\nExpires: 08/31/2028', 'RN_LICENSE'),
+        issueDate: F(NY + 'Issue date: 09/01/2022\nExpires: 08/31/2028', 'RN_LICENSE'),
+        origIssue: F(NY + 'Original issue date: 09/01/2022\nExpires: 08/31/2028', 'RN_LICENSE'),
+        regOnly: F(NY + 'Date of registration: 09/01/2022', 'RN_LICENSE'),
+        unlabeled: F(NY + '09/01/2022\n08/31/2028', 'RN_LICENSE'),
+        lblReg: typeof DocExtract.fieldLabel === 'function' ? DocExtract.fieldLabel('expires_on', { value: '2028-08-31', basis: 'REGISTRATION', source_label: 'Registered through' }) : null,
+        lblLic: typeof DocExtract.fieldLabel === 'function' ? DocExtract.fieldLabel('expires_on', { value: '2028-08-31' }) : null,
+        expTextReg: (DocExtract.documentExpiry({ expires_on: { value: '2028-08-31', basis: 'REGISTRATION', source_label: 'Registered through' } }) || {}).text || '',
+        badge: { acct: typeof ACCT_STATUS_TEXT !== 'undefined' ? [ACCT_STATUS_TEXT.VERIFYING, ACCT_STATUS_TEXT.UNVERIFIED] : null, menu: typeof MENU_STATUS !== 'undefined' ? [MENU_STATUS.UNVERIFIED, MENU_STATUS.VERIFYING] : null, demo: typeof verificationBadge === 'function' ? verificationBadge({ kind: 'RN_LICENSE', primary: 'VERIFYING', prov: {} }).text : null },
+        fam: {
+          dept: fam('Ohio Board of Nursing\nRegistered Nurse\nName: Testa Fakename\nLicense Number: RN.123456\nIssued by the RN/LPN Department'),
+          board: fam('Ohio Board of Nursing\nRegistered Nurse\nLicense Number: RN.123456\nThe Board regulates registered nurses (RNs), licensed practical nurses (LPNs) and dialysis technicians.'),
+          footer: fam('Texas Board of Nursing\nRegistered Nurse\nLicense Number: 990011\nExpiration Date: 01/31/2028\nRN | LVN | APRN license verification: www.bon.texas.gov'),
+          explain: fam('California Board of Registered Nursing\nRegistered Nurse\nLicense Number: 95000001\nThis card is not valid for practice as a Licensed Vocational Nurse.'),
+          lpnTitle: fam('Ohio Board of Nursing\nLicensed Practical Nurse\nLicense Number: PN.123456'),
+          lvnTitle: fam('Texas Board of Nursing\nLicensed Vocational Nurse\nLicense Number: 123456'),
+          lpnType: fam('Board of Nursing\nNurse License\nLicense Type: LPN\nLicense Number: 123456'),
+          lvnClass: fam('Board of Nursing\nNursing license\nClass: LVN\nLicense Number: 123456'),
+          lpnProfession: fam('Board of Nursing\nProfession: Licensed Practical Nurse\nLicense Number: 123456'),
+          lpnAcroTitle: fam('State Board of Nursing\nLPN License\nLicense Number: 123456'),
+          rnType: fam('Board of Nursing\nLicense Type: RN\nRegistered Nurse\nLicense Number: 123456'),
+        },
+      };
+    });
+    t('t151u A: the submitted-not-verified badge reads "Details captured · Awaiting verification" (account, menu, demo); no internal wording', JSON.stringify(u.badge.acct) === JSON.stringify(['Details captured · Awaiting verification', 'Details captured · Awaiting verification']) && u.badge.menu && u.badge.menu.every(x => /Awaiting verification/.test(x) && !/SUBMITTED|NOT VERIFIED|PENDING/.test(x)) && /^Details captured · Awaiting verification$/.test(u.badge.demo || ''), JSON.stringify(u.badge));
+    t('t151u C: "Registered through" / "Registration valid through" / "Current registration through" → current-practice-through date, source label kept, basis REGISTRATION', [u.reg, u.valid, u.cur].every(f => f.expires_on && f.expires_on.v === '2028-08-31' && f.expires_on.basis === 'REGISTRATION' && /regist/i.test(f.expires_on.src || '')), JSON.stringify([u.reg.expires_on, u.valid.expires_on, u.cur.expires_on]));
+    t('t151u C: a printed license expiration keeps the license basis', u.lic.expires_on && u.lic.expires_on.v === '2028-08-31' && u.lic.expires_on.basis !== 'REGISTRATION', JSON.stringify(u.lic.expires_on));
+    t('t151u C: the reader UI calls a registration date "Registration valid through" / "Current-practice-through date", never an expiration', /Registration valid through/.test(u.lblReg || '') && /current-practice-through/i.test(u.lblReg || '') && !/expir/i.test(u.lblReg || '') && /Registration valid through/.test(u.expTextReg) && !/expir/i.test(u.expTextReg) && /Expiration/i.test(u.lblLic || ''), JSON.stringify({ r: u.lblReg, l: u.lblLic, t: u.expTextReg }));
+    t('t151u D: "Date of registration" never becomes the license issue date', !u.reg.issued_on && !u.regOnly.issued_on, JSON.stringify([u.reg.issued_on, u.regOnly.issued_on]));
+    t('t151u D: "Date issued" / "Issue date" / "Original issue date" are issue dates', [u.dateIssued, u.issueDate, u.origIssue].every(f => f.issued_on && f.issued_on.v === '2022-09-01'), JSON.stringify([u.dateIssued.issued_on, u.issueDate.issued_on, u.origIssue.issued_on]));
+    t('t151u D / rule 8: unlabeled dates are never guessed', !u.unlabeled.issued_on && !u.unlabeled.expires_on, JSON.stringify(u.unlabeled));
+    t('t151u B: incidental LPN/LVN mentions on a valid RN document (department, board text, footer, explanation) are not a type conflict', ['dept', 'board', 'footer', 'explain'].every(k => !u.fam[k].includes('LPN') && !u.fam[k].includes('LVN') && u.fam[k].includes('RN')), JSON.stringify(u.fam));
+    t('t151u B: credential-bearing LPN/LVN evidence (title, License Type, Class, Profession, acronym title) is still detected', u.fam.lpnTitle.includes('LPN') && u.fam.lvnTitle.includes('LVN') && u.fam.lpnType.includes('LPN') && u.fam.lvnClass.includes('LVN') && u.fam.lpnProfession.includes('LPN') && u.fam.lpnAcroTitle.includes('LPN') && !u.fam.rnType.includes('LPN'), JSON.stringify(u.fam));
 
     /* ---------- 8. confidence words; 7. names and scope ---------- */
     const words = await pg.evaluate(() => typeof confidenceWords === 'function' ? [confidenceWords(0.95), confidenceWords(0.8), confidenceWords(0.5), confidenceWords(null, false)] : null);
