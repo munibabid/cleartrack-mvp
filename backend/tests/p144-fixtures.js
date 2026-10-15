@@ -51,7 +51,8 @@ const STATES = [
     lines: ['Texas Board of Nursing', 'Registered Nurse - Multistate License', 'Licensee: Casey Exampleton', 'License Number: 000123456', 'Original License Date: 07/01/2023', 'Expiration Date: 06/30/2027', '78 Maine Street, Augusta, ME 04330'] },
   { slug: 'fl', truth: { holder_name: 'Riley Testperson', credential_id: 'RN9990001', jurisdiction: 'US-FL', multistate: 'single-state', expires_on: '2026-04-30' },
     lines: ['Florida Board of Nursing', 'Department of Health', 'Registered Nurse', 'Name: Riley Testperson', 'License No: RN9990001', 'Single-State License', 'Expires: 04/30/2026', '9 Virginia Rd, Arlington, VA 22000'] },
-  { slug: 'ny', truth: { holder_name: 'Morgan Fakely', credential_id: '000999888', jurisdiction: 'US-NY', issued_on: '2022-09-01', expires_on: '2028-08-31' },
+  /* Munib t151u D: "Date of registration" is NOT the licence issue date, so no issue date is expected (must not be read); "Registered through" is the current-practice-through date. */
+  { slug: 'ny', truth: { holder_name: 'Morgan Fakely', credential_id: '000999888', jurisdiction: 'US-NY', expires_on: '2028-08-31' },
     lines: ['THE UNIVERSITY OF THE STATE OF NEW YORK', 'Education Department - Office of the Professions', 'Registered Professional Nurse', 'This is to certify that Morgan Fakely', 'is licensed to practice as a Registered Professional Nurse', 'License No. 000999888', 'Date of registration: 09/01/2022', 'Registered through: 08/31/2028', '12 Georgia Ln, Example, NJ 07000'] },
   { slug: 'ca', truth: { holder_name: 'Avery Specimen', credential_id: '95000123', jurisdiction: 'US-CA', issued_on: '2025-01-15', expires_on: '2027-01-31' },
     lines: ['California Board of Registered Nursing', 'Registered Nurse', 'Name: Avery Specimen', 'License Number: 95000123', 'Issue Date: 01/15/2025', 'Expiration Date: 01/31/2027', 'Address of record: 500 Washington Blvd, Nowhere, NV 89000'] }];

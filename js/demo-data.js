@@ -56,7 +56,7 @@ function nurseCreds(n){
 }
 function demoSeedCredentials(){
  const anchor=demoAnchor(),verifiedAt=addDays(anchor,-1).toISOString(),now=new Date().toISOString();
- return DEMO_SEED.map(([kind,jur,days,required,x],i)=>v81Normalize({id:Date.now()+i,name:x?.name||credentialDisplayName(kind,jur),...experienceFields(x,anchor),...skillsFields(kind,days,anchor),kind,type:credentialTypeCode(kind,jur),jurisdiction:jur,section:catalogKind(kind).section,required,primary:'VERIFIED',chain:'NOT ISSUED',expiration:seedExpiry(kind,days,anchor),file:'',prov:{source:issuerFor(kind,jur)+' (demo seed)',method:'Demo verification',verifier:'DEMO SEED (not a real verification)',verifiedAt,active:true,lastMonitored:now}}));
+ return DEMO_SEED.map(([kind,jur,days,required,x],i)=>v81Normalize({id:Date.now()+i,name:x?.name||credentialDisplayName(kind,jur),...experienceFields(x,anchor),...skillsFields(kind,days,anchor),kind,type:credentialTypeCode(kind,jur),jurisdiction:jur,section:catalogKind(kind).section,primary:'VERIFIED',chain:'NOT ISSUED',expiration:seedExpiry(kind,days,anchor),file:'',prov:{source:issuerFor(kind,jur)+' (demo seed)',method:'Demo verification',verifier:'DEMO SEED (not a real verification)',verifiedAt,active:true,lastMonitored:now}}));
 }
 /* Loads saved demo data; (re)seeds on first run, on Reset Demo Data, or when
    the stored data predates the current demo seed version. Never called

@@ -222,14 +222,17 @@ async function partB(browser) {
   }
 }
 
+/* t151u E: credentials without P13_LIVE=1 → refuse loudly (exit 2) before any work. */
+require('./lib/live-guard.js').guard('p13', 'P13_LIVE');
 (async () => {
   fs.mkdirSync(SH, { recursive: true });
   const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: 'new' });
   try {
     await partA(browser);
     if (process.env.P13_SKIP_ACCOUNT) skip('account PSV route', 'P13_SKIP_ACCOUNT set');
-    else if (await dbReachable()) await partB(browser);
-    else skip('account PSV route', 'database not reachable from this machine');
+    /* v14.8: Part B writes to the staging database, so it is opt-in (P13_LIVE=1); default runs never touch a live database. */
+    else if (process.env.P13_LIVE === '1' && await dbReachable()) await partB(browser);
+    else skip('account PSV route', process.env.P13_LIVE === '1' ? 'database not reachable from this machine' : 'live part is opt-in (P13_LIVE=1); default runs never touch a live database');
   } catch (e) { ok('p13 run', false, String(e && e.stack || e).replace(/postgres(ql)?:\/\/[^\s'"]+/g, '***')); }
   finally { await browser.close().catch(() => {}); }
   const fails = R.filter(r => r.startsWith('FAIL')).length, skips = R.filter(r => r.startsWith('SKIP')).length;

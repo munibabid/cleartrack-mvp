@@ -84,16 +84,16 @@
   <button id="v7Share"><span>↗</span>Share Passport<div class="small">QR or secure link</div></button>
   <button id="v7Tasks"><span>☑</span>View Tasks<div class="small">See what needs attention</div></button>
 </div>
-<div class="demo"><span><b>Demo flow:</b> add a credential → run the simulated check in the Verification Console → readiness updates → optionally secure an XRPL Devnet proof → share your Passport.</span><span class="demo-btns-v86"><button class="sec startTourV86" id="startTourHomeV86">▶ Start Demo Tour</button><button id="resetDemo" class="sec">Reset Demo Data</button></span></div>
+<div class="demo"><span><b>Demo flow:</b> add a credential → run the simulated check in the Verification Console → readiness updates → optionally add a tamper-evident proof → share your Passport.</span><span class="demo-btns-v86"><button class="sec startTourV86" id="startTourHomeV86">▶ Start Demo Tour</button><button id="resetDemo" class="sec">Reset Demo Data</button></span></div>
 <div class="dash-grid-v85">
  <div class="panel-v81"><div class="ph">Portable Readiness <span class="demo-tag-v81">LIVE · DEMO DATA</span></div><div class="pb" id="homeReadyV85"></div></div>
  <div class="panel-v81"><div class="ph">Current Assignments</div><div class="pb" id="homeAssignV85"></div></div>
  <div class="panel-v81"><div class="ph">Needs Attention</div><div class="pb" id="homeAttnV85"></div></div>
 </div>
 <div class="stats"><div class="stat"><span>Onboarding Progress</span><b id="onboardPct">0%</b></div><div class="stat"><span>Verified</span><b id="vcount">0</b></div><div class="stat"><span>Proofs (optional)</span><b id="acount">0</b></div><div class="stat"><span>Needs Attention</span><b id="ncount">0</b></div></div>
-<div class="onboard-summary"><div class="readybox"><div class="top"><div><h3>Newcomer Onboarding</h3><div class="small">Automatically generated Travel RN baseline</div></div><span id="readyBadge" class="badge PENDING">IN PROGRESS</span></div><div class="progress" style="margin-top:14px"><div id="onboardBar" style="width:0%"></div></div><div id="onboardSummaryText" class="small" style="margin-top:8px">0 of 0 requirements satisfied</div></div><div class="readybox"><h3>Passport readiness</h3><div class="small">Readiness counts verified, current credentials — XRPL proof is optional. The Passport QR uses accepted XRPL Devnet proofs; the Onboarding Complete QR activates when every baseline item is satisfied.</div></div></div>
+<div class="onboard-summary"><div class="readybox"><div class="top"><div><h3>Newcomer Onboarding</h3><div class="small">Automatically generated Travel RN baseline</div></div><span id="readyBadge" class="badge PENDING">Not ready yet</span></div><div class="progress" style="margin-top:14px"><div id="onboardBar" style="width:0%"></div></div><div id="onboardSummaryText" class="small" style="margin-top:8px">0 of 0 requirements satisfied</div></div><div class="readybox"><h3>Passport readiness</h3><div class="small">Readiness counts verified, current credentials. A proof is optional. The Passport QR uses accepted proofs; the Onboarding Complete QR activates when every baseline item is met.</div></div></div>
 <div class="panel"><div class="ph">Credential Requirements <span id="busy" class="small"></span></div><div class="toolbar"><button class="filter on" data-f="all">All</button><button class="filter" data-f="Licenses & Certifications">Licenses & Certifications</button><button class="filter" data-f="Health & Immunizations">Health & Immunizations</button><button class="filter" data-f="Screening & Employment">Screening & Employment</button><button class="filter" data-f="Clinical Requirements">Clinical Requirements</button></div><div id="empty" class="empty hidden"></div><table id="tbl"><thead><tr><th>Requirement</th><th>Type</th><th>Required</th><th>Verification</th><th>Proof <span class="small">(optional)</span></th><th>Expires</th><th>Provenance</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div>
-<div class="notice"><b>Security model:</b> PII and private documents remain off-chain. The verification network receives only minimal credential proof data. Each verification retains off-chain provenance. <b>Demo:</b> verification is simulated, data lives only in this browser, and XRPL proofs use the Devnet test network. NFTs are optional visual badges only; Portable credential proofs are the authoritative trust object.</div>
+<div class="notice"><b>Your privacy:</b> your documents and personal details stay private. A proof contains only minimal data about a verification, never your documents. <b>Demo:</b> verification is simulated, data stays in this browser, and proofs use a test network.</div>
 </div>
 <div id="profileViewV11" class="view"></div>
 <div id="credentialsViewV11" class="view"></div>
@@ -236,7 +236,7 @@
 <div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years of experience in this specialty <span class="small">(optional)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
 <div id="skillsRowV144" class="hidden"><label for="skillsDoneV144">Completed on</label><input id="skillsDoneV144" type="date"><div class="small" id="skillsNoteV144">Skills checklists are usually provided by your agency or facility (often through a skills-checklist vendor) and are self-attested by you. They are never shown as verified. Suggested redo: 12 months after completion (calculated); the facility rule is final, and some facilities need a new checklist per assignment.</div></div>
 <div id="dtRowV144"><label for="dt">Expiration date <span class="small">(if it has one)</span></label><input id="dt" type="date"><div class="exp-confirm-v147" id="addExpConfirmV147"><label class="exp-confirm-lbl-v147"><input type="checkbox" id="addExpOkV147"> <span id="addExpOkTextV147">No expiration date on this document</span></label><div class="small" id="addExpOkStateV147">Required before saving.</div></div></div>
-<label for="fl">Source document (optional)</label><input id="fl" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx">
+<label for="fl">Source document (optional)</label><input id="fl" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"><div id="addScreenSlotV148"><div id="addScreenV148" class="capture-v148 small" data-state="none">Type the details exactly as printed on your document. Veridun doesn't fill them in from the file.</div></div>
 <div id="privacyNoteV82" class="provenance small" style="line-height:1.6"></div>
 </div><div class="mf"><button class="sec xadd">Cancel</button><button id="save" class="pri">Add &amp; Submit for Verification</button></div></dialog>
 
@@ -314,6 +314,7 @@
 <script src="js/roles/organization.js?v=14.7"></script>
 <script src="js/roles/verifier.js?v=14.7"></script>
 <script src="js/references.js?v=14.7"></script>
+<script src="js/capture-safety.js?v=14.8"></script>
 <script src="js/exp-confirm.js?v=14.7"></script>
 <script src="js/app.js?v=14.7"></script>
 <script src="js/tour.js"></script>

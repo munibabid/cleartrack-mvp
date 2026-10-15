@@ -5,9 +5,14 @@
      - a single-state RN license in the assignment's jurisdiction, or
      - a multistate (NLC) license from an NLC home state, when the
        assignment's jurisdiction honors compact licenses. */
-function isVerifiedActive(c){return c.primary==='VERIFIED'&&!!c.prov?.active}
 function credExpiry(c){return c.official_expiration_date||c.expiration||''}
 function isRnLicense(c){return c.kind==='RN_LICENSE'||c.kind==='RN_LICENSE_MULTISTATE'}
+/* t150u: an RN license counts only with an authoritative current-practice-through date: the date the
+   verifier recorded from the primary source, else the date on the license record (license expiration,
+   or a registration's through date where a state uses registration). The data model can't tell the two
+   apart per jurisdiction, so there is no fallback: no date → no RN readiness credit (fail safe). */
+function rnPracticeThrough(c){return c?.prov?.sourceExpiration||credExpiry(c)||''}
+function isVerifiedActive(c){return c.primary==='VERIFIED'&&!!c.prov?.active&&(!isRnLicense(c)||!!rnPracticeThrough(c))}
 /* Returns a human-readable basis string if credential c could satisfy req
    (ignoring verification state), else null. */
 function satisfactionBasis(req,c){
@@ -17,7 +22,7 @@ function satisfactionBasis(req,c){
   if(isRnLicense(c)&&!multi&&c.jurisdiction===t)return'Single-state license';
   if(multi&&nlcCanIssueMultistate(c.jurisdiction)){
    if(c.jurisdiction===t)return'Multistate license (primary state of residence)';
-   if(nlcHonorsCompactIn(t))return`NLC multistate privilege (primary state of residence ${c.jurisdiction})`;
+   if(nlcHonorsCompactIn(t))return`Multistate privilege from your ${jurisdictionName(c.jurisdiction)} license`;
   }
   return null;
  }
@@ -149,7 +154,7 @@ function evaluateRequirement(req,a,list=creds,refStatuses=null){
  else if(matches.some(x=>['VERIFYING','UNVERIFIED'].includes(x.c.primary)))out={req,label,status:'PENDING_VERIFICATION',note:'Added — pending verification'};
  else{
   let note='';
-  if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>licenseRuleKind(c)==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Multistate license (home ${ms.jurisdiction}) not honored here: ${nlcStatusLabel(req.jurisdiction)}`}
+  if(req.kind===RN_AUTHORIZATION){const ms=list.find(c=>licenseRuleKind(c)==='RN_LICENSE_MULTISTATE'&&isVerifiedActive(c));if(ms)note=`Your ${jurisdictionName(ms.jurisdiction)} multistate license isn't accepted here (${jurisdictionName(req.jurisdiction)}: ${nlcStatusLabel(req.jurisdiction).toLowerCase()})`}
   out={req,label,status:'MISSING',note};
  }
  if(req.kind==='REF_SPECIALTY'&&out.status==='MISSING')out.note='References are requested in the References section of the demo; not yet available for signed-in accounts';
@@ -163,10 +168,10 @@ function requirementWhy(i,a){
  const r=i.req,c=i.credential,lvl=c?credentialLevel(c):null,p=c?.prov||{};
  const verifiedBy=c?[levelLabel(lvl)+(lvl&&credentialLevelIsDemo(c)?' (demo)':''),p.source?'source: '+p.source:'',p.verifiedAt?'checked '+String(p.verifiedAt).slice(0,10):''].filter(Boolean).join(' · '):'';
  const exp=c?credExpiry(c):'';
- if(i.status==='MET'&&r.kind==='CERT_NIHSS')return`Satisfied by ${c.name}: ${i.basis}. ${verifiedBy}. The certificate prints no expiration; the window comes from the requirement, not from the certificate.`;
- if(i.status==='MET')return`Satisfied by ${c.name} (${i.basis}). ${verifiedBy}. Meets the minimum (${levelLabel(r.minLevel)}).${exp?` Valid through ${exp}`+(a?.end?`, which covers the assignment end (${a.end}).`:'.'):' No expiration.'}`;
- if(i.status==='LEVEL_TOO_LOW')return`${c.name} is verified only as ${levelLabel(lvl)}. ${r.levelRule?.basis||''} It needs ${levelLabel(r.minLevel)} before it counts.`;
- if(i.status==='EXPIRES_BEFORE_END')return`${c.name} expires ${exp}, before the assignment ends (${a?.end}). Renew it, then have the renewal verified.`;
+ if(i.status==='MET'&&r.kind==='CERT_NIHSS')return`Satisfied by ${credLabel(c)}: ${i.basis}. ${verifiedBy}. The certificate prints no expiration; the window comes from the requirement, not from the certificate.`;
+ if(i.status==='MET')return`Satisfied by ${credLabel(c)} (${i.basis}). ${verifiedBy}. Meets the minimum (${levelLabel(r.minLevel)}).${exp?` Valid through ${exp}`+(a?.end?`, which covers the assignment end (${a.end}).`:'.'):' No expiration.'}`;
+ if(i.status==='LEVEL_TOO_LOW')return`${credLabel(c)} is verified only as ${levelLabel(lvl)}. ${r.levelRule?.basis||''} It needs ${levelLabel(r.minLevel)} before it counts.`;
+ if(i.status==='EXPIRES_BEFORE_END')return`${credLabel(c)} expires ${exp}, before the assignment ends (${a?.end}). Renew it, then have the renewal verified.`;
  if(i.status==='NOT_RECENT')return i.note||'Experience is not recent enough.';
  if(['NEEDS_REVIEW','OUTSIDE_WINDOW','GROUP_NOT_ACCEPTED'].includes(i.status))return i.note||REQUIREMENT_DECISIONS[i.status];
  if(i.status==='PENDING_VERIFICATION')return`A matching credential was added but nobody has verified it yet. It needs ${levelLabel(r.minLevel)}.`;
@@ -185,7 +190,7 @@ function v81Assignment(a,nurse=null){
  const missing=items.filter(i=>i.status!=='MET').map(i=>i.label+(i.status==='NEEDS_REVIEW'?' — needs review':i.status==='OUTSIDE_WINDOW'?' — outside the NIHSS window':i.status==='GROUP_NOT_ACCEPTED'?' — test group not accepted':'')+(i.status==='WAITING_REFERENCES'?' — waiting on references':'')+(i.status==='EXPIRES_BEFORE_END'?' — renew before submission':i.status==='NOT_RECENT'?' — experience not recent':i.status==='PENDING_VERIFICATION'?' — pending verification':i.status==='LEVEL_TOO_LOW'?' — needs a stronger verification':''));
  return{eligible:true,specialty:sp,ok,total:items.length,missing,ready:missing.length===0,items,reqs};
 }
-function v7Readiness(){const req=creds.filter(c=>c.required),ok=req.filter(reqSatisfied).length;return req.length?Math.round(ok/req.length*100):0}
+function v7Readiness(){return onboarding().pct}/* v14.8: one readiness computation for every widget */
 /* Called after a credential changes state (never from render): records
    ASSIGNMENT_READY once readiness is reached after the clinician started
    working on an assignment. */

@@ -100,45 +100,41 @@ async function run(browser, engine, vp, mode) {
       await store.account.hydrate(); acctShow('acctPassportV10'); return id;
     }, PDF);
     await pg.waitForTimeout(300);
-    await pg.evaluate(id => document.querySelector(`[data-act="doc-rescan"][data-id="${id}"]`).click(), id);
-    await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); });
-    const rs = await pg.evaluate(() => ({ st: document.getElementById('acctScanBoxV14').dataset.state, v: acctScan.values, txt: document.getElementById('acctScanBoxV14').innerText, mm: (document.getElementById('acctMismatchV14') || {}).innerText || '' }));
-    t('"Re-scan document" (signed URL → fetch → read) works', rs.st === 'done' && rs.v.credential_id === '261100000017' && /May 8, 2028/.test(rs.mm), rs.st + ' ' + rs.txt.slice(0, 160));
-    // v14.4: ONE expiration field on the add form, pre-filled from the document and marked
-    await pg.evaluate(() => { acctScan = null; acctRenderAll(); document.querySelector('[data-act="toggle-add"]').click(); });
+    /* v14.8 P0 (safety stops): the document reader no longer fills anything. These checks replace the
+       v14.4–v14.7 prefill checks ("Re-scan document", "from document, check it", scope "from document",
+       verifier "Read the document on this device" / date preferred from the document) with their inverse. */
+    const FINAL = ['clear', 'blocked', 'unreadable', 'unsupported', 'error'];
+    const screenDone = () => pg.waitForFunction(f => { const b = document.getElementById('acctScreenBoxV148'); return b && f.includes(b.dataset.state); }, FINAL, { timeout: 120000 });
+    t('v14.8 no "Re-scan document" on saved credentials (the reader never fills a saved credential)', await pg.evaluate(id => !document.querySelector(`[data-act="doc-rescan"][data-id="${id}"]`) && !document.getElementById('acctScanBoxV14'), id));
+    await pg.evaluate(() => { acctRenderAll(); document.querySelector('[data-act="toggle-add"]').click(); });
     await pg.waitForSelector('#acctKindV10'); await pg.selectOption('#acctKindV10', 'CERT_CCRN');
     await pg.setInputFiles('#acctFileV10', { name: 'ccrn.pdf', mimeType: 'application/pdf', buffer: Buffer.from(CCRN, 'base64') });
-    await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && b.dataset.state === 'done'; });
-    const pf = await pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, box: $('acctScanBoxV14').innerText, id: acctScan.values.credential_id }));
-    t('v14.4 add form: one expiration field pre-filled from the document ("from document, check it · NN%"); no duplicate prompt in the scan box', pf.exp === '2028-02-28' && /from document, check it · \d+%/.test(pf.src) && !/No expiration entered|Use the date from the document/.test(pf.box) && pf.id === '1234567890', JSON.stringify({ exp: pf.exp, src: pf.src, id: pf.id }));
-    await pg.evaluate(() => { acctScan = null; acctRenderAll(); });
-    // v14.5: one RN License type + one license-scope field; no stale document date across files / types
-    const upl = async (b, n) => { await pg.setInputFiles('#acctFileV10', { name: n, mimeType: 'application/pdf', buffer: Buffer.from(b, 'base64') }); await pg.waitForTimeout(150); await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && b.dataset.state === 'done'; }); await pg.waitForTimeout(150); };
+    await screenDone();
+    const pf = await pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, box: $('acctScreenBoxV148').innerText, st: $('acctScreenBoxV148').dataset.state, form: $('acctAddFormV10').innerText }));
+    t('v14.8 add form: the expiration is NOT pre-filled from the document; no read-back values; the box says to type details as printed', pf.exp === '' && !/from document/.test(pf.src) && !/1234567890|2028-02-28|Feb 28, 2028/.test(pf.form) && /type them exactly as printed/.test(pf.box), JSON.stringify({ exp: pf.exp, src: pf.src, st: pf.st }));
+    await pg.evaluate(() => { acctScreenReset(); acctRenderAll(); });
+    const upl = async (b, n) => { await pg.setInputFiles('#acctFileV10', { name: n, mimeType: 'application/pdf', buffer: Buffer.from(b, 'base64') }); await pg.waitForTimeout(150); await screenDone(); await pg.waitForTimeout(150); };
     await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-ME'; document.querySelector('[data-act="toggle-add"]').click(); });
     await pg.waitForSelector('#acctKindV10'); await pg.selectOption('#acctKindV10', 'RN_LICENSE'); await pg.selectOption('#acctJurV10', 'US-MI');
     await upl(LMI, 'mi.pdf');
     const l1 = await pg.evaluate(() => ({ opts: [...$('acctKindV10').options].filter(o => /^RN_LICENSE/.test(o.value)).map(o => o.textContent), fixed: !$('acctLicScopeFixedV145').classList.contains('hidden'), choice: !$('acctLicScopeChoiceV145').classList.contains('hidden'), note: $('acctLicenseNoteV10').innerText, exp: $('acctExpV10').value }));
-    t('v14.5 one "RN License" type; Michigan → single-state automatically (no choice); text about Michigan, residence only for multistate', l1.opts.join() === 'RN License' && l1.fixed && !l1.choice && /This license is from Michigan, so it covers Michigan only/.test(l1.note) && !/Maine is a compact state/.test(l1.note) && l1.exp === '2029-03-31', JSON.stringify(l1));
+    t('v14.5 one "RN License" type; Michigan → single-state automatically (no choice); text about Michigan; v14.8: expiration not pre-filled', l1.opts.join() === 'RN License' && l1.fixed && !l1.choice && /This license is from Michigan, so it covers Michigan only/.test(l1.note) && !/Maine is a compact state/.test(l1.note) && l1.exp === '', JSON.stringify(l1));
     await pg.selectOption('#acctJurV10', 'US-TX'); await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-TX'; acctLicenseNote(); });
     await upl(LTX, 'tx.pdf');
-    const l2 = await pg.evaluate(() => ({ choice: !$('acctLicScopeChoiceV145').classList.contains('hidden'), checked: (document.querySelector('input[name=acctLicTypeV10]:checked') || {}).value, src: $('acctLicScopeSrcV145').innerText, exp: $('acctExpV10').value, scanMulti: [...document.querySelectorAll('#acctScanBoxV14 .scan-row-v14[data-field="multistate"]')].every(x => x.classList.contains('hidden')) }));
-    t('v14.5 Texas with printed multistate: one choice pre-filled "from document"; no scan-box select; new file replaced the date', l2.choice && l2.checked === 'MULTI' && /from document, check it/.test(l2.src) && l2.scanMulti && l2.exp === '2029-01-31', JSON.stringify(l2));
-    await pg.selectOption('#acctKindV10', 'CERT_NIHSS'); await pg.waitForTimeout(200); await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && b.dataset.state === 'done'; });
+    const l2 = await pg.evaluate(() => ({ choice: !$('acctLicScopeChoiceV145').classList.contains('hidden'), checked: (document.querySelector('input[name=acctLicTypeV10]:checked') || {}).value || null, src: $('acctLicScopeSrcV145').innerText, exp: $('acctExpV10').value }));
+    t('v14.8 Texas license with printed multistate: the scope is NOT pre-filled from the document or the home state; the nurse chooses', l2.choice && l2.checked === null && !/from document/.test(l2.src) && /Choose the scope printed on your license/.test(l2.src) && l2.exp === '', JSON.stringify(l2));
+    await pg.selectOption('#acctKindV10', 'CERT_NIHSS'); await pg.waitForTimeout(200);
     await upl(LNIH, 'nihss.pdf');
     const l3 = await pg.evaluate(() => ({ exp: $('acctExpV10').value, src: $('acctExpSrcV144').innerText, sug: !!$('acctScanSuggestV144') }));
-    t('v14.5 switching to NIHSS + a file with no printed expiration clears the old document date ("not printed"), suggested renewal shown separately', l3.exp === '' && /not printed/.test(l3.src) && l3.sug, JSON.stringify(l3));
-    await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-CA'; acctScan = null; acctRenderAll(); });
+    t('v14.8 NIHSS with no printed expiration: nothing filled, no "not printed" claim, no suggested date', l3.exp === '' && !/not printed/.test(l3.src) && !l3.sug, JSON.stringify(l3));
+    await pg.evaluate(() => { acct().cache.profile.home_jurisdiction = 'US-CA'; acctScreenReset(); acctRenderAll(); });
     await pg.evaluate(() => document.querySelector('.acctTab[data-target="acctVerifyV12"]').click());
     await pg.waitForFunction(id => !!document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`), id, { timeout: 30000 });
     await pg.evaluate(id => document.querySelector(`.acct-verify-pick-v12[data-id="${id}"]`).click(), id);
     await pg.waitForSelector('#acctVerifyFormV12[data-mode="registry"]');
-    const before = await pg.evaluate(() => ({ exp: document.getElementById('acctVerifyExpV13').value, note: document.getElementById('acctVerifyExpNoteV14').innerText }));
-    t('before reading: note says the typed date is not compared yet', before.exp === '2028-05-08' && /not compared with the document yet/.test(before.note), JSON.stringify(before));
-    await pg.evaluate(() => document.getElementById('acctVReadV14').click());
-    await pg.waitForFunction(() => document.getElementById('acctCopyCodeV14') || document.getElementById('acctVScanErrV14'), null, { timeout: 120000 });
-    const vf = await pg.evaluate(() => ({ copy: !!document.getElementById('acctCopyCodeV14'), err: (document.getElementById('acctVScanErrV14') || {}).innerText || '', exp: document.getElementById('acctVerifyExpV13').value, note: document.getElementById('acctVerifyExpNoteV14').innerText, side: document.documentElement.scrollWidth <= window.innerWidth + 1 }));
-    t('verifier "Read the document on this device" works', vf.copy && !vf.err, vf.err);
-    t('verifier expiration prefers the document date and shows both dates', vf.exp === '2028-06-30' && /DATES DIFFER/.test(vf.note) && /Jun 30, 2028/.test(vf.note) && /May 8, 2028/.test(vf.note), JSON.stringify(vf));
+    const vf = await pg.evaluate(() => ({ exp: document.getElementById('acctVerifyExpV13').value, ref: document.getElementById('acctVerifyRefV12').value, note: document.getElementById('acctVerifyExpNoteV14').innerText, reader: !!document.getElementById('acctVReadV14'), aha: !!document.getElementById('acctOpenAhaV14'), side: document.documentElement.scrollWidth <= window.innerWidth + 1 }));
+    t('v14.8 verifier: expiration and reference start empty; the nurse\'s date is shown beside the field for comparison only', vf.exp === '' && vf.ref === '' && /nurse entered/.test(vf.note) && /May 8, 2028/.test(vf.note), JSON.stringify(vf));
+    t('v14.8 verifier: no on-device reader; AHA eCards lookup link offered', !vf.reader && vf.aha, JSON.stringify(vf));
     if (vp === 'mobile') t('verifier form fits the phone width', vf.side);
     t('no page errors', errs.length === 0, errs.join(' | '));
   } catch (e) { t('run', false, e.message); }
@@ -164,11 +160,12 @@ async function degrade(browser, engine) {
       await store.account.hydrate(); acctShow('acctPassportV10'); return { a, b };
     }, [PDF, PNG]);
     await pg.waitForTimeout(300);
-    const rescan = async id => { await pg.evaluate(id => document.querySelector(`[data-act="doc-rescan"][data-id="${id}"]`).click(), id); await pg.waitForFunction(() => { const b = document.getElementById('acctScanBoxV14'); return b && ['done', 'error', 'unsupported'].includes(b.dataset.state); }); return pg.evaluate(() => ({ st: document.getElementById('acctScanBoxV14').dataset.state, txt: document.getElementById('acctScanBoxV14').innerText })); };
-    const img = await rescan(ids.b);
-    t('no WebAssembly: image gets a friendly message offering manual entry', img.st === 'unsupported' && /type the details yourself/i.test(img.txt) && !RAW.test(img.txt), JSON.stringify(img));
-    const pdf = await rescan(ids.a);
-    t('PDF reader cannot load: friendly error offering manual entry, no raw JS error', pdf.st === 'error' && /type the details yourself/i.test(pdf.txt) && !RAW.test(pdf.txt), JSON.stringify(pdf));
+    /* v14.8: saved credentials have no re-scan; the add form's on-device safety check degrades instead */
+    const screenIn = async (b, n, ty) => { await pg.evaluate(() => { acctScreenReset(); acctRenderAll(); const w = $('acctAddWrapV10'); if (w.classList.contains('hidden')) document.querySelector('[data-act="toggle-add"]').click(); }); await pg.waitForSelector('#acctKindV10'); await pg.selectOption('#acctKindV10', 'CERT_BLS'); await pg.setInputFiles('#acctFileV10', { name: n, mimeType: ty, buffer: Buffer.from(b, 'base64') }); await pg.waitForFunction(() => { const x = document.getElementById('acctScreenBoxV148'); return x && ['clear', 'blocked', 'unreadable', 'unsupported', 'error'].includes(x.dataset.state); }); return pg.evaluate(() => ({ st: $('acctScreenBoxV148').dataset.state, txt: $('acctScreenBoxV148').innerText, exp: $('acctExpV10').value })); };
+    const img = await screenIn(PNG, 'nihss.png', 'image/png');
+    t('no WebAssembly: image gets a friendly message; the nurse types the details; nothing blocked or filled', ['unsupported', 'unreadable', 'error'].includes(img.st) && /type them exactly as printed/i.test(img.txt) && !RAW.test(img.txt) && img.exp === '', JSON.stringify(img));
+    const pdf = await screenIn(PDF, 'bls.pdf', 'application/pdf');
+    t('PDF reader cannot load: friendly message, no raw JS error; the nurse types the details', ['error', 'unreadable', 'unsupported'].includes(pdf.st) && /type them exactly as printed/i.test(pdf.txt) && !RAW.test(pdf.txt) && pdf.exp === '', JSON.stringify(pdf));
     const msg = await pg.evaluate(() => DocExtract.friendlyError(new TypeError("undefined is not a function (near '...t of e...')")));
     t('friendlyError hides raw JS errors', !RAW.test(msg) && msg.length > 20, msg);
   } catch (e) { t('run', false, e.message); }

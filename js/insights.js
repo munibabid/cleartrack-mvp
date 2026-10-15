@@ -9,7 +9,9 @@ function isCurrentVerified(c){const d=daysUntil(credExpiry(c));return isVerified
 function practiceAuthorization(list=creds){
  const set=new Map();
  list.filter(c=>isRnLicense(c)&&isCurrentVerified(c)).forEach(c=>{
-  if(c.kind==='RN_LICENSE')set.set(c.jurisdiction,'single-state license');
+  /* v14.8: since v14.5 every license is stored as RN_LICENSE + scope, so the old kind test called a
+     verified multistate license "single-state" (and the page said "no multistate license"). */
+  if(licenseScopeOf(c)!=='MULTISTATE'){if(!set.has(c.jurisdiction)||set.get(c.jurisdiction)==='NLC privilege')set.set(c.jurisdiction,'single-state license')}
   else if(nlcCanIssueMultistate(c.jurisdiction)){set.set(c.jurisdiction,'multistate home');US_JURISDICTIONS.filter(j=>nlcHonorsCompactIn(j.code)&&!set.has(j.code)).forEach(j=>set.set(j.code,'NLC privilege'))}
  });
  return set;
@@ -54,10 +56,10 @@ function needsManualReview(c){return['VERIFYING','UNVERIFIED'].includes(c.primar
 function clinicianAttention(){
  const t=taskSections(),out=[];
  t.required.forEach(b=>out.push({sev:1,icon:'○',text:`${b.item.label} — needed for ${b.assignments.map(a=>a.name).join(', ')}`,sub:b.item.note||'Required before submission',action:b.item.req?.kind==='REF_SPECIALTY'?{label:'Go to References',fn:`showV7View('referencesView')`}:{label:'Complete',fn:`completeMissingRequirement('${b.assignments[0].id}')`}}));
- t.missing.forEach(m=>out.push({sev:1,icon:'⚠',text:m.c?m.c.name:(catalogKind(m.kind)?.label||m.kind),sub:m.reason,action:{label:'Add',fn:`openAddForm({kind:'${m.c?m.c.kind:m.kind}',jurisdiction:'${m.c?.jurisdiction||''}'})`}}));
- t.exp30.filter(x=>!x.renewing).forEach(x=>out.push({sev:2,icon:'⏰',text:`${x.c.name} expires in ${x.d} day${x.d===1?'':'s'}`,sub:'Expiring within 30 days — renew',action:{label:'Renew',fn:`openRenewal(${x.c.id})`}}));
- t.awaiting.forEach(c=>out.push({sev:3,icon:'⏳',text:`${c.name} — awaiting verification`,sub:'In the Verification Console queue (simulated)',action:null}));
+ t.missing.forEach(m=>out.push({sev:1,icon:'⚠',text:m.c?credLabel(m.c):(catalogKind(m.kind)?.label||m.kind),sub:m.reason,action:{label:'Add',fn:`openAddForm({kind:'${m.c?m.c.kind:m.kind}',jurisdiction:'${m.c?.jurisdiction||''}'})`}}));
+ t.exp30.filter(x=>!x.renewing).forEach(x=>out.push({sev:2,icon:'⏰',text:`${credLabel(x.c)} expires in ${x.d} day${x.d===1?'':'s'}`,sub:'Expiring within 30 days — renew',action:{label:'Renew',fn:`openRenewal(${x.c.id})`}}));
+ t.awaiting.forEach(c=>out.push({sev:3,icon:'⏳',text:`${credLabel(c)} — awaiting verification`,sub:'In the Verification Console queue (simulated)',action:null}));
  loadShareRequests().filter(r=>r.status==='PENDING').forEach(r=>out.push({sev:2,icon:'⇆',text:`${r.orgName} requests longer Passport access`,sub:`${r.assignmentName} · through ${fd(r.requestedUntil)}`,action:{label:'Review',fn:`showV7View('shareView')`}}));
- t.renew.filter(x=>!x.renewing).forEach(x=>out.push({sev:4,icon:'↻',text:`${x.c.name} expires in ${x.d} days`,sub:'Renewal recommended (31–90 days)',action:{label:'Renew',fn:`openRenewal(${x.c.id})`}}));
+ t.renew.filter(x=>!x.renewing).forEach(x=>out.push({sev:4,icon:'↻',text:`${credLabel(x.c)} expires in ${x.d} days`,sub:'Renewal recommended (31–90 days)',action:{label:'Renew',fn:`openRenewal(${x.c.id})`}}));
  return out.sort((a,b)=>a.sev-b.sev);
 }
