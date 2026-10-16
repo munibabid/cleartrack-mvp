@@ -254,6 +254,7 @@ function renderPassportView(){
   return`<div class="task-category-v7"><div class="cathead"><b>${ec(g.title)}</b><span class="chip">${arr.length}</span></div>${g.note?`<div class="small pass-auth-v85">${ec(g.note)}</div>`:''}${extra}${arr.map(passportRowHtml).join('')}</div>`;
  }).join('');
  if(typeof renderEmploymentExperience==='function')renderEmploymentExperience();
+ if(typeof renderEducation==='function')renderEducation();
 }
 /* ---- Task Center (handoff §39) ---- */
 let renewalTargetV85=null;
