@@ -255,6 +255,7 @@ function renderPassportView(){
  }).join('');
  if(typeof renderEmploymentExperience==='function')renderEmploymentExperience();
  if(typeof renderEducation==='function')renderEducation();
+ if(typeof renderSecureShare==='function')renderSecureShare();
 }
 /* ---- Task Center (handoff §39) ---- */
 let renewalTargetV85=null;
