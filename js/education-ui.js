@@ -7,12 +7,12 @@ const EDU_RULE_PRESETS=[
  {id:'bsnreq',label:'BSN required',rule:{mode:'REQUIRED',minDegree:'BSN'}},
  {id:'bsnpref',label:'BSN preferred',rule:{mode:'PREFERRED',minDegree:'BSN'}}
 ];
-function eduLoad(){try{const s=JSON.parse(localStorage.getItem(EDU_STORE_KEY)||'null');if(s&&Array.isArray(s.records))return s}catch(e){}
+function eduLoad(){try{const s=store.adapter.readJSON(EDU_STORE_KEY,null);if(s&&Array.isArray(s.records))return s}catch(e){}
  const D=Education;let r=D.createEducation({degreeType:'ASN',institution:'Phoenix College',program:'Associate Degree in Nursing',gradDate:'2018'},{id:'edu-demo-asn',at:'2025-12-01T00:00:00Z'});
  r=D.appendEducationAttestation(r,{source:'National Student Clearinghouse (DEMO, simulated)',sourceType:'NATIONAL_STUDENT_CLEARINGHOUSE',verifier:'Veridun (DEMO)',confirms:{institution:'Phoenix College',degreeType:'ASN',gradDate:'2018-05'},at:'2026-01-10T00:00:00Z'});
  const b=D.createEducation({degreeType:'BSN',institution:'Arizona State University',program:'RN to BSN',gradDate:'2021'},{id:'edu-demo-bsn',at:'2025-12-01T00:00:00Z'});
  const s={skipped:false,records:[r,b]};eduSave(s);return s}
-function eduSave(s){try{localStorage.setItem(EDU_STORE_KEY,JSON.stringify(s))}catch(e){}}
+function eduSave(s){try{store.adapter.writeJSON(EDU_STORE_KEY,s)}catch(e){}}
 let eduState=null;
 const EDU_BADGE={'PRIMARY-SOURCE VERIFIED':'READY','DOCUMENT-SUPPORTED':'PENDING','SELF-ATTESTED':'PRIVATE',DISPUTED:'REVOKED'};
 const EDU_STATE_TEXT={'PRIMARY-SOURCE VERIFIED':'Primary-source verified','DOCUMENT-SUPPORTED':'Document uploaded — not verified','SELF-ATTESTED':'Self-attested',DISPUTED:'Disputed — needs review'};
