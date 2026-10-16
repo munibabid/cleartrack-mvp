@@ -9,7 +9,8 @@
      required  — counts toward assignment readiness
      preferred — shown to the nurse and the organization, never blocks
    Every module also requires, automatically:
-     - EMP_<ID>_VERIFIED  recent specialty experience, verified by an employer
+     - EMP_<ID>_VERIFIED  recent specialty experience (employer, RN role, dates and
+                          specialty each verified — see js/employment-experience.js)
                           (minimum months of work in a recent window — default
                           12 months in the last 24; organizations can change
                           it per requirement)

@@ -253,6 +253,7 @@ function renderPassportView(){
   const extra=g.cats[0]==='Licenses'?`<div class="small pass-auth-v85">Practice authorization: ${ms?`multistate (NLC) from ${ec(jurisdictionName(ms[0]))} — privilege in ${lic.filter(x=>x[1]==='NLC privilege').length+1} compact jurisdictions`:'no multistate license'}${single.length?` · single-state: ${single.map(j=>ec(jurisdictionName(j))).join(', ')}`:''}</div>`:'';
   return`<div class="task-category-v7"><div class="cathead"><b>${ec(g.title)}</b><span class="chip">${arr.length}</span></div>${g.note?`<div class="small pass-auth-v85">${ec(g.note)}</div>`:''}${extra}${arr.map(passportRowHtml).join('')}</div>`;
  }).join('');
+ if(typeof renderEmploymentExperience==='function')renderEmploymentExperience();
 }
 /* ---- Task Center (handoff §39) ---- */
 let renewalTargetV85=null;
