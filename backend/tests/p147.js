@@ -67,7 +67,7 @@ async function run(browser, name, vp, shots) {
   const lastAlert = () => alerts[alerts.length - 1] || '';
   try {
     await pg.goto(BASE, { waitUntil: 'networkidle' });
-    t('version label v14.7', await pg.evaluate(() => document.documentElement.textContent.includes('v14.7 demo')));
+    t('version label v14.8', await pg.evaluate(() => document.documentElement.textContent.includes('v14.8 demo') && !document.documentElement.textContent.includes('v14.7 demo')));
 
     /* ---------- 3. References are not credentials ---------- */
     const pick = await pg.evaluate(() => ({ picker: pickerCatalog().some(k => k.kind === 'REF_SPECIALTY' || /refer/i.test(k.label)), list: [...document.querySelectorAll('#kindListV82 option')].filter(o => /refer/i.test(o.value)).length, acct: /REF_SPECIALTY|Reference/i.test(acctKindOptions()), resolve: resolveCatalogKind('Specialty Reference Evaluation (manager or charge nurse)'), resolve2: resolveCatalogKind('REF_SPECIALTY') }));
