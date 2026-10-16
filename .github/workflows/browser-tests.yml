@@ -29,3 +29,4 @@ jobs:
       # v14.8: XRPL credential identity (opaque per-credential ledger id; mock ledger, no network)
       - run: node tests/xrpl-id-test.js
       - run: node tests/p148x.js
+      - run: node tests/proof-label-test.js
