@@ -20,8 +20,8 @@ function empSeedEpisodes(){const E=EmploymentExperience,t='2026-03-01T00:00:00.0
  let c=E.createEpisode({employer:'TravelCo Staffing (agency)',role:'RN',specialty:'ICU',subspecialty:'CVICU',start:'2021-03',end:'2022-05'},'NURSE_ENTRY',{id:'emp-demo-agency',at:'2025-12-01T00:00:00.000Z'});
  c=E.appendAttestation(c,{source:'W-2 and agency contract uploaded by nurse (demo)',verifier:'Veridun reviewer (DEMO)',evidenceLevel:'D',evidenceType:'W2_CONTRACT',confirms:{employer:'TravelCo Staffing',role:'RN',dates:{start:'2021-03',end:'2022-05'},specialty:'CVICU'},note:'Pay/contract records corroborate employment; they cannot prove specialty.',at:'2026-01-20T00:00:00.000Z'});
  return[a,b,c]}
-function empLoad(){try{const s=JSON.parse(localStorage.getItem(EMP_STORE_KEY)||'null');if(s&&s.v===EMP_SEED_VERSION&&Array.isArray(s.episodes))return s}catch(e){}const s={v:EMP_SEED_VERSION,episodes:empSeedEpisodes(),custom:{id:'CUSTOM',label:'Custom requirement',specialty:'ICU',minTotalMonths:24,minRecentMonths:12,recentLookbackMonths:24,lastWorkedWithinMonths:12,acceptedSubspecialties:[]}};empSave(s);return s}
-function empSave(s){try{localStorage.setItem(EMP_STORE_KEY,JSON.stringify(s))}catch(e){}}
+function empLoad(){try{const s=store.adapter.readJSON(EMP_STORE_KEY,null);if(s&&s.v===EMP_SEED_VERSION&&Array.isArray(s.episodes))return s}catch(e){}const s={v:EMP_SEED_VERSION,episodes:empSeedEpisodes(),custom:{id:'CUSTOM',label:'Custom requirement',specialty:'ICU',minTotalMonths:24,minRecentMonths:12,recentLookbackMonths:24,lastWorkedWithinMonths:12,acceptedSubspecialties:[]}};empSave(s);return s}
+function empSave(s){try{store.adapter.writeJSON(EMP_STORE_KEY,s)}catch(e){}}
 let empState=null,empDrafts=null;
 const EMP_BADGE={VERIFIED:'READY','CORROBORATED':'PENDING','SELF-ATTESTED':'PRIVATE',UNVERIFIED:'PENDING',DISPUTED:'REVOKED'};
 const EMP_ICON={VERIFIED:'✓',CORROBORATED:'◐','SELF-ATTESTED':'⚠',UNVERIFIED:'○',DISPUTED:'✕'};
