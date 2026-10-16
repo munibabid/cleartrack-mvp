@@ -158,7 +158,7 @@ const SPECIALTY_CERT_KINDS=[
 function specialtyCredentialKinds(){
  const w=SPECIALTY_EXPERIENCE_DEFAULT.windowMonths,m=SPECIALTY_EXPERIENCE_DEFAULT.minMonths;
  return[
-  ...SPECIALTIES.map(s=>({kind:s.expKind,label:`${s.short} experience: verified by an employer, within the last ${monthsText(w)}`,short:`${s.short} Experience`,recencyMonths:w,minMonths:m,experience:true,specialty:s.id,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification',keywords:'experience employment verification '+s.keywords})),
+  ...SPECIALTIES.map(s=>({kind:s.expKind,label:`${s.short} experience: recent work in the specialty within the last ${monthsText(w)} (employer, RN role, dates and specialty each verified)`,short:`${s.short} Experience`,recencyMonths:w,minMonths:m,experience:true,specialty:s.id,category:'Employment & HR',section:'Screening & Employment',privacy:'SHAREABLE',issuer:'Employer / HR verification',keywords:'experience employment verification '+s.keywords})),
   ...SPECIALTIES.map(s=>({kind:s.skillsKind,label:`${s.short} Skills Checklist (completed, attested)`,short:`${s.short} Skills Checklist`,specialty:s.id,category:'Clinical Qualifications',section:'Clinical Requirements',privacy:'SHAREABLE',issuer:'Clinician attestation · skills checklist',keywords:'skills checklist '+s.keywords}))
  ];
 }

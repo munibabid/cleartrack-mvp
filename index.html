@@ -110,6 +110,7 @@
   </div>
   <div id="v7PassportSummaryV85" class="pass-summary-v85"></div>
   <div id="v7PassportSections"></div>
+  <div id="empExpV149"></div>
   <div id="v7PassportRefsV146"></div>
 </div>
 <div id="referencesView" class="view"></div>
@@ -233,7 +234,7 @@
 <div id="licScopeRowV145" class="hidden"><b>License scope</b><div id="licScopeFixedV145" class="small hidden"></div><div id="licScopeChoiceV145" class="hidden"><label><input type="radio" name="licScopeV145" value="MULTISTATE"> Multistate (compact) — issued by your primary state of residence</label> <label><input type="radio" name="licScopeV145" value="SINGLE_STATE"> Single-state — covers this state only</label></div><div id="licScopeNoteV145" class="small" style="margin:0 0 12px"></div></div>
 <div id="otherRowV81" class="hidden"><label for="nm">Credential name</label><input id="nm" placeholder="e.g. Chemotherapy provider card"></div>
 <div id="experienceHelpV11" class="small hidden" style="margin:6px 0"></div>
-<div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years of experience in this specialty <span class="small">(optional)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
+<div id="experienceRowV11" class="hidden"><div class="grid2-v83"><div><label for="expYearsV11">Years in this specialty <span class="small">(optional · self-reported, never shown as verified)</span></label><input type="number" id="expYearsV11" min="0" max="60" step="0.5"></div><div><label for="expRecentV11">Months worked in the last 2 years <span class="small">(optional · self-reported)</span></label><input type="number" id="expRecentV11" min="0" max="24"></div></div><label for="expLastV11">Last worked in this specialty</label><input type="date" id="expLastV11"></div>
 <div id="skillsRowV144" class="hidden"><label for="skillsDoneV144">Completed on</label><input id="skillsDoneV144" type="date"><div class="small" id="skillsNoteV144">Skills checklists are usually provided by your agency or facility (often through a skills-checklist vendor) and are self-attested by you. They are never shown as verified. Suggested redo: 12 months after completion (calculated); the facility rule is final, and some facilities need a new checklist per assignment.</div></div>
 <div id="dtRowV144"><label for="dt">Expiration date <span class="small">(if it has one)</span></label><input id="dt" type="date"><div class="exp-confirm-v147" id="addExpConfirmV147"><label class="exp-confirm-lbl-v147"><input type="checkbox" id="addExpOkV147"> <span id="addExpOkTextV147">No expiration date on this document</span></label><div class="small" id="addExpOkStateV147">Required before saving.</div></div></div>
 <label for="fl">Source document (optional)</label><input id="fl" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"><div id="addScreenSlotV148"><div id="addScreenV148" class="capture-v148 small" data-state="none">Type the details exactly as printed on your document. Veridun doesn't fill them in from the file.</div></div>
@@ -305,6 +306,8 @@
 <script src="js/requirements.js?v=14.8"></script>
 <script src="js/assignments.js"></script>
 <script src="js/readiness-engine.js?v=14.8"></script>
+<script src="js/employment-experience.js?v=14.9"></script>
+<script src="js/employment-ui.js?v=14.9"></script>
 <script src="js/analytics.js"></script>
 <script src="js/verification.js?v=14.8"></script>
 <script src="js/ledger-identity.js?v=14.8"></script>

@@ -336,3 +336,14 @@ select optgroup{font-weight:700}
 .orig-issue-in-v147{display:flex;flex-direction:column;gap:2px;max-width:260px}
 .orig-issue-in-v147 input{font-size:16px}
 @media (max-width:600px){.verify-act-v147{align-items:stretch}.orig-issue-in-v147{max-width:none}}
+/* v14.9 Employment & Specialty Experience */
+.emp-card-v149{border:1px solid #d6dde8;border-radius:10px;padding:10px 12px;margin:6px 0;background:#f8fafc}
+.emp-kpis-v149{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:6px 0}
+.emp-ep-v149{border:1px solid #d6dde8;border-left-width:6px;border-radius:8px;padding:8px 10px;margin:6px 0}
+.emp-ep-v149.emp-strong{border-left-color:#15803d}.emp-ep-v149.emp-partial{border-left-color:#d97706;background:#fffbeb}.emp-ep-v149.emp-claim{border-left-color:#94a3b8;border-style:dashed;background:#f8fafc}
+.emp-fields-v149{list-style:none;padding:0;margin:4px 0;font-size:.9em}
+.emp-f-v149.emp-VERIFIED{color:#15803d}.emp-f-v149.emp-CORROBORATED{color:#b45309}.emp-f-v149.emp-SELFATTESTED{color:#b45309;font-style:italic}.emp-f-v149.emp-UNVERIFIED{color:#64748b}.emp-f-v149.emp-DISPUTED{color:#b91c1c;font-weight:700}
+.emp-hist-wrap-v149{overflow-x:auto}.emp-hist-v149{font-size:.8em}
+.emp-req-v149{margin:8px 0;border-top:1px solid #e2e8f0;padding-top:6px}
+.emp-draft-v149{border:1px dashed #94a3b8;border-radius:8px;padding:6px;margin:6px 0}
+.chk-inline-v149{display:inline-flex;gap:4px;align-items:center;margin-right:8px}
