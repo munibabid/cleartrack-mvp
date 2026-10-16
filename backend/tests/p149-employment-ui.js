@@ -22,7 +22,7 @@ const R = []; const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') +
     await pg.evaluate(() => { localStorage.removeItem('veridun_employment_v1'); v81ShowRole('clinician'); showV7View('passportView'); });
     await pg.waitForSelector('#empCardV149');
     const card = await pg.evaluate(() => ({ text: document.getElementById('empCardV149').innerText, v: document.getElementById('empVerifiedV149').innerText, c: document.getElementById('empClaimedV149').innerText, r: document.getElementById('empRecentV149').innerText, l: document.getElementById('empLastV149').innerText,
-      eps: [...document.querySelectorAll('.emp-ep-v149')].map(e => ({ s: e.dataset.strength, f: Object.fromEntries([...e.querySelectorAll('.emp-f-v149')].map(x => [x.dataset.field, x.dataset.status])), t: e.innerText })) }));
+      eps: [...document.querySelectorAll('#empCardV149 .emp-ep-v149')].map(e => ({ s: e.dataset.strength, f: Object.fromEntries([...e.querySelectorAll('.emp-f-v149')].map(x => [x.dataset.field, x.dataset.status])), t: e.innerText })) }));
     const asOf = new Date().toISOString().slice(0, 7);
     t('card shows verified total from the fully verified episode only (Sharp, Jan 2024–Feb 2026 = 2 years 2 months)', card.v === '2 years 2 months', card.v);
     t('claimed total is shown separately and is larger', /year/.test(card.c) && card.c !== card.v, card.c);
@@ -51,12 +51,12 @@ const R = []; const ok = (n, c, i = '') => { const l = (c ? 'PASS ' : 'FAIL ') +
     await pg.fill('.emp-draft-v149 .empDEmp', 'Mercy General Hospital');
     const beforeV = await pg.evaluate(() => document.getElementById('empVerifiedV149').innerText);
     await pg.click('#empSaveDraftsV149');
-    const after = await pg.evaluate(() => { const e = [...document.querySelectorAll('.emp-ep-v149')].find(x => /Mercy General Hospital/.test(x.innerText)); return { s: e && e.dataset.strength, t: e && e.innerText, v: document.getElementById('empVerifiedV149').innerText, c: document.getElementById('empClaimedV149').innerText }; });
+    const after = await pg.evaluate(() => { const e = [...document.querySelectorAll('#empCardV149 .emp-ep-v149')].find(x => /Mercy General Hospital/.test(x.innerText)); return { s: e && e.dataset.strength, t: e && e.innerText, v: document.getElementById('empVerifiedV149').innerText, c: document.getElementById('empClaimedV149').innerText }; });
     t('reviewed resume record saved with the nurse correction, as self-reported claim', after.s === 'claim' && /from resume/.test(after.t) && /self-reported/i.test(after.t), after);
     t('resume record does not change the verified total; claimed total grows', after.v === beforeV && after.c !== card.c, after);
     if (SHOTS) await pg.locator('#empCardV149').screenshot({ path: `${SHOTS}/${eng}-after-resume.png` });
     await pg.reload({ waitUntil: 'networkidle' }); await pg.evaluate(() => { v81ShowRole('clinician'); showV7View('passportView'); });
-    t('episodes persist in the browser-only demo store', await pg.evaluate(() => document.querySelectorAll('.emp-ep-v149').length === 4));
+    t('episodes persist in the browser-only demo store', await pg.evaluate(() => document.querySelectorAll('#empCardV149 .emp-ep-v149').length === 4));
     t('no horizontal page overflow', await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     t('no requests to external services (no model, no API)', ext.length === 0, ext);
     t('no page errors', errs.length === 0, errs);
