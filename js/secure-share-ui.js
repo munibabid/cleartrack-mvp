@@ -2,8 +2,8 @@
    recipient-bound links, access log, Audit Vault and the ?vsnap= verification page.
    Browser-only demo store. All verification states are DEMO (Veridun Verify is not active). */
 const SP_KEY='veridun_secure_share_v1';
-function spLoad(){try{const s=JSON.parse(localStorage.getItem(SP_KEY)||'null');if(s&&Array.isArray(s.grants))return s}catch(e){}return{grants:[],log:[],snapshots:[],revokedSnapshots:[]}}
-function spSave(s){try{localStorage.setItem(SP_KEY,JSON.stringify(s))}catch(e){}}
+function spLoad(){try{const s=store.adapter.readJSON(SP_KEY,null);if(s&&Array.isArray(s.grants))return s}catch(e){}return{grants:[],log:[],snapshots:[],revokedSnapshots:[]}}
+function spSave(s){try{store.adapter.writeJSON(SP_KEY,s)}catch(e){}}
 function spCategoryOf(kind){const k=String(kind||'');if(/^RN_LICENSE/.test(k))return'LICENSES';if(/^CERT_/.test(k))return'CERTIFICATIONS';if(/^EMP_/.test(k))return'EXPERIENCE';if(/^EDU_/.test(k))return'EDUCATION';if(/^HEALTH_/.test(k))return'SENSITIVE_HEALTH';if(/^SCREEN_/.test(k))return'BACKGROUND';return'COMPETENCIES'}
 /* Demo Passport → engine shape. Every verified state here comes from the demo seed: demoVerified:true. */
 function spPassport(){const list=(typeof creds!=='undefined'?creds:[]).filter(c=>!['REJECTED'].includes(c.primary));
